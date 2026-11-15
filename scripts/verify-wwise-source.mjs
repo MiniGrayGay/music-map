@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {resolveMusic} from '../src/features/bgm/musicGraph.js';
-import {readMusicDuration, readMusicMediaIndex} from './wwise-bank.mjs';
+import {readMusicDuration, readMusicMedia, readMusicMediaIndex} from './wwise-bank.mjs';
 import {buildMusicGraph, readMusicBanks} from './wwise-music-graph.mjs';
 import {homeTitles} from './wwise-home-titles.mjs';
 
 const {values: args} = parseArgs({options: {
   manifest: {type: 'string'}, 'audio-assets': {type: 'string'},
   'home-bgm-table': {type: 'string'}, textmap: {type: 'string'},
+  'title-catalog': {type: 'string'},
 }});
 if (!args.manifest) throw new Error('需要 --manifest 指定原始音区清单');
 if (Boolean(args['home-bgm-table']) !== Boolean(args.textmap)) {
@@ -86,6 +89,25 @@ for (let offset = 0; offset < mediaIds.length; offset += 24) {
   }));
 }
 console.log(`原始音乐 PCK 的 ${mediaIds.length} 个音源时长与试听清单一致`);
+
+const soundtrack = manifest.verification.soundtrackTitles;
+if (soundtrack) {
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const catalog = await readFile(args['title-catalog'] ?? new URL('./verified-soundtrack-titles.json', import.meta.url));
+  assert.equal(digest(catalog), soundtrack.catalogSha256, '曲名证据表指纹');
+  const library = Object.entries(JSON.parse(catalog)).filter(([, item]) => item.gameLibrary);
+  if (library.length) {
+    const ids = [...new Set(library.map(([, item]) => item.gameLibrary.mediaId))];
+    const recording = await readMusicMediaIndex(path.join(root, 'BeyondUGC'), ids, 'BeydMusic');
+    for (const [id, {title, gameLibrary: proof}] of library) {
+      const entry = recording.get(proof.mediaId);
+      assert.equal('BeyondUGC/' + path.basename(entry.packagePath), proof.media);
+      assert.equal(digest(await readMusicMedia(entry)), proof.mediaSha256, `音律库源录音 ${id}`);
+      assert.equal(graph.media[id].title, title, `音律库曲名 ${id}`);
+    }
+    console.log(`音律库 ${library.length} 首参考录音与曲名证据一致`);
+  }
+}
 
 if (args.textmap) {
   const evidence = manifest.verification.trackTitles;

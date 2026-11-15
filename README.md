@@ -120,6 +120,8 @@ pnpm run export:site --audio-base https://assets.example.org/teyvat/audio/
   现有英文曲名只有在音频指纹、分碟和曲序均吻合时才更新。
   有双语发行曲目表时，也可用 `--publisher-album Apple专辑编号:QQ专辑编号` 取得
   中文名，此路径核对发行者、英文名、分碟、曲序和原声时长。
+  音律库曲名的补充记录保留客户端事件、参考音源的 SHA-256 和固定偏移下的
+  波形对齐结果。运行 `verify-wwise-source.mjs` 会从本机 PCK 复核这些参考音源。
 - `pnpm run audio:extract` 从原始音乐 PCK 按音源编号提取 Wwise Vorbis，
   解码后生成浏览器可播的 Opus。新编码的文件有独立指纹，替换生产音频需要重新核对
   曲名证据。解码器用 `--decoder` 指定，编码器可用 `--ffmpeg` 指定。

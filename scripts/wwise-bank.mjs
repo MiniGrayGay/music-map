@@ -43,10 +43,12 @@ export async function readWwiseBank(packagePath, bankId) {
   }
 }
 
-export async function readMusicMediaIndex(directory, ids) {
+export async function readMusicMediaIndex(directory, ids, family = 'Music') {
+  if (!['Music', 'BeydMusic'].includes(family)) throw new Error(`未知音乐 PCK 家族 ${family}`);
   const wanted = new Set(ids);
   const entries = new Map();
-  const packages = (await readdir(directory)).filter((name) => /^Music\d+\.pck$/i.test(name));
+  const pattern = new RegExp(`^${family}\\d+\\.pck$`, 'i');
+  const packages = (await readdir(directory)).filter((name) => pattern.test(name));
   if (!packages.length) throw new Error(`目录里没有音乐 PCK ${directory}`);
   for (const name of packages) {
     const packagePath = path.join(directory, name);
