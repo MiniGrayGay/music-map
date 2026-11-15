@@ -106,6 +106,23 @@ if (titleEvidence) {
   soundtrack = JSON.parse(catalog);
   const matches = media.filter(([id]) => Object.hasOwn(soundtrack, id));
   if (matches.length !== titleEvidence.matchedMedia) throw new Error('曲名证据覆盖数与音区清单不一致');
+  await batches(matches, async ([id, track]) => {
+    const proof = soundtrack[id].arrangement;
+    if (!proof) return;
+    const reference = graph.media[proof.referenceId];
+    const stem = (name) => name?.replace(/_[^_]+$/, '');
+    if (!/^\d+$/.test(proof.referenceId) || id === proof.referenceId
+      || !reference?.titleState || reference.titleState !== proof.referenceState
+      || reference.title !== proof.referenceTitle || reference.name !== proof.referenceName
+      || track.name !== proof.assetName || reference.name === track.name
+      || stem(reference.name) !== stem(track.name)
+      || Math.abs(reference.duration - track.duration) > 0.5
+      || typeof proof.instrument !== 'string' || !proof.instrument
+      || track.title !== `${reference.title}（${proof.instrument}版）`
+      || await digest(path.join(audioSource, `${proof.referenceId}.opus`)) !== proof.referenceSha256) {
+      throw new Error(`音轨 ${id} 的演奏版本与已核实的原曲证据不符`);
+    }
+  });
 }
 const audioOutput = path.join(output, 'region-bgm-audio');
 await mkdir(audioOutput, {recursive: true});
