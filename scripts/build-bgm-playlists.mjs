@@ -4,10 +4,12 @@ import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {buildMusicGraph, readMusicBanks, rebuildAreaPlaylists} from './wwise-music-graph.mjs';
+import {readMusicClock} from './wwise-music-clock.mjs';
 
 const {values: args} = parseArgs({options: {
   bgm: {type: 'string'}, out: {type: 'string'}, 'game-exe': {type: 'string'},
   'audio-assets': {type: 'string'},
+  'init-package': {type: 'string', multiple: true},
 }});
 if (!args.bgm || !args.out) throw new Error('需要 --bgm 指定已核实的音乐区清单，并以 --out 指定新文件');
 const manifest = JSON.parse(await readFile(args.bgm, 'utf8'));
@@ -25,6 +27,12 @@ if (executable.digest('hex') !== manifest.source.clientExecutableSha256) {
 const {objects} = await readMusicBanks(folder, fingerprints);
 const entry = manifest.musicGraph.root;
 manifest.musicGraph.nodes = buildMusicGraph(objects, entry);
+const clockInputs = args['init-package'] ?? Object.keys(manifest.verification.musicClock?.banks ?? {});
+if (clockInputs.length) {
+  const {clock, evidence} = await readMusicClock(folder, clockInputs, manifest.musicGraph);
+  manifest.musicGraph.clock = clock;
+  manifest.verification.musicClock = evidence;
+}
 rebuildAreaPlaylists(manifest);
 await writeFile(args.out, `${JSON.stringify(manifest)}\n`, {flag: 'wx'});
 console.log(`从客户端重建了 ${Object.keys(manifest.musicGraph.nodes).length} 条音乐节点与 ${Object.keys(manifest.music).length} 个地点状态`);

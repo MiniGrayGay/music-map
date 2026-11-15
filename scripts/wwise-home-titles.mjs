@@ -1,16 +1,9 @@
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import {shortId} from './wwise-bank.mjs';
 import {buildMusicGraph, derivePlaylist} from './wwise-music-graph.mjs';
 
 const homeGroup = 'StateGroup_musicHomeWorld';
-
-function shortId(name) {
-  let result = 2166136261;
-  for (const code of Buffer.from(name.toLowerCase(), 'ascii')) {
-    result = Math.imul(result, 16777619) ^ code;
-  }
-  return result >>> 0;
-}
 
 async function readProvenJson(file, expected) {
   const input = await readFile(file);

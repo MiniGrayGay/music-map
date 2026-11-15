@@ -1,6 +1,14 @@
 import {open, readdir} from 'node:fs/promises';
 import path from 'node:path';
 
+export function shortId(name) {
+  let result = 2166136261;
+  for (const code of Buffer.from(name.toLowerCase(), 'ascii')) {
+    result = Math.imul(result, 16777619) ^ code;
+  }
+  return result >>> 0;
+}
+
 async function readExactly(file, size, position) {
   const result = Buffer.allocUnsafe(size);
   for (let offset = 0; offset < size;) {

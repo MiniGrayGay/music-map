@@ -772,6 +772,56 @@ async function main() {
       === `1 / ${cityTracks(dayEntry.key).length}`,
     '切回白天计数回到白天曲目数');
 
+    if (bgmManifest.musicGraph.clock) {
+      const trigger = 'button[aria-label="设置试听时间"]';
+      const range = 'input[aria-label="试听时间"]';
+      await page.click(trigger);
+      await page.waitForSelector(range, {visible: true});
+      check(await page.$eval(range, (input) => input === document.activeElement),
+        '打开试听时间后键盘直接调节时钟');
+      await page.$eval(range, (input) => {
+        input.value = '302';
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+      });
+      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
+      await page.keyboard.press('ArrowRight');
+      await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
+      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '05:03'),
+        '枫丹廷按音乐曲线在 05:02 与 05:03 之间切换到白天');
+      await page.$eval(range, (input) => {
+        input.value = '1020';
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+      });
+      await page.keyboard.press('ArrowRight');
+      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
+      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '17:01'),
+        '枫丹廷按音乐曲线在 17:00 与 17:01 之间切换到夜间');
+      await page.screenshot({path: path.join(shotDir, '19-audition-clock.png')});
+      await page.keyboard.press('Home');
+      await page.waitForFunction(() => !document.querySelector('.music-player audio')?.hasAttribute('src'));
+      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '00:00'),
+        '00:00 使用 Wwise 缺省分支');
+      await page.keyboard.press('ArrowRight');
+      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
+      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '00:01'),
+        '跨过缺省分支后恢复正在试听的意图');
+      const viewport = page.viewport();
+      await page.setViewport({...viewport, width: 320, height: 640});
+      check(await page.$eval('.clock-row', (row) => {
+        const bounds = row.getBoundingClientRect();
+        return bounds.top >= 0 && bounds.right <= innerWidth
+          && row.querySelector('input').getBoundingClientRect().width >= 90;
+      }), '320px 窄窗中试听时间的滑杆与读数完整显示');
+      await page.screenshot({path: path.join(shotDir, '20-narrow-audition-clock.png')});
+      await page.setViewport(viewport);
+      await page.keyboard.press('Escape');
+      check(await page.$(range) === null
+        && await page.$eval(trigger, (button) => button === document.activeElement),
+      'Escape 关闭试听时间并归还焦点');
+      await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
+      await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
+    }
+
     // 战斗回探索：身份保持，尊重前次昼夜选择。
     await page.click('.modes[aria-label="音乐模式"] button:nth-child(2)');
     const combatTracks = cityResolve('combat');

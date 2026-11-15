@@ -2,7 +2,7 @@
 import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch} from 'vue';
 // 域 API 不再返回 alternatives：播放器只呈现选中地点在当前条件下的真实曲目。
 import {BGM_MODES} from '../features/bgm/bgmStatus.js';
-import {resolveMusic} from '../features/bgm/musicGraph.js';
+import {musicClockPreset, musicClockState, resolveMusic} from '../features/bgm/musicGraph.js';
 import {useMusicMediaSession} from '../features/bgm/useMusicMediaSession.js';
 import {useMusicTransport} from '../features/bgm/useMusicTransport.js';
 import {pushEscapeHandler} from './escapeStack.js';
@@ -20,18 +20,31 @@ const audioRef = ref(null);
 const trackIndex = ref(0);
 const drawer = ref(null);
 const drawerTrigger = ref(null);
+const clockInput = ref(null);
 const seekDraft = ref(null);
+const auditionMinute = ref(null);
+const clockDraft = ref(null);
 const overrides = reactive({});
 let loadedTrackId;
+let resumeAfterEmpty = false;
 
+const clock = computed(() => props.zone.graph?.clock);
 const selection = computed(() => {
   if (props.zone.graph) {
-    return resolveMusic(props.zone.graph, props.zone.musicState, props.mode, overrides);
+    const time = clock.value;
+    const states = time && auditionMinute.value !== null
+      ? {...overrides, [time.group]: musicClockState(time, auditionMinute.value)} : overrides;
+    return resolveMusic(props.zone.graph, props.zone.musicState, props.mode, states);
   }
   const branch = props.zone.playlists[props.mode][0];
   return {tracks: branch.tracks, conditions: [], incomplete: branch.incomplete};
 });
 const dayNight = computed(() => selection.value.conditions.find((group) => group.title === '昼夜'));
+const hasClock = computed(() => Boolean(clock.value && dayNight.value?.id === clock.value.group));
+const dayNightKey = computed(() => hasClock.value && auditionMinute.value !== null
+  ? musicClockState(clock.value, auditionMinute.value) : dayNight.value?.value);
+const clockMinute = computed(() => clockDraft.value ?? auditionMinute.value
+  ?? (hasClock.value ? musicClockPreset(clock.value, dayNightKey.value) : 0));
 // 「播放条件」只收已核实的开关：组名与全部选项 label 都经证实才展示。
 // 未命名开关的语义留在数据层，界面不出现「未命名条件 N」或拿曲名冒充的
 // 条件选项；变体曲目组合只通过曲目列表按当前条件试听。
@@ -90,7 +103,8 @@ const conditionGroups = computed(() => advanced.value.map((group) => ({
 })));
 
 function pickDefaultCondition() {
-  if (tracks.value.length || !dayNight.value || dayNight.value.value) return;
+  if (tracks.value.length || !dayNight.value || dayNight.value.value
+    || (clock.value && auditionMinute.value !== null)) return;
   const daytime = dayNight.value.entries.find((entry) => entry.label === '白天');
   if (daytime) overrides[dayNight.value.id] = daytime.key;
 }
@@ -100,7 +114,7 @@ watch([() => props.zone, () => props.mode], ([zone], [previous]) => {
   trackIndex.value = 0;
   pickDefaultCondition();
   if (zone === previous && previousId) keepTrack(previousId);
-  loadTrack(zone !== previous ? true : requested.value);
+  loadTrack(zone !== previous || requested.value || resumeAfterEmpty);
 });
 
 function keepTrack(id) {
@@ -108,9 +122,11 @@ function keepTrack(id) {
   trackIndex.value = Math.max(0, index);
 }
 
-function loadTrack(autoplay = requested.value) {
+function loadTrack(autoplay = requested.value || resumeAfterEmpty) {
   seekDraft.value = null;
   loadedTrackId = track.value?.id;
+  // A curve can temporarily select an unassigned branch, such as exact midnight.
+  resumeAfterEmpty = autoplay && !track.value;
   load(track.value, {autoplay});
 }
 
@@ -131,6 +147,25 @@ function selectCondition(group, value) {
   overrides[group.id] = value;
   keepTrack(previousId);
   loadTrack();
+}
+
+function setAuditionMinute(minute) {
+  const previousId = track.value?.id;
+  auditionMinute.value = minute;
+  clockDraft.value = null;
+  keepTrack(previousId);
+  if (track.value?.id !== previousId) loadTrack();
+}
+
+function selectDayPhase(key) {
+  if (hasClock.value) setAuditionMinute(musicClockPreset(clock.value, key));
+  else selectCondition(dayNight.value, key);
+}
+
+function clockLabel(minute) {
+  const hours = String(Math.floor(minute / 60)).padStart(2, '0');
+  const minutes = String(minute % 60).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 function onEnd() {
@@ -162,12 +197,14 @@ function toggleDrawer(id, event) {
   }
   drawerTrigger.value = event.currentTarget;
   drawer.value = id;
+  if (id === 'clock') void nextTick(() => clockInput.value?.focus());
 }
 
-watch([() => tracks.value.length, () => advanced.value.length],
-  ([count, groups]) => {
+watch([() => tracks.value.length, () => advanced.value.length, hasClock],
+  ([count, groups, canSetTime]) => {
     if ((drawer.value === 'rules' && !groups)
       || (drawer.value === 'tracks' && count < 2)
+      || (drawer.value === 'clock' && !canSetTime)
       || (drawer.value === 'volume' && !count)) {
       drawer.value = null;
     }
@@ -218,8 +255,14 @@ onBeforeUnmount(() => {
     <div v-if="dayNight" class="modes" role="group" aria-label="昼夜">
       <button v-for="entry in dayNight.entries" :key="entry.key" type="button"
               :data-value="entry.key"
-              :aria-pressed="dayNight.value === entry.key" @click="selectCondition(dayNight, entry.key)">
+              :aria-pressed="dayNightKey === entry.key" @click="selectDayPhase(entry.key)">
         {{ conditionLabel(entry) }}
+      </button>
+      <button v-if="hasClock" type="button" class="clock-toggle"
+              aria-label="设置试听时间" :aria-expanded="drawer === 'clock'"
+              :aria-controls="drawer === 'clock' ? flyoutId : null"
+              @click="toggleDrawer('clock', $event)">
+        {{ auditionMinute === null || drawer === 'clock' ? '时刻' : clockLabel(auditionMinute) }}
       </button>
     </div>
 
@@ -295,7 +338,7 @@ onBeforeUnmount(() => {
     </div>
 
     <section v-if="drawer" :id="flyoutId" class="player-drawer"
-             :aria-label="{tracks: '歌曲列表', rules: '播放条件', volume: '音量设置'}[drawer]">
+             :aria-label="{tracks: '歌曲列表', rules: '播放条件', volume: '音量设置', clock: '试听时间'}[drawer]">
       <ScrollPane v-if="drawer === 'tracks'" label="歌曲列表滚动">
         <ul class="track-list">
           <li v-for="(entry, index) in tracks" :key="entry.id">
@@ -314,6 +357,15 @@ onBeforeUnmount(() => {
                       @update:model-value="(value) => selectCondition(group, value)" />
         </div>
       </ScrollPane>
+      <div v-else-if="drawer === 'clock'" class="volume-row clock-row">
+        <input ref="clockInput" class="progress" type="range" min="0" max="1439" step="1" aria-label="试听时间"
+               :aria-valuetext="clockLabel(clockMinute)" :value="clockMinute"
+               :style="{'--progress': `${clockMinute / 1439 * 100}%`}"
+               @input="clockDraft = Number($event.target.value)"
+               @change="setAuditionMinute(Number($event.target.value))"
+               @pointercancel="clockDraft = null" @blur="clockDraft = null" />
+        <output>{{ clockLabel(clockMinute) }}</output>
+      </div>
       <div v-else class="volume-row">
         <button type="button" class="conditions-toggle" :aria-pressed="muted"
                 @click="toggleMute">静音</button>
@@ -453,11 +505,18 @@ button:disabled { opacity: .38; cursor: default; }
   font-size: 13px;
 }
 .modes button[aria-pressed="true"], .track-list button[aria-current],
-.audio-options button[aria-pressed="true"], .volume-row button[aria-pressed="true"] {
+.audio-options button[aria-pressed="true"], .volume-row button[aria-pressed="true"],
+.modes .clock-toggle[aria-expanded="true"] {
   border-color: rgb(155 232 241 / .38);
   background: var(--control-hover);
   color: var(--accent-cyan);
 }
+.modes .clock-toggle {
+  flex: 0 0 56px;
+  font-variant-numeric: tabular-nums;
+}
+.clock-row { min-height: 36px; }
+.clock-row output { min-width: 5ch; }
 /* 曲数只是状态文本：与时间同款排版，不包裹按钮、不接受焦点。 */
 .count, .time {
   flex: none;

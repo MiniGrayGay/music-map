@@ -6,6 +6,7 @@ import {parseArgs} from 'node:util';
 import {resolveMusic} from '../src/features/bgm/musicGraph.js';
 import {readMusicDuration, readMusicMedia, readMusicMediaIndex} from './wwise-bank.mjs';
 import {buildMusicGraph, readMusicBanks} from './wwise-music-graph.mjs';
+import {readMusicClock} from './wwise-music-clock.mjs';
 import {homeTitles} from './wwise-home-titles.mjs';
 
 const {values: args} = parseArgs({options: {
@@ -40,6 +41,14 @@ for (const [id, node] of Object.entries(source)) {
 console.log(`可达音乐节点 ${Object.keys(source).length} 条与发布清单逐字段一致`, Object.fromEntries(counts));
 
 const graph = {...manifest.musicGraph, nodes: source};
+if (graph.clock) {
+  const proof = manifest.verification.musicClock;
+  assert.ok(proof?.banks, '试听时间必须有初始化 Bank 的来源证据');
+  const {clock, evidence} = await readMusicClock(root, Object.keys(proof.banks), graph);
+  assert.deepEqual(evidence, proof, '音乐时段来源指纹');
+  assert.deepEqual(clock, graph.clock, '音乐时段曲线参数');
+  console.log(`音乐时段 ${clock.points.length} 个采样点与初始化 Bank 一致`);
+}
 const areas = Object.values(manifest.music);
 for (const {wwiseId, playlists} of areas) {
   for (const [mode, expectedList] of Object.entries(playlists)) {

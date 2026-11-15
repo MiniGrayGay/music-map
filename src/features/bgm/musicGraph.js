@@ -5,6 +5,31 @@ const playlistId = (tracks) => tracks.map(({id}) => id).join(',');
 const switchIndex = new WeakMap();
 const randomModes = new Map([[2, 'continuousRandom'], [3, 'stepRandom']]);
 
+export function musicClockState(clock, minute) {
+  // Wwise stores the switch breakpoints as single-precision values.
+  const hour = Math.fround(minute / 60);
+  let state = 0;
+  for (const [start, key] of clock.points) {
+    if (start > hour) break;
+    state = key;
+  }
+  return state;
+}
+
+export function musicClockPreset(clock, state) {
+  let longest = 0;
+  let minute = 0;
+  for (let index = 1; index < clock.points.length; index += 1) {
+    const [start, key] = clock.points[index - 1];
+    const [end] = clock.points[index];
+    if (key !== state || end - start <= longest) continue;
+    longest = end - start;
+    minute = Math.round((start + end) * 30);
+  }
+  const wholeHour = Math.round(minute / 60) * 60;
+  return musicClockState(clock, wholeHour) === state ? wholeHour : minute;
+}
+
 function indexedSwitch(node) {
   if (switchIndex.has(node)) return switchIndex.get(node);
   const tree = {children: new Map()};
