@@ -1,6 +1,6 @@
 import {execFile} from 'node:child_process';
 import {constants} from 'node:fs';
-import {copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile} from 'node:fs/promises';
+import {copyFile, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, promisify} from 'node:util';
@@ -24,12 +24,15 @@ async function statIfPresent(file) {
 
 async function validateDestination(output) {
   const status = await statIfPresent(output);
-  if (!status) return false;
+  if (!status) return null;
   if (!status.isDirectory() || status.isSymbolicLink()) {
     throw new Error(`导出目标不是普通目录 ${output}`);
   }
   const entries = await readdir(output, {recursive: true, withFileTypes: true});
-  if (!entries.length) return true;
+  if (!entries.length) return {files: [], directories: []};
+  if (entries.some((entry) => !entry.isFile() && !entry.isDirectory())) {
+    throw new Error(`导出目录包含链接或其他非普通内容 ${output}`);
+  }
   const stamp = await readFile(path.join(output, marker), 'utf8').then(JSON.parse, (error) => {
     if (error.code !== 'ENOENT') throw error;
     throw new Error(`导出目标包含其他文件 ${output}`);
@@ -46,12 +49,16 @@ async function validateDestination(output) {
       directories.add(directory);
     }
   }
+  const snapshot = {files: [], directories: []};
   for (const entry of entries) {
     const file = path.relative(output, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
-    if ((entry.isFile() && owned.has(file)) || (entry.isDirectory() && directories.has(file))) continue;
-    throw new Error(`导出目录中有未登记的文件 ${file}`);
+    if (entry.isFile() && owned.has(file)) snapshot.files.push(file);
+    else if (entry.isDirectory() && directories.has(file)) snapshot.directories.push(file);
+    else throw new Error(`导出目录中有未登记的文件 ${file}`);
   }
-  return true;
+  snapshot.files.sort();
+  snapshot.directories.sort();
+  return snapshot;
 }
 
 async function discardGenerated(target) {
@@ -75,12 +82,8 @@ async function assetSize(root, relative) {
 
 async function copyAsset(source, target) {
   await mkdir(path.dirname(target), {recursive: true});
-  try {
-    await link(source, target);
-  } catch (error) {
-    if (!['EXDEV', 'ENOTSUP', 'EPERM'].includes(error.code)) throw error;
-    await copyFile(source, target, constants.COPYFILE_EXCL);
-  }
+  // Exported files must stay independent of source files rewritten by a later build.
+  await copyFile(source, target, constants.COPYFILE_EXCL | constants.COPYFILE_FICLONE);
 }
 
 async function renameDirectory(source, target) {
@@ -95,6 +98,110 @@ async function renameDirectory(source, target) {
     }
   }
   await rename(source, target);
+}
+
+async function copyFiles(source, target, files) {
+  for (let index = 0; index < files.length; index += 32) {
+    const batch = await Promise.allSettled(files.slice(index, index + 32).map((relative) =>
+      copyAsset(path.join(source, relative), path.join(target, relative))));
+    const failure = batch.find(({status}) => status === 'rejected');
+    if (failure) throw failure.reason;
+  }
+}
+
+async function createDirectories(output, directories) {
+  for (const relative of directories) await mkdir(path.join(output, relative), {recursive: true});
+}
+
+async function missingSnapshotFiles(output, snapshot) {
+  const status = await statIfPresent(output);
+  if (!status) return snapshot.files;
+  if (!status.isDirectory() || status.isSymbolicLink()) throw new Error(`待恢复路径已改变 ${output}`);
+  const missing = new Set(snapshot.files);
+  const directories = new Set(snapshot.directories);
+  for (const entry of await readdir(output, {recursive: true, withFileTypes: true})) {
+    const relative = path.relative(output, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
+    if (entry.isFile() && missing.delete(relative)) continue;
+    if (entry.isDirectory() && directories.has(relative)) continue;
+    throw new Error(`待恢复目录出现未登记内容 ${relative}`);
+  }
+  return [...missing];
+}
+
+async function copySite(source, target, snapshot) {
+  await mkdir(target);
+  try {
+    await createDirectories(target, snapshot.directories);
+    await copyFiles(source, target, snapshot.files.filter((name) => name !== 'index.html' && name !== marker));
+    for (const relative of ['index.html', marker]) {
+      if (snapshot.files.includes(relative)) await copyAsset(path.join(source, relative), path.join(target, relative));
+    }
+    if (JSON.stringify(await validateDestination(target)) !== JSON.stringify(snapshot)) {
+      throw new Error(`复制后的站点文件不完整 ${target}`);
+    }
+  } catch (error) {
+    try {
+      await missingSnapshotFiles(target, snapshot);
+      await discardGenerated(target);
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], `无法清理未完成的站点 ${target}`);
+    }
+    throw error;
+  }
+}
+
+function isWindowsRenameLock(error) {
+  return process.platform === 'win32' && ['EPERM', 'EACCES', 'EBUSY'].includes(error.code);
+}
+
+async function installSite(source, target, snapshot) {
+  try {
+    await renameDirectory(source, target);
+  } catch (error) {
+    if (!isWindowsRenameLock(error) || await statIfPresent(target)) throw error;
+    await copySite(source, target, snapshot);
+  }
+}
+
+async function restoreAfterRemovalFailure(output, prior, snapshot) {
+  if (!await statIfPresent(output)) {
+    await installSite(prior, output, snapshot);
+    await discardGenerated(prior);
+    return;
+  }
+  const missing = await missingSnapshotFiles(output, snapshot);
+  await createDirectories(output, snapshot.directories);
+  await copyFiles(prior, output, missing);
+  await discardGenerated(prior);
+}
+
+async function preserveDestination(output, prior, snapshot) {
+  try {
+    await renameDirectory(output, prior);
+    return;
+  } catch (error) {
+    if (!isWindowsRenameLock(error)) throw error;
+  }
+  // Windows may block a directory rename while permitting removal of the generated snapshot.
+  await copySite(output, prior, snapshot);
+  try {
+    const current = await validateDestination(output);
+    if (JSON.stringify(current) !== JSON.stringify(snapshot)) throw new Error(`导出目录在打包时发生变化 ${output}`);
+  } catch (error) {
+    await discardGenerated(prior);
+    throw error;
+  }
+  try {
+    await discardGenerated(output);
+  } catch (error) {
+    try {
+      await restoreAfterRemovalFailure(output, prior, snapshot);
+    } catch (restoreError) {
+      throw new AggregateError([error, restoreError], `无法恢复旧站点，已保留 ${prior}`);
+    }
+    throw error;
+  }
+  console.log('Windows 目录改名受限，已保留上一版快照并释放导出目录');
 }
 
 export async function exportStaticSite({source = dist, output = path.join(dist, 'site'), audioBase}) {
@@ -152,23 +259,32 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   try {
     const replace = await validateDestination(output);
     await mkdir(path.join(stage, 'data'));
-    for (let index = 0; index < relativeFiles.length; index += 32) {
-      const batch = await Promise.allSettled(relativeFiles.slice(index, index + 32).map((relative) =>
-        copyAsset(path.join(source, relative), path.join(stage, relative))));
-      const failure = batch.find(({status}) => status === 'rejected');
-      if (failure) throw failure.reason;
-    }
+    await copyFiles(source, stage, relativeFiles);
     await writeFile(path.join(stage, 'data/genshin-region-bgm.json'), manifest, {flag: 'wx'});
     await writeFile(path.join(stage, marker), stamp, {flag: 'wx'});
     await writeFile(path.join(stage, 'index.html'), index, {flag: 'wx'});
-    if (replace) await renameDirectory(output, prior);
+    const snapshot = await validateDestination(stage);
+    if (replace) await preserveDestination(output, prior, replace);
     try {
-      await renameDirectory(stage, output);
+      await installSite(stage, output, snapshot);
     } catch (error) {
-      if (replace) await renameDirectory(prior, output);
+      if (replace) {
+        try {
+          await installSite(prior, output, replace);
+          await discardGenerated(prior);
+        } catch (restoreError) {
+          throw new AggregateError([error, restoreError], `无法恢复旧站点，已保留 ${prior}`);
+        }
+      }
       throw error;
     }
-    if (replace) await discardGenerated(prior);
+    if (replace) {
+      const kept = await validateDestination(prior);
+      if (JSON.stringify(kept) !== JSON.stringify(replace)) {
+        throw new Error(`新站点已导出，备份目录发生变化并已保留 ${prior}`);
+      }
+      await discardGenerated(prior);
+    }
   } finally {
     await discardGenerated(stage);
   }

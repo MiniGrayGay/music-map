@@ -115,6 +115,10 @@ try {
   media = await startServer(path.join(release, 'region-bgm-audio'), {media: true});
   const output = path.join(qa, 'site');
   const firstExport = await exportStaticSite({source: release, output, audioBase: `${media.origin}/old`});
+  const [faviconSource, faviconSnapshot] = await Promise.all([release, output].map((directory) =>
+    lstat(path.join(directory, 'favicon.svg'), {bigint: true})));
+  assert.ok(faviconSource.dev !== faviconSnapshot.dev || faviconSource.ino !== faviconSnapshot.ino,
+    '导出文件必须与下次构建可能改写的源文件独立');
   const exported = await exportStaticSite({source: release, output, audioBase: `${media.origin}/music`});
   assert.equal(exported.files, firstExport.files);
   const ownNote = path.join(output, 'local-note.txt');
