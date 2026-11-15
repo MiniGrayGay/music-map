@@ -1,0 +1,57 @@
+/* 提瓦特区域图：全局样式与语义令牌。深色地图工作面，无装饰性层级。 */
+
+:root {
+  --surface-page: #10141b;
+  --surface-overlay: rgba(16, 20, 27, 0.88);
+  --surface-overlay-border: rgba(214, 226, 240, 0.16);
+  --text-primary: #e8eef5;
+  --text-secondary: #a7b4c4;
+  --region-stroke: rgba(219, 244, 249, 0.62);
+  --region-stroke-hover: #cefcff;
+  --region-fill-hover: rgba(83, 215, 232, 0.24);
+  --region-fill-selected: rgba(83, 215, 232, 0.32);
+  --control-focus: #9be8f1;
+  --accent-cyan: #53d7e8;
+  --control-hover: rgba(155, 232, 241, 0.16);
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* 键盘焦点统一可见；组件内可用更高优先级自定义样式，但不允许静默吞掉焦点。 */
+:focus-visible {
+  outline: 2px solid var(--control-focus);
+  outline-offset: 2px;
+}
+
+/* 减少动效：跟随系统设置关闭过渡与动画，只保留状态切换的最终态。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,14 @@
+/node_modules/
+/.vercel/
+/.env
+/.env.*
+/public/data/map-data.json
+/scripts/*.py
+/dist/*
+!/dist/data/
+!/dist/layers/
+!/dist/tiles/
+!/dist/region-bgm-audio/
+/dist/data/*
+!/dist/data/map-data.json
+!/dist/data/genshin-region-bgm.json

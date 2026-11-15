@@ -1,0 +1,14 @@
+{
+  "source": {
+    "file": "E:/vueProjects/bettergi-map/src/config/mapConfig.js",
+    "verifiedBy": "map-editor-conversion-report.json consumer[] sha256 fingerprints; constants define the same CoordinateConverter used to project every layer's proven world position onto its map canvas",
+    "formula": "world(x,z) -> canvas: px=(leftCols+1)*1024-x; py=(rows*1024)-((rows*1024)-((upRows+1)*1024-z)); pixelScale multiplies both axes"
+  },
+  "maps": {
+    "Teyvat": {"size": [22528, 19456], "gameMapRows": 19, "gameMapCols": 22, "gameMapUpRows": 11, "gameMapLeftCols": 15, "pixelScale": 1, "origin": null},
+    "SeaOfBygoneEras": {"size": [4096, 3072], "gameMapRows": 3, "gameMapCols": 4, "gameMapUpRows": 2, "gameMapLeftCols": 5, "pixelScale": 1, "origin": [6144, 3072]},
+    "AncientSacredMountain": {"size": [4096, 4096], "gameMapRows": 4, "gameMapCols": 4, "gameMapUpRows": 1, "gameMapLeftCols": 1, "pixelScale": 1, "origin": [2048, 2048]},
+    "TempleOfSpace": {"size": [3072, 4096], "gameMapRows": 4, "gameMapCols": 3, "gameMapUpRows": 1, "gameMapLeftCols": 1, "pixelScale": 1, "origin": [2048, 2048]},
+    "MoonCanon": {"size": [17408, 9216], "gameMapRows": 9, "gameMapCols": 17, "gameMapUpRows": 3, "gameMapLeftCols": 10, "pixelScale": 1, "origin": [11264, 4096]}
+  }
+}
