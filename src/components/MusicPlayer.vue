@@ -1,5 +1,6 @@
 <script setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch} from 'vue';
+// 域 API 不再返回 alternatives：播放器只呈现选中地点在当前条件下的真实曲目。
 import {BGM_MODES} from '../features/bgm/bgmStatus.js';
 import {resolveMusic} from '../features/bgm/musicGraph.js';
 import {useMusicMediaSession} from '../features/bgm/useMusicMediaSession.js';
@@ -32,17 +33,12 @@ const selection = computed(() => {
 });
 const dayNight = computed(() => selection.value.conditions.find((group) => group.title === '昼夜'));
 // 「播放条件」只收已核实的开关：组名与全部选项 label 都经证实才展示。
-// 未命名开关的语义留在数据层，其变体曲目组合由「其他曲单」按曲单提供
-// 试听，界面不再出现「未命名条件 N」或拿曲名冒充的条件选项。
+// 未命名开关的语义留在数据层，界面不出现「未命名条件 N」或拿曲名冒充的
+// 条件选项；变体曲目组合只通过曲目列表按当前条件试听。
 const advanced = computed(() => selection.value.conditions.filter((group) =>
   group !== dayNight.value && group.named && group.entries.every((entry) => entry.label)));
 // 解析层已按源编号序列全局去重，这里直接透传，不再复制去重。
-const alternatives = computed(() => selection.value.alternatives ?? []);
-const alternativeId = ref(null);
-const expandedAlt = ref(null);
-const activeAlternative = computed(() =>
-  alternatives.value.find((alt) => alt.id === alternativeId.value) ?? null);
-const tracks = computed(() => activeAlternative.value?.tracks ?? selection.value.tracks);
+const tracks = computed(() => selection.value.tracks);
 const track = computed(() => tracks.value[trackIndex.value]);
 const transport = useMusicTransport(audioRef, onEnd);
 const {
@@ -79,24 +75,6 @@ function conditionLabel(entry) {
   return entry.label ?? entry.firstTrack ?? '未核对曲名';
 }
 
-// 曲目抽屉首行：讲清列表来历，并区分两种行为——原游戏在当前条件下如何
-// 取曲（解析器实证 arrangement.selection 为 stepRandom/continuousRandom
-// 时才是随机候选；scope 全为 fallback 时是游戏沿用的共用曲单），与这里
-// 按列表顺序试听的手动预览。未证实的编排不推断，只用自然句。
-const trackScopeLabel = computed(() => {
-  if (activeAlternative.value) return '其他曲单的候选曲目，按列表顺序试听';
-  const current = dayNight.value?.entries.find((entry) => entry.key === dayNight.value.value);
-  const condition = `${current?.label ?? ''}${modeLabels[props.mode]}`;
-  const random = tracks.value.some((track) => ['stepRandom', 'continuousRandom']
-    .includes(track.arrangement?.selection));
-  const shared = tracks.value.length > 0
-    && tracks.value.every((track) => track.scope === 'fallback');
-  if (random && shared) return `原游戏${condition}时随机播放的共用曲单，这里按列表顺序试听`;
-  if (random) return `原游戏${condition}时随机播放的候选，这里按列表顺序试听`;
-  if (shared) return `原游戏${condition}使用的共用曲单，这里按列表顺序试听`;
-  return `${condition}条件下的候选曲目，按列表顺序试听`;
-});
-
 // 抽屉里的条件组（advanced 已保证组名与选项 label 均经证实）。选项右侧为
 // 切换后的曲数；已确认无曲目的分支写明「无曲目」，与曲名未核对区分开。
 const conditionGroups = computed(() => advanced.value.map((group) => ({
@@ -110,15 +88,6 @@ const conditionGroups = computed(() => advanced.value.map((group) => ({
     })),
 })));
 
-// 备选曲单行：辨识文案只来自实际曲名。多曲曲单可展开查看完整曲名，
-// 单曲曲单点行直接试听；不编造曲单名。
-const alternativeRows = computed(() => alternatives.value.map((alt) => ({
-  id: alt.id,
-  label: alt.tracks.find((entry) => entry.name)?.name ?? '未核对曲名',
-  tracks: alt.tracks,
-  expandable: alt.tracks.length > 1,
-})));
-
 function pickDefaultCondition() {
   if (tracks.value.length || !dayNight.value || dayNight.value.value) return;
   const daytime = dayNight.value.entries.find((entry) => entry.label === '白天');
@@ -128,8 +97,6 @@ function pickDefaultCondition() {
 watch([() => props.zone, () => props.mode], ([zone], [previous]) => {
   const previousId = loadedTrackId;
   trackIndex.value = 0;
-  alternativeId.value = null;
-  expandedAlt.value = null;
   pickDefaultCondition();
   if (zone === previous && previousId) keepTrack(previousId);
   loadTrack(zone !== previous ? true : requested.value);
@@ -158,39 +125,11 @@ function selectTrack(index, autoplay = true) {
 }
 
 function selectCondition(group, value) {
-  // 播放备选曲单时点同一时段按钮也回到该时段主曲单，其余情况值未变则不动。
-  if (group.value === value && !activeAlternative.value) return;
+  if (group.value === value) return;
   const previousId = track.value?.id;
-  alternativeId.value = null;
-  expandedAlt.value = null;
   overrides[group.id] = value;
   keepTrack(previousId);
   loadTrack();
-}
-
-// 备选曲单选择：直接按曲单播放，不把未核实的开关反塞进播放条件。
-// 单曲曲单点行即直接试听；展开行点具体曲目按该曲起播。起播后关抽屉，
-// 焦点还给「其他曲单」入口。
-function selectAlternative(alt, index = 0) {
-  alternativeId.value = alt.id;
-  expandedAlt.value = null;
-  trackIndex.value = index;
-  loadTrack(true);
-  drawer.value = null;
-  void nextTick(() => drawerTrigger.value?.focus());
-}
-
-// 一键回主曲单：曲目在主曲单中仍存在时保持当前曲目不重播，
-// 播放/进度/音量等合法状态由 transport 原样保留。
-function backToMain() {
-  const previousId = track.value?.id;
-  alternativeId.value = null;
-  keepTrack(previousId);
-  loadTrack();
-}
-
-function toggleAltExpand(id) {
-  expandedAlt.value = expandedAlt.value === id ? null : id;
 }
 
 function onEnd() {
@@ -224,11 +163,10 @@ function toggleDrawer(id, event) {
   drawer.value = id;
 }
 
-watch([() => tracks.value.length, () => advanced.value.length, () => alternatives.value.length],
-  ([count, groups, altLists]) => {
+watch([() => tracks.value.length, () => advanced.value.length],
+  ([count, groups]) => {
     if ((drawer.value === 'rules' && !groups)
       || (drawer.value === 'tracks' && count < 2)
-      || (drawer.value === 'alternatives' && !altLists)
       || (drawer.value === 'volume' && !count)) {
       drawer.value = null;
     }
@@ -289,10 +227,7 @@ onBeforeUnmount(() => {
             :data-source="track?.id" :aria-busy="phase === 'buffering' || undefined">
         {{ track ? trackTitle(track) : message }}
       </span>
-      <button v-if="tracks.length > 1" type="button" class="count" :aria-expanded="drawer === 'tracks'"
-              :aria-controls="drawer === 'tracks' ? flyoutId : null" @click="toggleDrawer('tracks', $event)">
-        {{ trackIndex + 1 }} / {{ tracks.length }}<span class="sr-only">，打开曲目列表</span>
-      </button>
+      <span v-if="tracks.length > 1" class="count">{{ trackIndex + 1 }} / {{ tracks.length }}</span>
     </div>
 
     <div class="transport">
@@ -331,10 +266,9 @@ onBeforeUnmount(() => {
       <button v-if="advanced.length" type="button" class="conditions-toggle"
               :aria-expanded="drawer === 'rules'" :aria-controls="drawer === 'rules' ? flyoutId : null"
               @click="toggleDrawer('rules', $event)">播放条件</button>
-      <button v-if="alternatives.length" type="button" class="conditions-toggle"
-              :aria-expanded="drawer === 'alternatives'" :aria-controls="drawer === 'alternatives' ? flyoutId : null"
-              @click="activeAlternative ? backToMain() : toggleDrawer('alternatives', $event)">
-        {{ activeAlternative ? '返回主曲单' : '其他曲单' }}</button>
+      <button v-if="tracks.length > 1" type="button" class="conditions-toggle"
+              :aria-expanded="drawer === 'tracks'" :aria-controls="drawer === 'tracks' ? flyoutId : null"
+              @click="toggleDrawer('tracks', $event)">歌曲列表</button>
       <span v-if="track && message" class="playback-status" role="status">{{ message }}</span>
       <div v-if="track" class="audio-options">
         <button type="button" class="icon-btn"
@@ -360,9 +294,8 @@ onBeforeUnmount(() => {
     </div>
 
     <section v-if="drawer" :id="flyoutId" class="player-drawer"
-             :aria-label="{tracks: '曲目列表', rules: '播放条件', volume: '音量设置', alternatives: '其他曲单'}[drawer]">
-      <ScrollPane v-if="drawer === 'tracks'" label="曲目列表滚动">
-        <p class="drawer-scope">{{ trackScopeLabel }}</p>
+             :aria-label="{tracks: '歌曲列表', rules: '播放条件', volume: '音量设置'}[drawer]">
+      <ScrollPane v-if="drawer === 'tracks'" label="歌曲列表滚动">
         <ul class="track-list">
           <li v-for="(entry, index) in tracks" :key="entry.id">
             <button type="button" :aria-current="trackIndex === index || null"
@@ -379,35 +312,6 @@ onBeforeUnmount(() => {
                       :aria-label="group.title" placement="top"
                       @update:model-value="(value) => selectCondition(group, value)" />
         </div>
-      </ScrollPane>
-      <ScrollPane v-else-if="drawer === 'alternatives'" label="其他曲单滚动">
-        <ul class="track-list">
-          <li v-for="alt in alternativeRows" :key="alt.id">
-            <button type="button" class="alternative-row"
-                    :aria-current="activeAlternative?.id === alt.id || null"
-                    :aria-expanded="alt.expandable ? expandedAlt === alt.id : undefined"
-                    :title="alt.label"
-                    @click="alt.expandable ? toggleAltExpand(alt.id) : selectAlternative(alt)">
-              <span>{{ alt.label }}</span>
-              <span class="alternative-meta">
-                <span>{{ alt.tracks.length }} 首</span>
-                <svg v-if="alt.expandable" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-                  <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"
-                        stroke-linecap="round" stroke-linejoin="round"
-                        :class="{up: expandedAlt === alt.id}" />
-                </svg>
-              </span>
-            </button>
-            <ul v-if="alt.expandable && expandedAlt === alt.id" class="track-list alternative-tracks">
-              <li v-for="(entry, index) in alt.tracks" :key="entry.id">
-                <button type="button" :title="entry.name"
-                        @click="selectAlternative(alt, index)">
-                  <span>{{ trackTitle(entry) }}</span><span>{{ fmt(entry.duration) }}</span>
-                </button>
-              </li>
-            </ul>
-          </li>
-        </ul>
       </ScrollPane>
       <div v-else class="volume-row">
         <button type="button" class="conditions-toggle" :aria-pressed="muted"
@@ -484,7 +388,7 @@ onBeforeUnmount(() => {
 }
 .now-playing { min-height: 38px; }
 .player-footer { min-height: 26px; }
-.icon-btn, .modes button, .count, .conditions-toggle, .track-list button {
+.icon-btn, .modes button, .conditions-toggle, .track-list button {
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-primary);
@@ -553,21 +457,24 @@ button:disabled { opacity: .38; cursor: default; }
   background: var(--control-hover);
   color: var(--accent-cyan);
 }
+/* 曲数只是状态文本：与时间同款排版，不包裹按钮、不接受焦点。 */
 .count, .time {
+  flex: none;
   font-size: 12px;
   color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .conditions-toggle {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.count, .conditions-toggle {
   flex: none;
   min-height: 26px;
   padding: 3px 6px;
-  border-color: var(--surface-overlay-border);
+  border: 1px solid var(--surface-overlay-border);
+  border-radius: 7px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
-.time { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .audio-options, .volume-row {
   display: flex;
   align-items: center;
@@ -626,13 +533,6 @@ button:disabled { opacity: .38; cursor: default; }
   backdrop-filter: blur(6px);
   --pane-limit: min(240px, calc(100dvh - 300px));
 }
-.drawer-scope {
-  margin: 0;
-  padding: 4px 8px 6px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.4;
-}
 .track-list { margin: 0; padding: 0; list-style: none; }
 .track-list button {
   width: 100%;
@@ -664,24 +564,6 @@ button:disabled { opacity: .38; cursor: default; }
   white-space: nowrap;
 }
 .condition-select { min-width: 0; }
-.alternative-row { position: relative; }
-.alternative-meta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--text-secondary);
-}
-.alternative-meta path { transition: transform 120ms ease; }
-.alternative-meta path.up { transform: rotate(180deg); }
-.alternative-tracks { padding-left: 14px; }
-.sr-only {
-  position: absolute;
-  clip-path: inset(50%);
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
 
 @media (max-width: 360px) {
   .transport {

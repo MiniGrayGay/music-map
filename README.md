@@ -49,6 +49,7 @@ pnpm run data      # 从本机 7.2 资料重新生成地图坐标
 pnpm run tiles     # 用 Sharp 重新生成多级 WebP
 pnpm run layers --out <新目录>   # 从地图编辑器的源资产重建楼层贴片
 pnpm run music --bgm <已核实的音区清单> --out <新文件>   # 从本机音频包重建 Wwise 曲单
+pnpm run audio:extract --manifest <原始音区清单> --decoder <vgmstream-cli> --work <工作缓存> --out <新目录>
 ```
 
 ## 静态交付
@@ -102,17 +103,22 @@ pnpm run export:site --audio-base https://assets.example.org/teyvat/audio/
 
 - `scripts/build-bgm-playlists.mjs` 使用已通过核对的 MapInfo、入口与曲名清单，
   核对客户端和 Bank 指纹，并独立从 Wwise HIRC 重建决策树、曲单、片段、音轨和
-  切换规则。播放器按选定的地点和模式解析 Wwise 曲单。昼夜开关立即切换对应主曲单。
-  触发语义尚未核实的分支只有在产生不同的可试听曲单时，才在「其他曲单」里出现。
-  游戏时钟的赋值边界仍待核实。
+  切换规则。播放器按选定的地点和模式解析 Wwise 曲目。昼夜开关立即切换对应歌曲。
+  「歌曲列表」只显示当前地点、探索或战斗以及选定时段的曲目。UI 条件使用已核实的
+  状态名称。游戏时钟的赋值边界仍待核实。
   现有素材名按 7.2 音源 ID 连接
   [AnimeWwise 名称表](https://github.com/Escartem/AnimeWwise/blob/deba68978cec74d44bff6989bf1066953a73a173/maps/hk4e.map)。
   部分游戏内中文曲名来自当前版本尘歌壶曲目的 Wwise 分支、音源编号和本地化表。
   `node scripts/verify-wwise-source.mjs --manifest <音区清单>` 可从本机 Bank
   逐字段复核清单中的音乐图。
   `scripts/match-bgm-soundtrack.mjs` 用 Chromaprint 比对本机 Opus 和官方原声试听。
-  已确认的匹配收录在 `scripts/verified-soundtrack-titles.json`，音乐清单生成时
-  会重新校验对应音源的 SHA-256。
+  已确认的匹配收录在 `scripts/verified-soundtrack-titles.json`，打包时重新校验
+  曲名证据表、音源 SHA-256 和 Ogg Opus 时长。
+- `pnpm run audio:extract` 从原始音乐 PCK 按音源编号提取 Wwise Vorbis，
+  解码后生成浏览器可播的 Opus。新编码的文件有独立指纹，替换生产音频需要重新核对
+  曲名证据。解码器用 `--decoder` 指定，编码器可用 `--ffmpeg` 指定。
+  [vgmstream](https://github.com/vgmstream/vgmstream/releases)
+  [FFmpeg](https://ffmpeg.org/download.html)
 - `scripts/build-bgm-surface.mjs` 使用同版本 Scene Point 的楼层归属和 LayerRegion
   体积重建地表视图。 `surfaceLayerExclusions` 保留楼层专属音区，`floorVolumeBindings`
   同时保留有独立证据可在地表和楼层生效的状态。

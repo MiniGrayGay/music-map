@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {parseArgs} from 'node:util';
 import {resolveMusic} from '../src/features/bgm/musicGraph.js';
+import {readMusicDuration, readMusicMediaIndex} from './wwise-bank.mjs';
 import {buildMusicGraph, readMusicBanks} from './wwise-music-graph.mjs';
 import {homeTitles} from './wwise-home-titles.mjs';
 
@@ -39,12 +40,9 @@ const graph = {...manifest.musicGraph, nodes: source};
 const areas = Object.values(manifest.music);
 for (const {wwiseId, playlists} of areas) {
   for (const [mode, expectedList] of Object.entries(playlists)) {
-    const {tracks, alternatives} = resolveMusic(graph, wwiseId, mode);
+    const {tracks, conditions} = resolveMusic(graph, wwiseId, mode);
     assert.deepEqual(tracks.map(({id}) => id), expectedList.sources, `状态 ${wwiseId} 的 ${mode} 曲单`);
-    const defaultId = tracks.map(({id}) => id).join(',');
-    assert.equal(new Set(alternatives.map(({id}) => id)).size, alternatives.length);
-    assert.ok(alternatives.every(({id, tracks}) => id !== defaultId
-      && id === tracks.map((track) => track.id).join(',')));
+    assert.ok(conditions.every(({title, entries}) => title && entries.every(({label}) => label)));
   }
 }
 const cave = Object.values(manifest.floorViews ?? {}).flat().find(({name}) => name === '残辉岩窟');
@@ -69,15 +67,25 @@ if (manifest.clientVersion === '7.2.0' && fontaine) {
   assert.ok(group);
   const phases = group.entries.map(({label, key}) => {
     const selection = resolveMusic(graph, fontaine, 'exploration', {[group.id]: key});
-    return [label, selection.tracks[0]?.name, selection.tracks.length,
-      selection.alternatives.map(({tracks}) => tracks.map(({name}) => name))];
+    assert.ok(selection.tracks.every(({name}) => name !== '轻雨何故落'));
+    return [label, selection.tracks[0]?.name, selection.tracks.length];
   });
   assert.deepEqual(phases, [
-    ['白天', '众水之诗', 4, [['轻雨何故落']]],
-    ['夜间', '月夕花朝', 4, [['轻雨何故落']]],
+    ['白天', '众水之诗', 4],
+    ['夜间', '月夕花朝', 4],
   ]);
 }
 console.log(`地点默认曲单 ${areas.length * Object.keys(graph.modes).length} 份与播放器一致`);
+
+const mediaIds = Object.keys(graph.media).map(Number);
+const media = await readMusicMediaIndex(root, mediaIds);
+for (let offset = 0; offset < mediaIds.length; offset += 24) {
+  await Promise.all(mediaIds.slice(offset, offset + 24).map(async (id) => {
+    const actual = await readMusicDuration(media.get(id));
+    assert.ok(Math.abs(actual - graph.media[id].duration) <= 0.1, `音源 ${id} 试听时长与原始 PCK 不符`);
+  }));
+}
+console.log(`原始音乐 PCK 的 ${mediaIds.length} 个音源时长与试听清单一致`);
 
 if (args.textmap) {
   const evidence = manifest.verification.trackTitles;

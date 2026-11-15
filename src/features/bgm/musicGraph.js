@@ -46,7 +46,7 @@ export function trackDetails(id, graph) {
     url: audioUrl(id, graph.audioBaseUrl)} : null;
 }
 
-function evaluate(graph, location, mode, overrides, discover, findAlternatives = false) {
+function evaluate(graph, location, mode, overrides, discover) {
   const locked = {[graph.zoneGroup]: location, [graph.modeGroup]: graph.modes[mode]};
   const preferred = {...(mode === 'combat' ? graph.combatDefaults : null), ...overrides};
   const states = {...preferred, ...locked};
@@ -54,8 +54,6 @@ function evaluate(graph, location, mode, overrides, discover, findAlternatives =
   const tracks = new Map();
   const unknown = new Set();
   const seen = new Set();
-  const switches = new Map();
-  const branches = [];
 
   function musicItem(item, local, playlist, position, inheritedMode) {
     if (item.children?.length) {
@@ -78,44 +76,27 @@ function evaluate(graph, location, mode, overrides, discover, findAlternatives =
     }
     if (node.kind === 'switch') {
       const zoneSlot = node.groups.indexOf(graph.zoneGroup);
-      if (discover || findAlternatives) {
+      if (discover) {
         const global = node.groups.map((group) => locked[group]);
         const authored = node.leaves.filter(([keys]) => keys.every(
           (key, index) => isWildcard(key) || global[index] === undefined || key === global[index],
         ));
-        if (discover) {
-          node.groups.forEach((group, index) => {
-            if (global[index] !== undefined) return;
-            const choices = options.get(group) ?? new Set();
-            for (const [keys] of authored) {
-              const key = keys[index];
-              const authoredForZone = local || (zoneSlot >= 0 && keys[zoneSlot] === location);
-              const verifiedCondition = Object.hasOwn(graph.groups?.[group]?.options ?? {}, key);
-              if (key && (authoredForZone || verifiedCondition)) choices.add(key);
-            }
-            if (choices.size) options.set(group, choices);
-          });
-        }
-        if (findAlternatives) {
-          const known = node.groups.map((group) => Boolean(graph.groups?.[group]?.name));
-          for (const [keys, target] of authored) {
-            if (!local && (zoneSlot < 0 || keys[zoneSlot] !== location)) continue;
-            if (keys.some((key, index) =>
-              key && known[index] && key !== (states[node.groups[index]] || graph.noneState))) continue;
-            const changes = keys.flatMap((key, index) =>
-              key && !known[index] && global[index] === undefined
-                && key !== (states[node.groups[index]] || graph.noneState)
-                ? [[node.groups[index], key]] : []);
-            if (changes.length) branches.push({id, keys, target, changes});
+        node.groups.forEach((group, index) => {
+          const definition = graph.groups?.[group];
+          if (global[index] !== undefined || !definition?.name) return;
+          const choices = options.get(group) ?? new Set();
+          for (const [keys] of authored) {
+            const key = keys[index];
+            if (key && definition.options?.[key]) choices.add(key);
           }
-        }
+          if (choices.size) options.set(group, choices);
+        });
       }
       const choice = resolveWwiseSwitch(node, states, graph.noneState);
       if (choice.issue) {
         unknown.add(id);
         return;
       }
-      if (findAlternatives) switches.set(id, choice);
       const targetLocal = zoneSlot >= 0 && choice.keys[zoneSlot] === location;
       visit(choice.target, local || targetLocal);
     } else if (node.kind === 'playlist') {
@@ -136,38 +117,12 @@ function evaluate(graph, location, mode, overrides, discover, findAlternatives =
   }
 
   visit(graph.root);
-  return {tracks: [...tracks.values()], options, preferred, incomplete: unknown.size > 0, switches, branches};
-}
-
-function alternatePlaylists(graph, location, mode, overrides, current) {
-  const result = new Map();
-  const visited = new Set([JSON.stringify(overrides)]);
-  const queue = [{overrides, selection: evaluate(graph, location, mode, overrides, false, true)}];
-  for (const item of queue) {
-    for (const branch of item.selection.branches) {
-      const next = {...item.overrides, ...Object.fromEntries(branch.changes)};
-      const signature = JSON.stringify(next);
-      if (visited.has(signature)) continue;
-      const selection = evaluate(graph, location, mode, next, false, true);
-      const reached = selection.switches.get(branch.id);
-      if (reached?.target !== branch.target || !reached.keys.every((key, index) => key === branch.keys[index])) {
-        continue;
-      }
-      visited.add(signature);
-      queue.push({overrides: next, selection});
-      const {tracks, incomplete} = selection;
-      const id = playlistId(tracks);
-      if (id && id !== current && (!result.has(id) || result.get(id).incomplete)) {
-        result.set(id, {id, tracks, incomplete});
-      }
-    }
-  }
-  return [...result.values()];
+  return {tracks: [...tracks.values()], options, preferred, incomplete: unknown.size > 0};
 }
 
 export function resolveMusic(graph, location, mode, overrides = {}) {
   if (!Number.isSafeInteger(location) || !Object.hasOwn(graph.modes, mode)) {
-    return {tracks: [], conditions: [], alternatives: [], incomplete: true};
+    return {tracks: [], conditions: [], incomplete: true};
   }
   const scopedOverrides = {};
   let resolved = evaluate(graph, location, mode, scopedOverrides, true);
@@ -184,21 +139,17 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
   const conditions = [];
   for (const [id, keys] of resolved.options) {
     const initial = mode === 'combat' ? graph.combatDefaults[id] : undefined;
-    const title = graph.groups[id]?.name ?? null;
-    const competing = new Set([initial ?? 0, ...keys]);
+    const title = graph.groups[id].name;
     const variants = new Map();
-    for (const key of competing) {
-      const known = graph.groups[id]?.options?.[key];
-      if (title && !known) continue;
+    for (const key of keys) {
+      const label = graph.groups[id].options[key];
       const choice = evaluate(graph, location, mode, {...scopedOverrides, [id]: key}, false);
       const fingerprint = playlistId(choice.tracks);
       if (!fingerprint && choice.incomplete) continue;
-      if (variants.has(fingerprint) && !known) continue;
+      if (variants.has(fingerprint)) continue;
       variants.set(fingerprint, {
         key,
-        // 展示层只允许两种文案：已核实的语义名，或切换后的曲名/曲数。未命名
-        // 的选项保持 label=null，由 UI 决定自然表达，不生成十六进制/默认占位。
-        label: known ?? null,
+        label,
         firstTrack: choice.tracks.find((track) => track.name)?.name ?? null,
         count: choice.tracks.length,
       });
@@ -210,11 +161,10 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
     conditions.push({
       id,
       title,
-      named: Boolean(title),
+      named: true,
       value,
       entries,
     });
   }
-  const alternatives = alternatePlaylists(graph, location, mode, scopedOverrides, playlistId(resolved.tracks));
-  return {tracks: resolved.tracks, conditions, alternatives, incomplete: resolved.incomplete};
+  return {tracks: resolved.tracks, conditions, incomplete: resolved.incomplete};
 }

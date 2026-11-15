@@ -2,7 +2,7 @@
 // 共享自绘选择控件（button + Teleport 弹层 listbox）：替代可见的原生
 // <select>。触发器保留焦点，方向键/Home/End 移动活动项，Enter/Space 选中，
 // Escape 经 escapeStack 只关本弹层；点外部关闭；选项列表滚动复用
-// ScrollPane 的独立滚动条。弹层 fixed 定位到 body，避免被抽屉的滚动
+// ScrollPane 的原生滚动与预留槽位。弹层 fixed 定位到 body，避免被抽屉的滚动
 // 容器裁剪，空间不足时向上翻转。
 import {computed, nextTick, onBeforeUnmount, ref, useId, watch} from 'vue';
 import ScrollPane from './ScrollPane.vue';

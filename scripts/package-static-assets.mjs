@@ -1,8 +1,9 @@
 import {createHash} from 'node:crypto';
 import {constants, createReadStream} from 'node:fs';
-import {copyFile, link, lstat, mkdir, open, readFile, rename, writeFile} from 'node:fs/promises';
+import {copyFile, link, lstat, mkdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {layerFileNames, tileFileNames} from './asset-layout.mjs';
+import {verifyOpus} from './opus-file.mjs';
 
 const project = path.resolve(import.meta.dirname, '..');
 const workspace = path.resolve(project, '..', '..');
@@ -16,42 +17,6 @@ async function regularFile(file) {
   const info = await lstat(file);
   if (!info.isFile() || !info.size) throw new Error(`缺少有效文件 ${file}`);
   return info;
-}
-
-async function verifyOpus(file, size, expectedDuration) {
-  const stream = await open(file, 'r');
-  try {
-    const head = Buffer.alloc(Math.min(size, 512));
-    await stream.read(head, 0, head.length, 0);
-    const header = 27 + head[26];
-    if (head.subarray(0, 4).toString() !== 'OggS'
-      || header + 19 > head.length || head.subarray(header, header + 8).toString() !== 'OpusHead') {
-      throw new Error(`音频缺少 Ogg Opus 头 ${file}`);
-    }
-    const serial = head.readUInt32LE(14);
-    const preSkip = head.readUInt16LE(header + 10);
-    const tail = Buffer.alloc(Math.min(size, 65536));
-    await stream.read(tail, 0, tail.length, size - tail.length);
-    for (let offset = tail.lastIndexOf('OggS'); offset >= 0;) {
-      const segments = tail[offset + 26];
-      const payload = offset + 27 + segments;
-      if (payload <= tail.length && tail[offset + 4] === 0 && (tail[offset + 5] & 4)
-        && tail.readUInt32LE(offset + 14) === serial) {
-        const end = tail.subarray(offset + 27, payload).reduce((sum, bytes) => sum + bytes, payload);
-        if (end === tail.length) {
-          const duration = (Number(tail.readBigUInt64LE(offset + 6)) - preSkip) / 48000;
-          if (Math.abs(duration - expectedDuration) > 0.1) {
-            throw new Error(`音频时长与清单不符 ${file}`);
-          }
-          return;
-        }
-      }
-      offset = offset > 0 ? tail.lastIndexOf('OggS', offset - 1) : -1;
-    }
-    throw new Error(`音频末尾不完整 ${file}`);
-  } finally {
-    await stream.close();
-  }
 }
 
 async function digest(file) {
@@ -130,6 +95,18 @@ await batches(layers.layers, async (layer) => {
 
 const graph = source.musicGraph;
 const media = Object.entries(graph.media);
+const titleEvidence = source.verification?.soundtrackTitles;
+const soundtrackPath = new URL('./verified-soundtrack-titles.json', import.meta.url);
+let soundtrack;
+if (titleEvidence) {
+  const catalog = await readFile(soundtrackPath);
+  if (createHash('sha256').update(catalog).digest('hex') !== titleEvidence.catalogSha256) {
+    throw new Error('曲名证据表指纹与音区清单不一致');
+  }
+  soundtrack = JSON.parse(catalog);
+  const matches = media.filter(([id]) => Object.hasOwn(soundtrack, id));
+  if (matches.length !== titleEvidence.matchedMedia) throw new Error('曲名证据覆盖数与音区清单不一致');
+}
 const audioOutput = path.join(output, 'region-bgm-audio');
 await mkdir(audioOutput, {recursive: true});
 let audioBytes = 0;
@@ -139,6 +116,12 @@ await batches(media, async ([id, track]) => {
   }
   const file = path.join(audioSource, `${id}.opus`);
   const info = await regularFile(file);
+  const titleProof = soundtrack?.[id];
+  if (titleProof && (track.soundtrack !== titleProof.url
+    || (!track.titleState && track.title !== titleProof.title)
+    || await digest(file) !== titleProof.audioSha256)) {
+    throw new Error(`音轨 ${id} 与已核实的曲名证据不符`);
+  }
   await verifyOpus(file, info.size, track.duration);
   await materialize(file, path.join(audioOutput, `${id}.opus`), info);
   audioBytes += info.size;

@@ -245,7 +245,7 @@ async function main() {
     executablePath: chromePath,
     headless: true,
     userDataDir: chromeProfile,
-    args: ['--no-first-run', '--disable-background-timer-throttling', '--hide-scrollbars', '--mute-audio'],
+    args: ['--no-first-run', '--disable-background-timer-throttling', '--mute-audio'],
   });
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
@@ -330,6 +330,37 @@ async function main() {
   await page.waitForSelector('.select-popup', {visible: true});
   await page.mouse.click(20, 880); // 空白海面：点外部关闭下拉
   check(await page.$('.select-popup') === null, '点击下拉外部关闭地图菜单');
+
+  await page.click('button[aria-label="切换分层地图"]');
+  const layerScroller = '.panel .group-scroll .scroll-viewport';
+  await page.waitForSelector(layerScroller, {visible: true});
+  const scrolling = await page.$eval(layerScroller, (node) => {
+    const style = getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    const track = getComputedStyle(node, '::-webkit-scrollbar-track');
+    return {
+      top: node.scrollTop,
+      range: node.scrollHeight - node.clientHeight,
+      space: node.offsetWidth - node.clientWidth,
+      separate: style.scrollbarGutter === 'stable' && style.scrollbarWidth === 'thin',
+      frame: style.borderRightWidth + ' ' + track.borderLeftWidth,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  });
+  check(scrolling.range > 0 && scrolling.space > 0 && scrolling.separate && scrolling.frame === '0px 0px',
+    `楼层列表实际留出 ${scrolling.space}px 滚动空间，无轨道边线`);
+  const fixedMap = await worldState(page);
+  await page.mouse.move(scrolling.x, scrolling.y);
+  await page.mouse.wheel({deltaY: 240});
+  await page.waitForFunction((selector, top) => document.querySelector(selector)?.scrollTop > top,
+    {timeout: 3000}, layerScroller, scrolling.top);
+  const afterWheel = await worldState(page);
+  check(afterWheel.tx === fixedMap.tx && afterWheel.ty === fixedMap.ty && afterWheel.scale === fixedMap.scale,
+    '楼层列表滚动不会平移或缩放地图');
+  await page.screenshot({path: path.join(shotDir, '14-floor-scrollbar.png')});
+  await page.keyboard.press('Escape');
+  check(await page.$('.panel') === null, '滚动后 Escape 关闭分层目录');
 
   // 只通过当前清单中的真实音乐分区检查悬停。
   const hoverPoint = await page.evaluate(() => {
@@ -502,15 +533,40 @@ async function main() {
   const playerText = await page.$eval('.music-player', (node) => node.innerText);
   check(!playerText.includes('0x') && !playerText.includes('·'),
     '播放器可见文案无状态十六进制与中点拼接');
-  await page.click('.now-playing .count');
-  await page.screenshot({path: path.join(shotDir, '12-music-conditions.png')});
-  await page.keyboard.press('Escape');
-  check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-    'Escape 只关曲目抽屉，播放器保留');
+  // 蒙德当前条件的曲内前后曲与歌曲列表抽屉。期望曲单走同一解析路径，
+  // 与播放器消费的 resolveMusic 完全同源。
+  const mondstadtResolve = (overrides = {}) => resolveMusic(bgmManifest.musicGraph,
+    bgmManifest.music.State_MengDe?.wwiseId, 'exploration', overrides);
+  const mondstadtDay = (() => {
+    const group = mondstadtResolve().conditions.find((candidate) => candidate.title === '昼夜');
+    const key = group?.entries.find((entry) => entry.key === '3815942830')?.key;
+    return key ? mondstadtResolve({[group.id]: key}) : mondstadtResolve();
+  })();
+  if (mondstadtDay.tracks.length > 1) {
+    const count = await page.$eval('.now-playing .count', (node) => ({
+      tag: node.tagName, text: node.textContent.trim(),
+    }));
+    check(count.tag === 'SPAN' && count.text === `1 / ${mondstadtDay.tracks.length}`,
+      `曲数计数是非交互文本（${count.tag} “${count.text}”）`);
+    await page.click('button[aria-label="下一首"]');
+    await waitForAudio(page, mondstadtDay.tracks[1].id);
+    await page.click('button[aria-label="上一首"]');
+    await waitForAudio(page, mondstadtDay.tracks[0].id);
+    check(true, '蒙德前后曲按钮只在当前条件曲单内切换');
+    await page.evaluate(() => [...document.querySelectorAll('.player-footer .conditions-toggle')]
+      .find((button) => button.textContent.trim() === '歌曲列表')?.click());
+    await page.waitForSelector('.player-drawer', {visible: true});
+    await page.screenshot({path: path.join(shotDir, '12-music-conditions.png')});
+    await page.keyboard.press('Escape');
+    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
+      'Escape 只关歌曲列表抽屉，播放器保留');
+  } else {
+    check(true, '蒙德当前条件为单曲，前后曲按钮与列表入口按数据隐藏');
+  }
 
   // 播放条件抽屉只收已核实的开关（组名与全部选项 label 均经证实）。按实际
   // 清单定位有此类开关的分区走完整下拉回归；当前清单没有时，该按钮按数据
-  // 不出现，备选曲单单独覆盖。
+  // 不出现。
   const graph = bgmManifest.musicGraph;
   const zoneSelection = (zone, mode = 'exploration', overrides = {}) =>
     resolveMusic(graph, bgmManifest.music[zone.state].wwiseId, mode, overrides);
@@ -624,175 +680,128 @@ async function main() {
     check(true, '当前清单没有已核实的非昼夜条件开关，播放条件按钮按数据出现');
   }
 
-  // 其他曲单（备选曲单）：用实际清单中带备选的分区复现「同一时段下另一
-  // 组真正可试听的曲目」。期望值全部从清单解析推导，不写死曲目。
-  // 枫丹廷等分区只有确定白天/夜间后才解析出备选，无 overrides 的初次解析
-  // 不足以判断带备选与否：昼夜组内有有名「白天」项时按其 key 重跑解析。
-  const daytimeSelection = (zone) => {
-    const initial = zoneSelection(zone);
-    const group = initial.conditions.find((candidate) => candidate.title === '昼夜');
-    const day = group?.entries.find((entry) => entry.label === '白天');
-    return group && day ? zoneSelection(zone, 'exploration', {[group.id]: day.key}) : initial;
-  };
-  const hasAltListens = (zone) => {
-    if (bgmManifest.music?.[zone.state]?.wwiseId == null) return false;
-    return (daytimeSelection(zone).alternatives ?? []).some((alt) => alt.tracks.length > 0);
-  };
-  // 优先复现 7.2 枫丹廷等（State_FD40_City）：白天众水之诗、夜间月夕花朝，
-  // 唯一备选轻雨何故落；该区不可用（无备选或不在当前地图）时回退首个带备选分区。
-  const fdCity = bgmManifest.zones.find((zone) => zone.state === 'State_FD40_City' && hasAltListens(zone));
-  const altZone = (fdCity && await page.$(
-    `path[data-zone-key=${JSON.stringify(fdCity.id)}]`) !== null)
-    ? fdCity
-    : bgmManifest.zones.find(hasAltListens);
-  check(altZone !== undefined, '清单中存在带备选曲单的分区');
-  if (altZone) {
-    await openZoneByState(altZone.state);
+  // 歌曲列表：枫丹廷白天众水之诗、夜间月夕花朝，各自打开列表核对当前条件
+  // 的真实曲目。期望值全部从清单解析推导，不写死曲目；备选曲单（轻雨何故落）
+  // 已随 alternatives 一并移除，列表不得再出现。
+  const cityZone = bgmManifest.zones.find((zone) => zone.state === 'State_FD40_City'
+    && bgmManifest.music?.[zone.state]?.wwiseId != null);
+  check(cityZone !== undefined, '清单中存在枫丹廷分区');
+  if (cityZone) {
+    await openZoneByState(cityZone.state);
     await page.waitForSelector('[aria-label="昼夜"]', {visible: true});
-    const base = daytimeSelection(altZone);
-    const dayNightGroup = base.conditions.find((group) => group.title === '昼夜');
+    const cityResolve = (mode = 'exploration', overrides = {}) => resolveMusic(
+      bgmManifest.musicGraph, bgmManifest.music[cityZone.state].wwiseId, mode, overrides);
+    const dayNightGroup = cityResolve().conditions.find((group) => group.title === '昼夜');
     const dayEntry = dayNightGroup.entries.find((entry) => entry.label === '白天');
     const nightEntry = dayNightGroup.entries.find((entry) => entry.label === '夜间');
-    const tracksFor = (key) => zoneSelection(altZone, 'exploration',
-      {[dayNightGroup.id]: key}).tracks.map((track) => track.id);
-    const altTrackIds = base.alternatives.map((alt) => alt.tracks.map((track) => track.id));
-    const altTrackNames = base.alternatives.map((alt) => alt.tracks.map((track) => track.name));
-    const altTrigger = () => footerButton('其他曲单');
-    const backTrigger = () => footerButton('返回主曲单');
+    const cityTracks = (key) => cityResolve('exploration', {[dayNightGroup.id]: key}).tracks;
+    const openSongList = async () => {
+      await page.evaluate(() => [...document.querySelectorAll('.player-footer .conditions-toggle')]
+        .find((button) => button.textContent.trim() === '歌曲列表')?.click());
+      await page.waitForSelector('.player-drawer', {visible: true});
+    };
 
-    // 与 base 对齐：明确点白天主曲单，DOM 起点与解析结果一致。
-    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
-    await waitForAudio(page, base.tracks[0].id);
-
-    // 打开抽屉：备选只出现一次，辨识文案来自实际曲名。
-    await (await altTrigger()).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
-    const altDrawer = await page.evaluate(() => {
-      const rows = [...document.querySelectorAll('.player-drawer .track-list > li')];
-      return {
+    // 打开抽屉核对列表内容、滚动区外观与页脚入口。抽屉保持打开供后续交互。
+    const auditSongDrawer = async (key, label) => {
+      const expected = cityTracks(key);
+      await openSongList();
+      const drawer = await page.evaluate(() => ({
         text: document.querySelector('.player-drawer').innerText,
-        rowCount: rows.length,
-        rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
-        currentRows: rows.filter((row) => row.querySelector('[aria-current="true"]')).length,
-      };
-    });
-    check(altDrawer.rowCount === base.alternatives.length && altDrawer.rowCount > 0,
-      `备选抽屉行列出全部备选曲单（${altDrawer.rowCount} 行）`);
-    check(altDrawer.text.split(altTrackNames[0][0]).length - 1 === 1,
-      `备选曲单在抽屉中只出现一次（${altTrackNames[0][0]}）`);
-    check(!altDrawer.text.includes('未命名') && !altDrawer.text.includes('0x'),
-      '备选抽屉无未命名条件或内部标识');
-    check(altDrawer.rowHeights.every((height) => height >= 30),
-      `备选行高可触达（${altDrawer.rowHeights.join(',')}px）`);
-    await page.screenshot({path: path.join(shotDir, '14-alternatives-drawer.png')});
+        names: [...document.querySelectorAll('.player-drawer .track-list > li > button > span:first-child')]
+          .map((span) => span.textContent.trim()),
+        footer: [...document.querySelectorAll('.player-footer .conditions-toggle')]
+          .map((button) => button.textContent.trim()),
+      }));
+      check(drawer.names.length === expected.length && expected.length === 4,
+        `${label}歌曲列表只列当前条件 4 首真实曲目（${drawer.names.length} 行）`);
+      check(drawer.names.join('|') === expected.map((track) => track.name).join('|'),
+        `${label}列表曲目与解析期望一致（${drawer.names[0]} 等）`);
+      check(!drawer.text.includes('轻雨何故落') && !drawer.text.includes('未命名')
+        && !drawer.text.includes('0x'),
+      `${label}列表无备选曲目、未命名条件或内部标识`);
+      check(!drawer.footer.includes('其他曲单') && !drawer.footer.includes('返回主曲单'),
+        '页脚无其他曲单/返回主曲单入口');
+      const scrollBox = await page.$eval('.player-drawer .scroll-viewport', (node) => {
+        const style = getComputedStyle(node);
+        return {gutter: style.scrollbarGutter, borderX: style.borderLeftWidth,
+          rail: Boolean(document.querySelector('.scroll-rail'))};
+      });
+      check(scrollBox.gutter === 'stable' && scrollBox.borderX === '0px' && !scrollBox.rail,
+        `歌曲列表滚动区只留稳定槽位、无边线与自绘轨道（gutter=${scrollBox.gutter}）`);
+    };
 
-    // 点备选直接试听，行标记当前项；页脚出现一键返回主曲单。
-    await page.click('.player-drawer .track-list > li > button');
-    await waitForAudio(page, altTrackIds[0][0]);
-    check(await backTrigger() !== null && await altTrigger() === null,
-      '播放备选后页脚提供返回主曲单入口');
-    // 旁路会话：选中备选单曲即关闭抽屉，焦点归还页脚返回主曲单入口。
-    check(await page.$('.player-drawer') === null, '选中备选单曲后备选抽屉即关闭');
-    check(await page.evaluate(() =>
-      document.activeElement?.textContent.trim() === '返回主曲单'),
-    '抽屉关闭后焦点归还返回主曲单入口');
+    // 白天：众水之诗起播，计数为非交互文本，列表入口在页脚。
+    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
+    await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
+    check((await page.$eval('.track-name', (node) => node.textContent.trim()))
+      === cityTracks(dayEntry.key)[0].name,
+    `枫丹廷白天起播当前条件首曲（${cityTracks(dayEntry.key)[0].name}）`);
+    check((await page.$eval('.now-playing .count', (node) => node.textContent.trim()))
+      === `1 / ${cityTracks(dayEntry.key).length}`,
+    '白天曲数计数按当前条件显示');
+    await auditSongDrawer(dayEntry.key, '白天');
+    await page.screenshot({path: path.join(shotDir, '14-song-list-drawer.png')});
+    await page.keyboard.press('Escape');
+    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
+      'Escape 只关歌曲列表抽屉，播放器保留');
 
-    // 播放备选时点夜间：立即切到该时段主曲单，备选选择被清除。
+    // 夜间：月夕花朝起播，列表同样只含当前条件曲目；点列表曲目直接试听。
     await page.click(`[aria-label="昼夜"] button[data-value="${nightEntry.key}"]`);
-    await waitForAudio(page, tracksFor(nightEntry.key)[0]);
-    check(await altTrigger() !== null && await backTrigger() === null,
-      '切时段后回到该时段主曲单，页脚恢复其他曲单入口');
-    const nightName = zoneSelection(altZone, 'exploration', {[dayNightGroup.id]: nightEntry.key})
-      .tracks[0]?.name;
-    check((await page.$eval('.track-name', (node) => node.textContent)) === nightName,
-      `切时段立即播放该时段主曲单首曲（${nightName}）`);
+    await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
+    check((await page.$eval('.track-name', (node) => node.textContent.trim()))
+      === cityTracks(nightEntry.key)[0].name,
+    `切夜间立即播放该时段首曲（${cityTracks(nightEntry.key)[0].name}）`);
+    await auditSongDrawer(nightEntry.key, '夜间');
+    await page.click('.player-drawer .track-list > li:nth-child(2) > button');
+    await waitForAudio(page, cityTracks(nightEntry.key)[1].id);
+    check(await page.$eval('.player-drawer .track-list > li:nth-child(2) > button',
+      (button) => button.getAttribute('aria-current') === 'true'),
+    '点选列表曲目直接试听并标记当前项');
 
-    // 重开抽屉仍只有一个备选；再点备选后点白天，立即播放白天主曲单。
-    await (await altTrigger()).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
-    check(await page.$$eval('.player-drawer .track-list > li',
-      (rows) => rows.length) === base.alternatives.length,
-    '切时段后重开备选抽屉仍只列同一组备选');
-    await page.click('.player-drawer .track-list > li > button');
-    await waitForAudio(page, altTrackIds[0][0]);
-    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
-    await waitForAudio(page, tracksFor(dayEntry.key)[0]);
-    check(await altTrigger() !== null, '切回白天播放白天主曲单并恢复入口');
-
-    // 播放备选时点当前时段按钮，同样一键回该时段主曲单。
-    await (await altTrigger()).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
-    await page.click('.player-drawer .track-list > li > button');
-    await waitForAudio(page, altTrackIds[0][0]);
-    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
-    await waitForAudio(page, tracksFor(dayEntry.key)[0]);
-    check(await page.$('.player-drawer .track-list > li > button[aria-current="true"]') === null,
-      '点当前时段按钮同样回到主曲单，无残留当前备选标记');
-
-    // 返回主曲单按钮：备选播放中一键返回且立即出声。
-    await (await altTrigger()).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
-    await page.click('.player-drawer .track-list > li > button');
-    await waitForAudio(page, altTrackIds[0][0]);
-    await (await backTrigger()).click();
-    await waitForAudio(page, tracksFor(dayEntry.key)[0]);
-    check(true, '返回主曲单立即按主曲单播放');
-
-    // 战斗回探索：尊重前次昼夜选择、清失效备选、播放器与 audio 元素不重挂。
-    const identity = await page.evaluate(() => {
+    // 切回白天：立即播放白天首曲，播放器与 audio 元素不重挂。
+    await page.evaluate(() => {
       window.__panelEl = document.querySelector('.music-player');
       window.__audioEl = document.querySelector('.music-player audio');
-      return true;
     });
-    const combatButton = await page.$('.modes[aria-label="音乐模式"] button:nth-child(2)');
-    await combatButton.click();
-    const combatTracks = zoneSelection(altZone, 'combat');
+    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
+    await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
+    check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
+      && document.querySelector('.music-player audio') === window.__audioEl),
+    '昼夜切换播放器与 audio 元素不重挂');
+    check((await page.$eval('.now-playing .count', (node) => node.textContent.trim()))
+      === `1 / ${cityTracks(dayEntry.key).length}`,
+    '切回白天计数回到白天曲目数');
+
+    // 战斗回探索：身份保持，尊重前次昼夜选择。
+    await page.click('.modes[aria-label="音乐模式"] button:nth-child(2)');
+    const combatTracks = cityResolve('combat');
     if (combatTracks.tracks.length) await waitForAudio(page, combatTracks.tracks[0].id);
-    const exploreButton = await page.$('.modes[aria-label="音乐模式"] button:nth-child(1)');
-    await exploreButton.click();
-    await waitForAudio(page, tracksFor(dayEntry.key)[0]);
-    check(identity && await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
+    await page.click('.modes[aria-label="音乐模式"] button:nth-child(1)');
+    await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
+    check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
       && document.querySelector('.music-player audio') === window.__audioEl),
     '战斗回探索播放器与 audio 元素不重挂');
     check(await page.$eval(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`,
       (button) => button.getAttribute('aria-pressed') === 'true'),
     '战斗回探索尊重前次昼夜选择');
-    check(await altTrigger() !== null && await backTrigger() === null,
-      '模式切换清失效备选，页脚恢复其他曲单入口');
 
-    // 地图切区：目标须与 altZone 实际不同，避免同名切换后标题看似未变。
-    // altZone 为枫丹廷时切蒙德；回退到蒙德时优先 State_KL63_BW_PiLaMiDa。
-    const nextCandidates = (altZone.state !== 'State_MengDe'
-      ? [bgmManifest.zones.find((zone) => zone.state === 'State_MengDe')]
-      : [bgmManifest.zones.find((zone) => zone.state === 'State_KL63_BW_PiLaMiDa'),
-         bgmManifest.zones.find((zone) => zone.state !== altZone.state && hasAltListens(zone))]
-    ).filter(Boolean);
-    let nextZone = null;
-    for (const candidate of nextCandidates) {
-      if (await page.$(`path[data-zone-key=${JSON.stringify(candidate.id)}]`) !== null) {
-        nextZone = candidate;
-        break;
-      }
+    // 切区：优先蒙德（该区已在地表地图可达时），身份保持且标题更新。
+    const nextZone = bgmManifest.zones.find((zone) => zone.state === 'State_MengDe');
+    if (await page.$(`path[data-zone-key=${JSON.stringify(nextZone.id)}]`) !== null) {
+      await openZoneByState(nextZone.state);
+      check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
+        && document.querySelector('.music-player audio') === window.__audioEl),
+      '切换分区播放器与 audio 元素不重挂');
+      await page.waitForFunction(
+        (name) => document.querySelector('.zone-name')?.textContent === name,
+        {timeout: 5000}, nextZone.name);
+      check((await page.$eval('.zone-name', (node) => node.textContent)) === nextZone.name,
+        `切区后播放器标题更新为新分区（${nextZone.name}）`);
     }
-    check(nextZone !== null, '存在可点击的切区目标分区');
-    await openZoneByState(nextZone.state);
-    check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
-      && document.querySelector('.music-player audio') === window.__audioEl),
-    '切换分区播放器与 audio 元素不重挂');
-    await page.waitForFunction(
-      (name) => document.querySelector('.zone-name')?.textContent === name,
-      {timeout: 5000}, nextZone.name);
-    check((await page.$eval('.zone-name', (node) => node.textContent)) === nextZone.name,
-      `切区后播放器标题更新为新分区（${nextZone.name}）`);
 
-    // Escape 分层关闭备选抽屉与播放器。
-    await (await altTrigger()).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
+    // Escape 关闭播放器收尾，后续楼层回归从无播放器状态开始。
     await page.keyboard.press('Escape');
-    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-      'Escape 只关备选抽屉，播放器保留');
-    await page.keyboard.press('Escape');
-    check(await page.$('.music-player') === null, '再次 Escape 关闭播放器');
+    check(await page.$('.music-player') === null, 'Escape 关闭播放器');
   }
 
   const sourcePath = process.env.TEYVAT_BGM_MANIFEST ?? path.join(workspaceRoot, 'dist/genshin-region-bgm.json');
@@ -986,7 +995,7 @@ async function main() {
     });
     check(narrowDrawerBox.left >= 0 && narrowDrawerBox.right <= 390
       && narrowDrawerBox.top >= 0 && narrowDrawerBox.bottom <= 844,
-      `窄窗播放条件或备选抽屉落在视口内（${JSON.stringify(narrowDrawerBox)}）`);
+      `窄窗播放条件或歌曲列表抽屉落在视口内（${JSON.stringify(narrowDrawerBox)}）`);
     check(narrowDrawerBox.rowHeight >= 30,
       `窄窗抽屉行高可触达（${narrowDrawerBox.rowHeight.toFixed(0)}px）`);
     if (await page.$('.condition-row .select-trigger')) {
@@ -1018,7 +1027,7 @@ async function main() {
       check(await page.$('.select-popup') === null && await page.$('.player-drawer') !== null,
         '窄窗 Escape 先关下拉，条件抽屉保留');
     } else {
-      await page.screenshot({path: path.join(shotDir, '16-narrow-alternatives.png')});
+      await page.screenshot({path: path.join(shotDir, '16-narrow-drawer.png')});
     }
     await page.keyboard.press('Escape');
     check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,

@@ -1,4 +1,5 @@
-import {open} from 'node:fs/promises';
+import {open, readdir} from 'node:fs/promises';
+import path from 'node:path';
 
 async function readExactly(file, size, position) {
   const result = Buffer.allocUnsafe(size);
@@ -37,6 +38,76 @@ export async function readWwiseBank(packagePath, bankId) {
       throw new Error('音频 Bank 身份不符');
     }
     return bytes;
+  } finally {
+    await file.close();
+  }
+}
+
+export async function readMusicMediaIndex(directory, ids) {
+  const wanted = new Set(ids);
+  const entries = new Map();
+  const packages = (await readdir(directory)).filter((name) => /^Music\d+\.pck$/i.test(name));
+  if (!packages.length) throw new Error(`目录里没有音乐 PCK ${directory}`);
+  for (const name of packages) {
+    const packagePath = path.join(directory, name);
+    const file = await open(packagePath, 'r');
+    try {
+      const {size: length} = await file.stat();
+      const header = await readExactly(file, 28, 0);
+      if (header.toString('ascii', 0, 4) !== 'AKPK') throw new Error(`${name} 缺少 AKPK 头`);
+      const offset = 28 + header.readUInt32LE(12) + header.readUInt32LE(16);
+      const size = header.readUInt32LE(20);
+      if (size < 4 || offset + size > length) throw new Error(`${name} 音频索引超出文件范围`);
+      const table = await readExactly(file, size, offset);
+      if (size !== 4 + table.readUInt32LE(0) * 20) throw new Error(`${name} 音频索引长度不符`);
+      for (let row = 4; row < size; row += 20) {
+        const id = table.readUInt32LE(row);
+        if (!wanted.has(id)) continue;
+        const bytes = table.readUInt32LE(row + 8);
+        const start = table.readUInt32LE(row + 4) * table.readUInt32LE(row + 12);
+        if (entries.has(id) || !Number.isSafeInteger(start)
+          || start < offset + size || bytes < 12 || start + bytes > length) {
+          throw new Error(`${name} 音源 ${id} 重复或位置无效`);
+        }
+        entries.set(id, {id, packagePath, start, bytes});
+      }
+    } finally {
+      await file.close();
+    }
+  }
+  const missing = ids.filter((id) => !entries.has(id));
+  if (missing.length) throw new Error(`音乐 PCK 缺少 ${missing.length} 个音源，首个 ${missing[0]}`);
+  return entries;
+}
+
+export async function readMusicMedia({id, packagePath, start, bytes}) {
+  const file = await open(packagePath, 'r');
+  try {
+    const data = await readExactly(file, bytes, start);
+    if (data.toString('ascii', 0, 4) !== 'RIFF' || data.readUInt32LE(4) + 8 !== bytes
+      || data.toString('ascii', 8, 12) !== 'WAVE') {
+      throw new Error(`音源 ${id} 的封装不完整`);
+    }
+    return data;
+  } finally {
+    await file.close();
+  }
+}
+
+export async function readMusicDuration({id, packagePath, start, bytes}) {
+  const file = await open(packagePath, 'r');
+  try {
+    const header = await readExactly(file, 48, start);
+    // The 7.2 music PCK uses the Wwise Vorbis sample count in the extended fmt chunk.
+    if (bytes < 48 || header.toString('ascii', 0, 4) !== 'RIFF'
+      || header.readUInt32LE(4) + 8 !== bytes || header.toString('ascii', 8, 16) !== 'WAVEfmt '
+      || header.readUInt32LE(16) !== 0x42 || header.readUInt16LE(20) !== 0xffff) {
+      throw new Error(`音源 ${id} 不是已核实的 Wwise Vorbis 封装`);
+    }
+    const rate = header.readUInt32LE(24);
+    const samples = header.readUInt32LE(44);
+    if (!rate || !samples) throw new Error(`音源 ${id} 缺少采样时长`);
+    return samples / rate;
   } finally {
     await file.close();
   }
