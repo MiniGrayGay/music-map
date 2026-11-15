@@ -14,6 +14,7 @@
     "layers": "node scripts/build-layer-data.mjs",
     "music": "node scripts/build-bgm-playlists.mjs",
     "audio:extract": "node scripts/extract-bgm-audio.mjs",
+    "audio:apply-titles": "node scripts/apply-bgm-soundtrack-matches.mjs",
     "dev": "vite",
     "build": "vite build && node scripts/package-static-assets.mjs",
     "build:hosted": "node scripts/build-hosted.mjs",

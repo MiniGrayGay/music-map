@@ -40,13 +40,37 @@ async function request(url) {
   return response;
 }
 
+async function appleMusicTracks(id, country) {
+  const response = await request(`https://music.apple.com/${country}/album/${id}`);
+  const page = await response.text();
+  const state = page.match(/<script\b(?=[^>]*\bid="serialized-server-data")[^>]*>([\s\S]*?)<\/script>/);
+  if (!state) throw new Error(`Apple Music 缺少专辑数据 ${country}:${id}`);
+  const entries = JSON.parse(state[1]).data ?? [];
+  const album = entries.find(({intent}) => intent?.contentDescriptor?.kind === 'album'
+    && intent.contentDescriptor.identifiers?.storeAdamID === id
+    && intent.contentDescriptor.locale?.storefront === country);
+  if (!album) throw new Error(`Apple Music 实际返回的专辑不符 ${country}:${id}`);
+  const tracks = (album.data?.sections ?? []).flatMap(({items}) => items ?? [])
+    .filter(({contentDescriptor, playAction}) => contentDescriptor?.kind === 'song'
+      && playAction?.containerContentDescriptor?.identifiers?.storeAdamID === id);
+  if (!tracks.length) throw new Error(`Apple Music 缺少完整曲目表 ${country}:${id}`);
+  return tracks.map((track) => ({
+    trackId: track.contentDescriptor.identifiers?.storeAdamID,
+    trackName: track.title, trackViewUrl: track.contentDescriptor.url,
+    discNumber: track.discNumber, trackNumber: track.trackNumber,
+    artistName: track.artistName, previewUrl: track.previewUrl,
+  }));
+}
+
 async function catalog(album) {
   const match = /^([a-z]{2}):(\d+)$/i.exec(album);
   if (!match) throw new Error(`无效专辑地址 ${album}`);
   const [, country, id] = match;
   const query = new URLSearchParams({id, country, entity: 'song', limit: '200'});
   const response = await request(`https://itunes.apple.com/lookup?${query}`);
-  return (await response.json()).results.filter((row) => row.previewUrl
+  const search = (await response.json()).results.filter((row) => row.trackId);
+  const tracks = search.length ? search : await appleMusicTracks(id, country);
+  return tracks.filter((row) => row.trackId && row.trackName && row.previewUrl
     && row.artistName?.includes('HOYO-MiX')
     && (!args.excerpt || args.excerpt.includes(String(row.trackId))));
 }
@@ -106,8 +130,10 @@ const files = (await readdir(args.audio)).filter((file) => /^\d+\.opus$/.test(fi
 if (!files.length) throw new Error('找不到可比对的音源');
 const identities = await parallel(files, 24, async (file) => {
   const info = await stat(path.join(args.audio, file));
-  return [file, info.size, info.mtimeMs];
+  const digest = createHash('sha256').update(await readFile(path.join(args.audio, file))).digest('hex');
+  return [file, info.size, info.mtimeMs, digest];
 });
+const sourceDigests = new Map(identities.map(([file, , , digest]) => [path.basename(file, '.opus'), digest]));
 const signature = createHash('sha256').update(JSON.stringify([path.resolve(args.audio), identities])).digest('hex');
 const cacheFile = path.join(args.scratch, 'opus-fingerprints.json');
 const cached = await readFile(cacheFile, 'utf8').then(JSON.parse, () => null);
@@ -183,7 +209,10 @@ for (const [source, hits] of matches) {
   const winner = ordered[0];
   const runnerUp = ordered.find((item) => item.title !== winner.title)?.score ?? null;
   if (winner.score >= 0.89 && (runnerUp === null || winner.score - runnerUp >= 0.07)) {
-    verified[source] = {...winner, runnerUp};
+    const audioSha256 = createHash('sha256')
+      .update(await readFile(path.join(args.audio, `${source}.opus`))).digest('hex');
+    if (audioSha256 !== sourceDigests.get(source)) throw new Error(`比对过程中音源发生变化 ${source}`);
+    verified[source] = {...winner, runnerUp, audioSha256};
   }
 }
 await writeFile(path.join(args.scratch, args.result), JSON.stringify({

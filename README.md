@@ -114,6 +114,12 @@ pnpm run export:site --audio-base https://assets.example.org/teyvat/audio/
   `scripts/match-bgm-soundtrack.mjs` 用 Chromaprint 比对本机 Opus 和官方原声试听。
   已确认的匹配收录在 `scripts/verified-soundtrack-titles.json`，打包时重新校验
   曲名证据表、音源 SHA-256 和 Ogg Opus 时长。
+  某些地区的 iTunes 索引只返回专辑。匹配脚本会改读 Apple Music 的发行曲目表
+  和官方试听。使用 `pnpm run audio:apply-titles` 可把确认的指纹结果合入候选清单
+  和候选证据表。通过 `--edition 原专辑编号:中文专辑编号` 指定同一专辑的发行版本，
+  现有英文曲名只有在音频指纹、分碟和曲序均吻合时才更新。
+  有双语发行曲目表时，也可用 `--publisher-album Apple专辑编号:QQ专辑编号` 取得
+  中文名，此路径核对发行者、英文名、分碟、曲序和原声时长。
 - `pnpm run audio:extract` 从原始音乐 PCK 按音源编号提取 Wwise Vorbis，
   解码后生成浏览器可播的 Opus。新编码的文件有独立指纹，替换生产音频需要重新核对
   曲名证据。解码器用 `--decoder` 指定，编码器可用 `--ffmpeg` 指定。
