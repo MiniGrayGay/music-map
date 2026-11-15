@@ -1,6 +1,7 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
 
 const storageKey = 'teyvat-bgm-playback';
+const bufferingLimitMs = 20_000;
 
 function readPreferences() {
   try {
@@ -27,7 +28,30 @@ export function useMusicTransport(element, onEnded) {
   let source = '';
   let request = 0;
   let pendingSeek = null;
-  const playing = computed(() => requested.value && !['blocked', 'error'].includes(phase.value));
+  let bufferingTimer;
+  const playing = computed(() => phase.value === 'playing');
+  const failed = computed(() => phase.value === 'error' || phase.value === 'timeout');
+
+  function setPhase(value) {
+    clearTimeout(bufferingTimer);
+    phase.value = value;
+  }
+
+  function buffer(audio) {
+    if (phase.value === 'buffering') return;
+    phase.value = 'buffering';
+    const activeRequest = request;
+    // A server can leave a request open without ever producing a media error.
+    bufferingTimer = setTimeout(() => {
+      if (activeRequest !== request || !requested.value || phase.value !== 'buffering') return;
+      request += 1;
+      requested.value = false;
+      setPhase('timeout');
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    }, bufferingLimitMs);
+  }
 
   function applyPreferences() {
     if (element.value) {
@@ -70,28 +94,31 @@ export function useMusicTransport(element, onEnded) {
     request += 1;
     requested.value = false;
     element.value?.pause();
-    phase.value = source ? 'paused' : 'idle';
+    if (!failed.value) setPhase(source ? 'paused' : 'idle');
   }
 
   async function play() {
     const audio = element.value;
-    if (!audio || !source) return;
-    if (phase.value === 'error') {
+    if (!audio || !source || requested.value) return;
+    if (failed.value) {
       if (current.value > 0) pendingSeek = current.value;
-      audio.load();
+      if (audio.src === source) audio.load();
+      else audio.src = source;
     }
     if (audio.ended) audio.currentTime = 0;
     const activeRequest = ++request;
     requested.value = true;
-    phase.value = audio.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? 'buffering' : 'playing';
+    buffer(audio);
     try {
       await audio.play();
+      if (activeRequest === request && !audio.paused && !audio.seeking
+        && audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) setPhase('playing');
     } catch (error) {
       if (activeRequest !== request) return;
       requested.value = false;
-      if (error?.name === 'NotAllowedError') phase.value = 'blocked';
-      else if (error?.name === 'AbortError') phase.value = 'paused';
-      else phase.value = 'error';
+      if (error?.name === 'NotAllowedError') setPhase('blocked');
+      else if (error?.name === 'AbortError') setPhase('paused');
+      else setPhase('error');
     }
   }
 
@@ -100,7 +127,7 @@ export function useMusicTransport(element, onEnded) {
     if (!audio) return;
     const url = track?.url ? new URL(track.url, document.baseURI).href : '';
     if (url && url === source) {
-      if (autoplay && !playing.value) void play();
+      if (autoplay && !requested.value) void play();
       return;
     }
     request += 1;
@@ -115,7 +142,7 @@ export function useMusicTransport(element, onEnded) {
     if (url) audio.src = url;
     else audio.removeAttribute('src');
     audio.load();
-    phase.value = url ? 'paused' : 'idle';
+    setPhase(url ? 'paused' : 'idle');
     if (autoplay && url) void play();
   }
 
@@ -155,26 +182,26 @@ export function useMusicTransport(element, onEnded) {
 
   const events = {
     playing: ({target}) => {
-      if (matches(target) && requested.value && !target.paused) phase.value = 'playing';
+      if (matches(target) && requested.value && !target.paused) setPhase('playing');
     },
     waiting: ({target}) => {
-      if (matches(target) && requested.value && !target.paused) phase.value = 'buffering';
+      if (matches(target) && requested.value && !target.paused) buffer(target);
     },
     pause: ({target}) => {
       if (!matches(target) || !target.paused || target.ended) return;
-      if (playing.value) pause();
+      if (requested.value) pause();
     },
     ended: ({target}) => {
       if (!matches(target) || !target.ended) return;
       requested.value = false;
-      phase.value = 'paused';
+      setPhase('paused');
       onEnded();
     },
     error: ({target}) => {
       if (!source || target.src !== source || !target.error) return;
       request += 1;
       requested.value = false;
-      phase.value = 'error';
+      setPhase('error');
     },
     timeupdate: ({target}) => syncProgress(target),
     durationchange: ({target}) => syncProgress(target),
@@ -190,6 +217,7 @@ export function useMusicTransport(element, onEnded) {
   onBeforeUnmount(() => {
     const audio = element.value;
     request += 1;
+    clearTimeout(bufferingTimer);
     if (!audio) return;
     for (const [type, handler] of Object.entries(events)) audio.removeEventListener(type, handler);
     audio.pause();
@@ -198,7 +226,7 @@ export function useMusicTransport(element, onEnded) {
   });
 
   return {
-    phase, requested, playing, current, duration, buffered, volume, adjustableVolume, muted, repeat,
+    phase, requested, playing, failed, current, duration, buffered, volume, adjustableVolume, muted, repeat,
     load, play, pause, seek, setVolume, toggleMute, toggleRepeat,
   };
 }

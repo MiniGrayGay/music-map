@@ -42,18 +42,19 @@ const tracks = computed(() => selection.value.tracks);
 const track = computed(() => tracks.value[trackIndex.value]);
 const transport = useMusicTransport(audioRef, onEnd);
 const {
-  phase, requested, playing, current, duration, buffered, volume, adjustableVolume, muted, repeat,
+  phase, requested, failed, current, duration, buffered, volume, adjustableVolume, muted, repeat,
   load, play, pause, seek, setVolume, toggleMute, toggleRepeat,
 } = transport;
 const position = computed(() => seekDraft.value ?? current.value);
 const percent = (seconds) => duration.value > 0 ? Math.min(100, seconds / duration.value * 100) : 0;
 const message = computed(() => {
   if (phase.value === 'blocked') return '点播放继续试听';
+  if (phase.value === 'timeout') return '音源响应超时';
   if (phase.value === 'error') return '音源读取失败';
   if (!track.value) return selection.value.incomplete ? '当前条件的音轨待核实' : '当前条件暂无音轨';
   return '';
 });
-const playLabel = computed(() => playing.value ? '暂停' : phase.value === 'error' ? '重试播放' : '播放');
+const playLabel = computed(() => requested.value ? '暂停' : failed.value ? '重试播放' : '播放');
 
 // 曲目文案只允许两种：游戏内已核实的中文曲名，或自然的无曲名状态。
 // 不用素材文件名、Wwise 状态值或「地区 · 时段」式拼接充当曲名。
@@ -114,7 +115,7 @@ function loadTrack(autoplay = requested.value) {
 }
 
 function togglePlay() {
-  if (playing.value) pause();
+  if (requested.value) pause();
   else void play();
 }
 
@@ -235,7 +236,7 @@ onBeforeUnmount(() => {
               :aria-busy="phase === 'buffering' || undefined"
               :disabled="!track" @click="togglePlay">
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path :d="playing ? 'M4.5 3.5h2.4v9H4.5zM9.1 3.5h2.4v9H9.1z' : 'M5 3.2v9.6L12.6 8z'"
+          <path :d="requested ? 'M4.5 3.5h2.4v9H4.5zM9.1 3.5h2.4v9H9.1z' : 'M5 3.2v9.6L12.6 8z'"
                 fill="currentColor" />
         </svg>
       </button>

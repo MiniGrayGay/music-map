@@ -208,6 +208,33 @@ try {
   await page.click('button[aria-label="重试播放"]');
   await playing(second.url);
   assert.equal(await page.$('.playback-status'), null);
+
+  const releaseStalled = media.hold(first.id);
+  await page.click('button[aria-label="上一首"]');
+  await page.waitForFunction((url) => {
+    const element = document.querySelector('audio');
+    return element.currentSrc === url && element.readyState === 0;
+  }, {}, first.url);
+  await page.waitForSelector('button[aria-label="暂停"][aria-busy="true"]', {visible: true});
+  await page.click('button[aria-label="暂停"]');
+  await page.waitForSelector('button[aria-label="播放"]', {visible: true});
+  await page.mouse.click(rect.x + rect.width * 0.62, rect.y + rect.height / 2);
+  await page.click('button[aria-label="播放"]');
+  await page.waitForFunction(() => document.querySelector('.playback-status')?.textContent
+    === '音源响应超时', {timeout: 25000});
+  assert.ok(await page.$eval('audio', (element) => element.paused && !element.hasAttribute('src')));
+  assert.ok(await slider.evaluate((input) => Number(input.value) > Number(input.max) / 2));
+  releaseStalled();
+  await page.screenshot({path: path.join(qa, 'external-timeout.png')});
+  await page.click('button[aria-label="重试播放"]');
+  await playing(first.url);
+  await page.waitForFunction(() => {
+    const element = document.querySelector('audio');
+    return !element.seeking && element.currentTime > element.duration / 2;
+  });
+  assert.equal(await page.$('.playback-status'), null);
+  console.log('无响应的音源可以暂停等待，超时后保留选曲与进度，并从所选位置重试播放');
+
   assert.deepEqual(errors, []);
   await page.screenshot({path: path.join(qa, 'external-playback.png')});
   console.log('浏览器通过独立源播放、暂停定位、切歌和故障重试，站点目录无音频文件');
