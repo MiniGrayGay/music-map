@@ -4,7 +4,7 @@
 // 交互走 .world 内透明命中 path（fill:none + pointer-events:fill）；tooltip
 // 只用 RegionTooltip。单击、右键或回车激活分区交给播放器，空白点击收起
 // 播放器。基础交互保持：鼠标/触屏拖动、指轮锚点缩放、双指捏合、键盘平移缩放。
-import {computed, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
+import {computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} from 'vue';
 
 import RegionTooltip from '../../components/RegionTooltip.vue';
 import {musicView} from '../bgm/bgmStatus.js';
@@ -18,11 +18,15 @@ import {
 import RegionLines from './RegionLines.vue';
 import TileCanvas from './TileCanvas.vue';
 import {
+  drawMoonCanonOverlay, loadMoonCanonSafety, moonCanonPatch, moonCanonReachable, moonCanonZoneAnchor,
+} from './mooncanonSafety.js';
+import {
   MAX_SCALE,
   clampTransform,
   fitTransform,
   minScale,
   panBy,
+  rasterPosition,
   viewportWorldRect,
   zoomAt,
 } from './mapModel.js';
@@ -31,11 +35,16 @@ const props = defineProps({
   mapData: {type: Object, required: true},
   mapName: {type: String, required: true},
   bgm: {type: Object, required: true}, // {status, reason, zones, …}（bgmStatus 结果）
+  smoothBoundaries: {type: Boolean, default: true},
 });
 
-const emit = defineEmits(['view', 'zone-activate', 'blank-tap']);
+const emit = defineEmits(['view', 'zone-activate', 'blank-tap', 'canvas-frame']);
 
 const containerRef = ref(null);
+const moonOverlay = ref(null);
+const moonSafety = shallowRef(null);
+const moonSafetyError = ref(false);
+const isMoonCanon = computed(() => props.mapName === 'MoonCanon');
 const viewport = reactive({width: 0, height: 0});
 const deviceScale = ref(window.devicePixelRatio || 1);
 const transform = reactive({scale: 1, tx: 0, ty: 0});
@@ -63,12 +72,38 @@ const layerArtworkReady = computed(() => currentLayerIds.value.length > 0
 const zoomCeiling = computed(() => Math.min(MAX_SCALE, ...activeLayerPieces.value.map(
   (entry) => entry.pixelDensity / deviceScale.value,
 )));
-const zones = computed(() => {
+const mapZones = computed(() => {
   if (layerModeActive.value && !layerArtworkReady.value) {
     return [];
   }
   return musicView(props.bgm, props.mapName, currentLayerIds.value, layerModeActive.value);
 });
+const moonZoneAnchors = computed(() => {
+  const anchors = new Map();
+  if (!isMoonCanon.value || !moonSafety.value) return anchors;
+  for (const zone of mapZones.value) {
+    const anchor = moonCanonZoneAnchor(moonSafety.value, zone);
+    if (anchor) anchors.set(zone.key, anchor);
+  }
+  return anchors;
+});
+const zones = computed(() => isMoonCanon.value
+  ? mapZones.value.filter(({key}) => moonZoneAnchors.value.has(key)) : mapZones.value);
+
+watch(isMoonCanon, (enabled, _, cleanup) => {
+  moonSafetyError.value = false;
+  if (!enabled) return;
+  let current = true;
+  cleanup(() => { current = false; });
+  loadMoonCanonSafety().then((safety) => {
+    if (current) moonSafety.value = safety;
+  }).catch(() => {
+    if (current) moonSafetyError.value = true;
+  });
+}, {immediate: true});
+watch([moonOverlay, moonSafety], ([canvas, safety]) => {
+  if (canvas && safety) drawMoonCanonOverlay(canvas, safety);
+}, {flush: 'post'});
 
 const activeZoneKey = computed(() =>
   hoveredZoneKey.value ?? focusedZoneKey.value ?? selectedZoneKey.value);
@@ -175,6 +210,9 @@ function onPointerDown(event) {
 
 function onPointerMove(event) {
   if (!pointers.has(event.pointerId)) {
+    if (isMoonCanon.value && (event.pointerType === 'mouse' || event.pointerType === 'pen')) {
+      hoveredZoneKey.value = zoneAt(event.clientX, event.clientY)?.key ?? null;
+    }
     // 未按下的鼠标移动：仅更新 tooltip 跟随位置。
     if (event.pointerType === 'mouse' && activeZone.value) {
       const point = pointFromEvent(event);
@@ -245,8 +283,16 @@ function onPointerUp(event) {
   }
 }
 
+function moonReachableAt(clientX, clientY) {
+  if (!isMoonCanon.value) return true;
+  const point = pointFromEvent({clientX, clientY});
+  const {width, height} = props.mapData.canvas;
+  return moonCanonReachable(moonSafety.value, (point.x - transform.tx) / (transform.scale * width),
+    (point.y - transform.ty) / (transform.scale * height));
+}
+
 function zoneAt(clientX, clientY) {
-  if (!zones.value.length) return null;
+  if (!zones.value.length || !moonReachableAt(clientX, clientY)) return null;
   const hit = document.elementFromPoint(clientX, clientY);
   const path = hit?.closest?.('path[data-zone-key]');
   if (!path) return null;
@@ -254,6 +300,7 @@ function zoneAt(clientX, clientY) {
 }
 
 function zoneFromEventTarget(event) {
+  if (!moonReachableAt(event.clientX, event.clientY)) return null;
   const path = event.target?.closest?.('path[data-zone-key]');
   if (!path) return null;
   return zones.value.find((zone) => zone.key === path.dataset.zoneKey) ?? null;
@@ -282,6 +329,7 @@ function setTooltipPoint(point) {
 function onZoneEnter(zone, event) {
   if (dragState.active) return;
   if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
+  if (!moonReachableAt(event.clientX, event.clientY)) return;
   hoveredZoneKey.value = zone.key;
   setTooltipPoint(pointFromEvent(event));
 }
@@ -293,6 +341,14 @@ function onZoneLeave() {
 // 键盘焦点即可视选中（RegionLines 洗色），tooltip 钉在命中面包围盒中心。
 function onZoneFocus(zone, event) {
   focusedZoneKey.value = zone.key;
+  const anchor = moonZoneAnchors.value.get(zone.key);
+  if (anchor) {
+    setTooltipPoint({
+      x: transform.tx + anchor[0] * props.mapData.canvas.width * transform.scale,
+      y: transform.ty + anchor[1] * props.mapData.canvas.height * transform.scale,
+    });
+    return;
+  }
   const rect = event.currentTarget.getBoundingClientRect();
   setTooltipPoint({x: rect.left + rect.width / 2, y: rect.top + rect.height / 2});
 }
@@ -358,9 +414,16 @@ function clearSelection() {
   focusedZoneKey.value = null;
 }
 
+function focusZone(key) {
+  const map = containerRef.value;
+  if (!map) return;
+  const zone = key ? map.querySelector(`[data-zone-key="${CSS.escape(key)}"]`) : null;
+  (zone ?? map).focus({preventScroll: true});
+}
+
 defineExpose({
   zoomIn: () => zoomCenter(1.5), zoomOut: () => zoomCenter(1 / 1.5),
-  resetView, clearSelection,
+  resetView, clearSelection, focusZone,
 });
 
 onMounted(() => {
@@ -397,7 +460,7 @@ onBeforeUnmount(() => {
   <div
     ref="containerRef"
     class="map-surface"
-    :class="{dragging: dragState.active}"
+    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon}"
     tabindex="0"
     role="application"
     aria-roledescription="提瓦特区域地图"
@@ -411,7 +474,14 @@ onBeforeUnmount(() => {
   >
     <TileCanvas :class="{ 'floor-context': layerModeActive }" :map-name="mapName"
                 :pyramid="mapData.pyramid" :canvas="mapData.canvas" :sea-color="mapData.seaColor"
-                :viewport="viewport" :transform="transform" />
+                :viewport="viewport" :transform="transform" @canvas-frame="emit('canvas-frame', $event)" />
+    <img v-if="isMoonCanon" :src="moonCanonPatch.url" class="moon-editor-patch"
+         :class="{'floor-context': layerModeActive}"
+         :style="rasterPosition(transform, moonCanonPatch.left, moonCanonPatch.top,
+           moonCanonPatch.width, moonCanonPatch.height)"
+         alt="" draggable="false" />
+    <canvas v-if="isMoonCanon && moonSafety" ref="moonOverlay" class="moon-safety-overlay"
+            :class="{'floor-context': layerModeActive}" :style="worldStyle" aria-hidden="true" />
     <LayerOverlay :pieces="activeLayerPieces" :transform="transform"
                   @loaded="loadedLayerIds.add($event)" />
     <div class="world" :style="worldStyle">
@@ -451,6 +521,8 @@ onBeforeUnmount(() => {
       :regions="zoneRegions"
       :active-region="activeZoneRegion"
       :transform="transform"
+      :smooth="smoothBoundaries"
+      :highlight-footprint="layerModeActive"
     />
     <RegionTooltip
       v-if="!dragState.active && activeZone && activeZone.key !== selectedZoneKey &&
@@ -463,7 +535,9 @@ onBeforeUnmount(() => {
       :y="tooltipPoint.y"
       :viewport="viewport"
     />
-    <p v-if="layerArtworkReady && bgm.status === 'ready' && !zones.length" class="floor-status" role="status">
+    <p v-if="moonSafetyError" class="floor-status" role="status">霜月遮罩无法加载</p>
+    <p v-else-if="layerArtworkReady && bgm.status === 'ready' && !zones.length
+      && (!isMoonCanon || moonSafety)" class="floor-status" role="status">
       本层音乐分区待核实
     </p>
   </div>
@@ -472,13 +546,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .map-surface {
   position: relative;
+  z-index: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
   outline: none;
   cursor: grab;
-  background:
-    radial-gradient(ellipse 120% 90% at 50% 40%, #17202e 0%, #10141b 70%);
+  background: var(--surface-page);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -488,8 +562,13 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.map-surface:focus-visible {
-  outline: 2px solid var(--control-focus);
+.map-surface:not(.moon-surface)::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(145deg, rgb(191 203 184 / .36), rgb(160 181 168 / .24));
 }
 
 .world {
@@ -499,7 +578,24 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.tile-layer.floor-context {
+.moon-safety-overlay,
+.moon-editor-patch {
+  position: absolute;
+  pointer-events: none;
+}
+
+.moon-safety-overlay {
+  left: 0;
+  top: 0;
+}
+
+.moon-surface .zone-hit:not([data-hovered]) {
+  cursor: inherit;
+}
+
+.tile-layer.floor-context,
+.moon-editor-patch.floor-context,
+.moon-safety-overlay.floor-context {
   opacity: 0.38;
 }
 
@@ -527,13 +623,20 @@ onBeforeUnmount(() => {
 .floor-status {
   position: absolute;
   left: 12px;
-  bottom: 12px;
+  bottom: var(--space-2);
   margin: 0;
-  padding: 5px 8px;
-  border-radius: 7px;
+  padding: var(--space-1);
+  border-radius: var(--radius-card);
   color: var(--text-secondary);
   background: var(--surface-overlay);
   font-size: 12px;
   pointer-events: none;
+}
+
+@media (min-width: 701px) {
+  .floor-status {
+    left: 86px;
+    bottom: 24px;
+  }
 }
 </style>

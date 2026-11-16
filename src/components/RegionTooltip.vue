@@ -3,6 +3,7 @@
 // id1 对查看无益，不直接展示，仅挂 data-region-id 供调试与无头验收定位；
 // 音乐状态只在调用方传入实证 state 时出现，缺省不占位、不猜测。
 import {computed, onBeforeUnmount, onMounted, reactive, ref} from 'vue';
+import LiquidGlass from './LiquidGlass.vue';
 
 const props = defineProps({
   label: {type: String, required: true},
@@ -18,22 +19,37 @@ const MAP_INSET = 8;
 const rootRef = ref(null);
 const size = reactive({width: 0, height: 0});
 const bounds = reactive({width: 0, height: 0});
+const avoidance = ref(null);
 let observer;
 
 onMounted(() => {
   const tooltip = rootRef.value;
   const map = tooltip.offsetParent;
   if (!map) return;
+  const player = map.parentElement?.querySelector('.music-player');
   const measure = () => {
     size.width = tooltip.offsetWidth;
     size.height = tooltip.offsetHeight;
     bounds.width = map.clientWidth;
     bounds.height = map.clientHeight;
+    if (player?.isConnected) {
+      const frame = map.getBoundingClientRect();
+      const panel = player.getBoundingClientRect();
+      avoidance.value = {
+        left: panel.left - frame.left,
+        top: panel.top - frame.top,
+        right: panel.right - frame.left,
+        bottom: panel.bottom - frame.top,
+      };
+    } else {
+      avoidance.value = null;
+    }
   };
   measure();
   observer = new ResizeObserver(measure);
   observer.observe(tooltip);
   observer.observe(map);
+  if (player) observer.observe(player);
 });
 
 onBeforeUnmount(() => observer?.disconnect());
@@ -51,11 +67,19 @@ const placementStyle = computed(() => {
   const left = x - w - CURSOR_GAP;
   const below = y + CURSOR_GAP;
   const above = y - h - CURSOR_GAP;
-  let position;
-  if (right <= maxX - MAP_INSET) position = [right, clamp(below, maxY)];
-  else if (left >= MAP_INSET) position = [left, clamp(below, maxY)];
-  else if (below <= maxY - MAP_INSET) position = [clamp(x - w / 2, maxX), below];
-  else if (above >= MAP_INSET) position = [clamp(x - w / 2, maxX), above];
+  const candidates = [
+    [right, clamp(below, maxY)],
+    [left, clamp(below, maxY)],
+    [clamp(x - w / 2, maxX), below],
+    [clamp(x - w / 2, maxX), above],
+  ];
+  const panel = avoidance.value;
+  const position = candidates.find(([px, py]) => {
+    if (px < MAP_INSET || px > maxX - MAP_INSET
+      || py < MAP_INSET || py > maxY - MAP_INSET) return false;
+    return !panel || px + w + MAP_INSET <= panel.left || px >= panel.right + MAP_INSET
+      || py + h + MAP_INSET <= panel.top || py >= panel.bottom + MAP_INSET;
+  });
   if (!position || w === 0 || h === 0) return {visibility: 'hidden'};
   return {left: `${position[0]}px`, top: `${position[1]}px`};
 });
@@ -64,11 +88,12 @@ const placementStyle = computed(() => {
 <template>
   <div
     ref="rootRef"
-    class="region-tooltip"
+    class="region-tooltip map-glass"
     :style="placementStyle"
     :data-region-id="id1"
     role="status"
   >
+    <LiquidGlass />
     <span class="name">{{ label }}</span>
     <span v-if="bgmState" class="bgm">
       <span class="bgm-text">{{ bgmState }}</span>
@@ -86,19 +111,16 @@ const placementStyle = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
+  gap: 0;
   padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--surface-overlay-border);
-  backdrop-filter: blur(6px);
+  border-radius: var(--radius-control);
   width: max-content;
   max-width: min(220px, calc(100% - 16px));
 }
 
 .name {
   font-size: 14px;
-  line-height: 1.35;
+  line-height: 1.5;
   font-weight: 600;
   color: var(--text-primary);
   overflow-wrap: anywhere;
@@ -107,10 +129,10 @@ const placementStyle = computed(() => {
 .bgm {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
   max-width: 100%;
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 

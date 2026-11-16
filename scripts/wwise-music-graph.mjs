@@ -181,5 +181,35 @@ export function rebuildAreaPlaylists(manifest) {
       const label = graph.groups?.[group]?.options?.[key];
       (base.variants ??= []).push({...choice, condition: [group, key], ...(label ? {label} : {})});
     }
+    // 已证隐藏分支：探索默认解析完全无曲、无变体且无失败项（链路完整落在唯一的
+    // 空默认分支）时，若链路上存在单父级、只绑一个未命名条件组的开关，把它的
+    // 非默认键解析为可试听变体。组名与游戏触发条件未知，label 用「变体 N」，
+    // 不猜名字；默认分支保持空，不让未知条件成为全局默认。
+    if (!base.sources.length && !base.variants?.length && !base.unresolved) {
+      const named = new Set([graph.zoneGroup, graph.modeGroup,
+        ...(paired ? [paired[0]] : []), ...Object.keys(graph.groups ?? {}).map(Number)]);
+      const parents = new Map();
+      for (const node of Object.values(graph.nodes)) {
+        for (const [, target] of node.leaves ?? []) parents.set(target, (parents.get(target) ?? 0) + 1);
+      }
+      for (const step of base.path ?? []) {
+        const node = graph.nodes[step.switch];
+        if (node?.kind !== 'switch' || node.groups?.length !== 1
+          || named.has(node.groups[0]) || parents.get(step.switch) !== 1) continue;
+        const group = node.groups[0];
+        let index = 0;
+        for (const [keys] of node.leaves) {
+          const key = keys[0];
+          if (key === graph.noneState) continue;
+          const choice = derivePlaylist(graph, {
+            ...states, [graph.modeGroup]: graph.modes.exploration, [group]: key,
+          });
+          if (!choice.sources.length) continue;
+          index += 1;
+          (base.variants ??= []).push({...choice, condition: [group, key], label: `变体 ${index}`});
+        }
+        if (base.variants?.length) break;
+      }
+    }
   }
 }

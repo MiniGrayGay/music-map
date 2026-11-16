@@ -126,3 +126,5 @@ export function compareSourceOrder(a, b) {
 
 export const roundPositions = (points) => points.map((pair) =>
   pair.map((number) => Number(number.toFixed(5))));
+
+export const volumeKey = ({sceneId, id, order}) => `${sceneId}:${id}:${order.join('.')}`;

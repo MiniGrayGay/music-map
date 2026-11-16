@@ -2,9 +2,11 @@ import {readFile, readdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {
-  compareSourceOrder, components, covers, difference, emptyPolygon, filledRings, intersection,
-  pointAt, pointsFromLine, polygonFromRings, polygonRings, roundPositions, symmetricDifference, union,
+  compareSourceOrder, components, covers, difference, emptyPolygon, filledRings, intersection, intersects,
+  lineFromPoints, pointAt, pointsFromLine, polygonFromRings, polygonRings, polygonsOnly, roundPositions,
+  symmetricDifference, union, volumeKey,
 } from './bgm-geometry.mjs';
+import {readSurfaceTerrain} from './bgm-surface-terrain.mjs';
 
 const read = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value);
@@ -74,7 +76,7 @@ async function locatePoints(directory, guide, volumes, layers, layerFloor) {
     .map(({id, position}) => [id, position]))]));
   const layerIds = new Map([...group(layers, (layer) => layer.sceneId)]
     .map(([id, rows]) => [id, new Set(rows.map(({layerId}) => layerId))]));
-  const ground = new Set();
+  const ground = new Map();
   const floorAssignments = new Map();
   const floorAnchors = {};
   for (const file of (await readdir(directory)).sort()) {
@@ -105,14 +107,18 @@ async function locatePoints(directory, guide, volumes, layers, layerFloor) {
       if (floorKey && layerId && verified) {
         const area = child ?? parent;
         (floorAnchors[floorKey] ??= []).push({
-          pointId, layerId, position: xyz, areaId: area.id, state: area.state,
+          pointId, layerId, position: xyz, areaId: area.id, state: area.state, volume: volumeKey(area),
         });
       }
       if (!child) continue;
+      const key = volumeKey(child);
       if (layerId) {
-        if (!floorAssignments.has(child.id)) floorAssignments.set(child.id, new Set());
-        floorAssignments.get(child.id).add(layerId);
-      } else if (verified) ground.add(child.id);
+        if (!floorAssignments.has(key)) floorAssignments.set(key, new Set());
+        floorAssignments.get(key).add(layerId);
+      } else if (verified) {
+        if (!ground.has(key)) ground.set(key, []);
+        ground.get(key).push(point);
+      }
     }
   }
   return {ground, floorAssignments, floorAnchors};
@@ -150,25 +156,73 @@ async function layerPolygons(directory, layers) {
   return group(shapes, ({sceneId}) => sceneId);
 }
 
-function projectSurface(volumes, excluded) {
+async function findUndergroundVolumes(volumes, terrain, ground) {
+  const result = new Set();
+  for (const volume of volumes) {
+    if (!volume.areaId2 || !volume.yRange || ground.has(volumeKey(volume))) continue;
+    const range = await terrain.heightRange(volume.shape);
+    if (range && range[0] > volume.yRange[1]) result.add(volume);
+  }
+  return result;
+}
+
+async function projectSurface(volumes, excluded, underground, terrain, ground) {
   const visible = [];
+  const conflicts = [];
+  const uncertainAreas = [];
   let occupiedParents = emptyPolygon();
   for (const zones of group(volumes, (zone) => zone.areaId1).values()) {
     const parent = zones.find((zone) => !zone.areaId2);
     const parentShape = parent && difference(parent.shape, occupiedParents);
-    let occupiedChildren = emptyPolygon();
+    const candidates = [];
     for (const zone of zones) {
-      if (Object.hasOwn(excluded, zone.id)) continue;
+      if (excluded.has(volumeKey(zone)) || underground.has(zone)) continue;
       let shape = difference(zone.shape, occupiedParents);
       if (parentShape) shape = intersection(shape, parentShape);
-      shape = difference(shape, occupiedChildren);
-      if (shape.getArea() < 0.02) continue;
-      visible.push({zone, shape});
-      occupiedChildren = union([occupiedChildren, shape]);
+      if (shape.getArea() >= 0.02) candidates.push({zone, shape});
+    }
+    const uncertain = [];
+    for (const [index, a] of candidates.entries()) {
+      if (!a.zone.yRange) continue;
+      for (const b of candidates.slice(index + 1)) {
+        if (!b.zone.yRange || a.zone.state === b.zone.state) continue;
+        const [lo, hi] = a.zone.yRange;
+        const [otherLo, otherHi] = b.zone.yRange;
+        // Where the earlier volume covers the later one's whole height band,
+        // the original order always decides between those two.
+        if ((lo <= otherLo && otherHi <= hi) || !intersects(a.shape, b.shape)) continue;
+        const overlap = polygonsOnly(intersection(a.shape, b.shape));
+        if (overlap.getArea() < 0.02) continue;
+        const heights = await terrain?.heightRange(overlap);
+        if (heights && lo <= heights[0] && heights[1] <= hi
+          && (ground.get(volumeKey(b.zone)) ?? []).every((point) => !covers(overlap, point))) continue;
+        const provenOutside = heights ? [a, b].filter(({zone}) => {
+          const anchors = ground.get(volumeKey(zone)) ?? [];
+          const [lower, upper] = zone.yRange;
+          return (heights[0] > upper || heights[1] < lower)
+            && anchors.every((point) => !covers(overlap, point));
+        }) : [];
+        if (provenOutside.length) {
+          for (const candidate of provenOutside) candidate.shape = difference(candidate.shape, overlap);
+        } else {
+          uncertain.push(overlap);
+          conflicts.push({areas: [a.zone.id, b.zone.id], squareMetres: Number(overlap.getArea().toFixed(2))});
+        }
+      }
+    }
+    // A child may override its parent at one of the unresolved heights.
+    let occupied = union(uncertain);
+    if (uncertain.length) uncertainAreas.push(occupied);
+    for (const {zone, shape} of candidates) {
+      const clear = difference(shape, occupied);
+      if (clear.getArea() < 0.02) continue;
+      visible.push({zone, shape: clear});
+      occupied = union([occupied, clear]);
     }
     if (parent) occupiedParents = union([occupiedParents, parent.shape]);
   }
   const result = [];
+  const noBoundary = union(uncertainAreas);
   for (const [state, parcels] of group(visible, ({zone}) => zone.state)) {
     for (const patch of components(union(parcels.map(({shape}) => shape)), 'Polygon')) {
       const owners = parcels.map(({zone, shape}) => ({
@@ -178,15 +232,33 @@ function projectSurface(volumes, excluded) {
       const largest = owners.reduce((a, b) => b.overlap > a.overlap ? b : a).zone;
       const suffix = new Set(owners.map(({zone}) => zone.name)).size > 1 ? '等' : '';
       const rings = polygonRings(patch).map((ring) =>
-        roundPositions(pointsFromLine(ring, {omitClosing: true})));
+        roundPositions(pointsFromLine(ring, {omitClosing: true}))).filter((ring, index) => {
+        if (index === 0) return true;
+        // Overlay can leave a long, effectively zero-width hole along a shared
+        // seam. Five-decimal coordinate rounding can move either side by one unit.
+        const perimeter = ring.reduce((length, [x, z], i) => {
+          const [px, pz] = ring[(i + 1) % ring.length];
+          return length + Math.hypot(x - px, z - pz);
+        }, 0);
+        return polygonFromRings([ring]).getArea() > perimeter * 1e-5;
+      });
       const [x, z] = rings[0][0];
-      result.push({
+      const zone = {
         id: `${largest.id}:${x.toFixed(5)}:${z.toFixed(5)}`,
         name: largest.name + suffix, state, rings, areaIds: owners.map(({zone}) => zone.id),
-      });
+      };
+      if (intersects(patch, noBoundary)) {
+        // A missing height decision creates a hole in the hit area. Its edge
+        // is not an authored music boundary.
+        zone.lines = polygonRings(patch).flatMap((ring) => components(
+          difference(lineFromPoints(pointsFromLine(ring)), noBoundary), 'LineString',
+        ))
+          .map((line) => roundPositions(pointsFromLine(line)));
+      }
+      result.push(zone);
     }
   }
-  return result;
+  return {zones: result, conflicts};
 }
 
 function retainZoneIds(previous, current) {
@@ -230,32 +302,55 @@ const [{ground, floorAssignments, floorAnchors}, shapes] = await Promise.all([
   layerPolygons(args.regions, catalog.layers),
 ]);
 const floorVolumes = new Set(Object.values(bgm.floorZones).flat().flatMap((zone) => zone.areaIds));
-const verifiedLayers = group(Object.values(floorAnchors).flat(), (anchor) => anchor.areaId);
-const excluded = {};
+const verifiedLayers = group(Object.values(floorAnchors).flat(), (anchor) => anchor.volume);
+const excluded = new Map();
 const floorVolumeBindings = {};
+const floorVolumeBindingsByVolume = {};
 for (const [sceneId, zones] of volumes) {
-  for (const {areaId2, id, yRange, shape} of zones) {
+  for (const zone of zones) {
+    const {areaId2, id, yRange, shape} = zone;
     if (!areaId2 || !yRange) continue;
-    const verified = (verifiedLayers.get(id) ?? []).map(({layerId}) => layerId);
+    const key = volumeKey(zone);
+    const verified = (verifiedLayers.get(key) ?? []).map(({layerId}) => layerId);
     const exact = (shapes.get(sceneId) ?? []).filter((layer) =>
       layer.bounds[0] <= yRange[0] && yRange[1] <= layer.bounds[1] && covers(layer.shape, shape),
     ).map(({layerId}) => layerId);
     const assigned = new Set([...verified, ...exact]);
     if (floorVolumes.has(id)) {
-      for (const layer of floorAssignments.get(id) ?? []) assigned.add(layer);
+      for (const layer of floorAssignments.get(key) ?? []) assigned.add(layer);
     }
     if (!assigned.size) continue;
     const ids = [...assigned].sort((a, b) => a - b);
-    floorVolumeBindings[id] = ids;
-    if (!ground.has(id)) excluded[id] = ids;
+    floorVolumeBindingsByVolume[key] = ids;
+    floorVolumeBindings[id] = [...new Set([...(floorVolumeBindings[id] ?? []), ...ids])].sort((a, b) => a - b);
+    if (!ground.has(key)) excluded.set(key, ids);
   }
 }
-const scenes = Object.fromEntries([...volumes].map(([sceneId, rows]) => [
-  sceneId, retainZoneIds(sceneId === 3 ? bgm.zones : bgm.scenes?.[sceneId], projectSurface(rows, excluded)),
-]));
-const {3: zones, ...otherScenes} = scenes;
+const surfaceLayerExclusions = {};
+for (const [id, instances] of group(bgm.volumes.filter(({yRange}) => yRange), ({id}) => id)) {
+  if (instances.every((row) => excluded.has(volumeKey(row)))) {
+    surfaceLayerExclusions[id] = [...new Set(instances.flatMap((row) => excluded.get(volumeKey(row))))].sort((a, b) => a - b);
+  }
+}
+const terrain = await readSurfaceTerrain(bgm.source.clientExecutableSha256);
+const mainWorld = volumes.get(bgm.sceneId);
+if (!mainWorld) throw new Error('音区清单缺少主世界体积');
+const underground = await findUndergroundVolumes(mainWorld, terrain, ground);
+const scenes = {};
+const surfaceViewConflicts = {};
+for (const [sceneId, rows] of volumes) {
+  const main = sceneId === bgm.sceneId;
+  const result = await projectSurface(rows, excluded, underground, main ? terrain : null, ground);
+  scenes[sceneId] = retainZoneIds(main ? bgm.zones : bgm.scenes?.[sceneId], result.zones);
+  if (result.conflicts.length) surfaceViewConflicts[sceneId] = result.conflicts;
+}
+const zones = scenes[bgm.sceneId];
+delete scenes[bgm.sceneId];
 Object.assign(bgm, {
-  zones, scenes: otherScenes, surfaceLayerExclusions: excluded, floorVolumeBindings, floorAnchors,
+  zones, scenes, surfaceLayerExclusions, floorVolumeBindings, floorVolumeBindingsByVolume, floorAnchors,
+  surfaceViewConflicts,
+  surfaceUndergroundExclusions: [...underground].map(({sceneId, id}) => ({sceneId, id})),
 });
+bgm.verification.projection = 'Surface projections use Scene Point and LayerRegion evidence per source volume. Teyvat also checks the map editor terrain heightfield. Unresolved height-dependent overlaps have no clickable surface region.';
 await writeFile(args.out, `${JSON.stringify(bgm)}\n`);
-console.log(`主世界 ${zones.length} 块音区，楼层独立音区 ${Object.keys(excluded).length} 个`);
+console.log(`主世界 ${zones.length} 块音区，楼层独立音区 ${excluded.size} 个`);

@@ -2,6 +2,15 @@
 
 Vue 3、Vite 和 pnpm 项目，使用 7.2.0 的主世界瓦片及地图编辑器的分层资产。
 地图支持鼠标、触屏和键盘操作。音乐清单提供已核对的坐标、分区和可试听音轨。
+默认打开球面地图，支持搜索地点、跨地图定位和选区浮起。退出分层后返回球面。
+地表常驻标签为七国和挪德卡莱，点击地区名称可定位到该地区。
+选中音乐分区时显示该分区的名称，并按边界和可用视野自动移动、缩放。
+进入球面近景后，细分区线随缩放淡入。
+桌面端选中提瓦特地表分区时，在右下角显示对应的 3D 模型点阵，连续旋转 360°。选区自动取景会避开放大的预览。
+`pnpm exec node scripts/build-relief-preview.mjs --out <已登记的生成目录>` 读取 3D 编辑器正式注册表和实例变换，从显示网格取点，以原生地形做底面并过滤地下几何，最后按音乐分区裁剪。
+批量生成时，每批使用 `--part <从 0 开始的批号> --parts <总批数>` 和单独的输出目录。运行 `pnpm exec node scripts/merge-relief-preview.mjs --input <第一批目录> --input <第二批目录> --out <合并目录>`，核对同一模型索引后合并。
+运行 `pnpm exec node scripts/build-uniform-relief.mjs --input <原始模型点阵目录> --mesh-sides --out <地表点阵目录>` 生成等距地面点阵，并在原模型表面的 XZ、XY、ZY 平面上采样屋顶、墙和岩面。常规地面网格最长边约 224 格，极窄分片保留原始采样点。
+运行 `pnpm exec node scripts/build-relief-native-regions.mjs --base <地表点阵目录> --out <合成点阵目录>` 合入至冬 7.2 原生 LOD0 和杜南纳井体，在井体投影范围内移除盖住开口的地面格。将通过校验的索引与数据发布到 `dist/relief/`。浏览器按选区读取对应字节段。
 
 ## 数据来源（全部只读，同版本 7.2.0 客户端）
 
@@ -27,11 +36,15 @@ WorldArea 几何和名称留作音频条件关联的研究输入。主地图投�
 
 - `scripts/build-tile-pyramid.mjs` 按 BetterGI 地图编辑器的 512 像素规格、
   图集切片边界与缩放层级生成 `dist/tiles/<地图>/<z>/<x>/<y>.webp`，
-  所有层级使用有损 WebP quality 100。输入摘要与层级记录在
+  基础金字塔使用有损 WebP quality 100。输入摘要与层级记录在
   `dist/tiles/meta.json`。四张独立地图使用同版本的原始纹理合成。
 - 浏览器按当前视口和 DPI 请求目标层级，未就绪的位置从已缓存的低层级取图，
   在单个画布中合成。楼层贴片与音乐边线由其各自的图层绘制。
   主世界没有源瓦片的空格用海色填底，图集中实际合成的像素保留。
+- `scripts/build-native-map-tiles.mjs --out <已登记的缓存目录>` 读取同版本
+  `Teyvat_2048.png`，在 48 张 2048 像素原图覆盖处切出 768 张 512 像素瓦片。
+  将生成的层级目录放到 `dist/tiles/Teyvat/`，并同步更新 `dist/tiles/meta.json`。
+  放大时平面和球面自动按屏幕像素密度加载这一层，其余位置继续使用基础瓦片。
 
 ## 命令
 
@@ -39,7 +52,7 @@ WorldArea 几何和名称留作音频条件关联的研究输入。主地图投�
 7.2 地图资产与音频清单。
 
 ```powershell
-pnpm run dev       # 编辑器预览
+pnpm run dev       # 本地预览，默认球面，/?player-lab 打开播放器实验页
 pnpm run build     # 编译 Vue，校验并打包静态音频、瓦片、楼层和运行清单
 pnpm run build:hosted # 用仓库中的运行资料生成可发布的 dist/site
 pnpm run preview   # 直接提供 dist 中的文件
@@ -95,6 +108,19 @@ Windows 上遇到目录改名受限时，导出会先保留上一版快照，再
 记录在 manifest 的 `noImageLayers` 中。455 张贴片中有 5 张来自已验证的
 现成 q80 中间图，再编码为 q100，其余 450 张直接用源 PNG 转换。
 
+### 霜月安全区
+
+霜月（场景 102）使用两层原始雾遮罩、九个安全区和左侧开放区 920。球面和平面使用
+同一张遮罩，蓝色点阵裁在原地图轮廓内。鼠标、触屏和搜索按可达范围命中音乐分区。
+描线使用源遮罩和材质阈值，保留静态轮廓。危险区之外使用底图原色。
+
+在项目目录运行 `pnpm exec node scripts/build-mooncanon-stencil.mjs` 可从工作区的
+`research/Extracted/maps/MoonCanonBlueMask/` 重建 `MoonCanonStencil.png`。
+红、绿、蓝通道分别记录危险覆盖、可达像素和描线覆盖。
+乌吉恩圈的合成贴片来自 BetterGI 地图编辑器 `public/MoonCanon_1024.jpg`，
+按照原图像素位置叠入总览和近景。可运行 `pnpm exec node scripts/build-mooncanon-composite.mjs` 重建，
+编辑器目录可通过 `BGI_MAP_EDITOR` 指定。
+
 ## 音乐分区
 
 应用通过静态地址 `/data/genshin-region-bgm.json` 和
@@ -105,14 +131,9 @@ Windows 上遇到目录改名受限时，导出会先保留上一版快照，再
 
 - `scripts/build-bgm-playlists.mjs` 使用已通过核对的 MapInfo、入口与曲名清单，
   核对客户端和 Bank 指纹，并独立从 Wwise HIRC 重建决策树、曲单、片段、音轨和
-  切换规则。播放器按选定的地点和模式解析 Wwise 曲目。昼夜开关立即切换对应歌曲。
-  「歌曲列表」只显示当前地点、探索或战斗以及选定时段的曲目。UI 条件使用已核实的
-  状态名称。
-- 支持昼夜分支的音区可设置「试听时间」。该控件按分钟采样初始化 Bank 的开放世界
-  音乐开关曲线。曲线原始参数在 5.04154 切为白天，在 17.001 切为夜间，所以按整分钟
-  试听时分别在 05:03 与 17:01 切换。参数为 0 时沿用 Wwise 缺省分支。曲线与其他
-  四时段开关组独立，游戏客户端向音频引擎传值的过程仍待复核。
-  `build-bgm-playlists.mjs --init-package <文件名>` 可从原始初始化 Bank 提取曲线，
+  切换规则。歌曲列表中的探索、战斗、昼夜及播放条件可用来浏览对应曲目。
+  点选歌曲后，对应曲单成为播放队列。界面条件使用已核实的状态名称。
+- `build-bgm-playlists.mjs --init-package <文件名>` 可从原始初始化 Bank 提取昼夜曲线，
   重建时会复用清单中已登记的两份 Bank，并可用 `verify-wwise-source.mjs` 核对指纹及控制点。
   现有素材名按 7.2 音源 ID 连接
   [AnimeWwise 名称表](https://github.com/Escartem/AnimeWwise/blob/deba68978cec74d44bff6989bf1066953a73a173/maps/hk4e.map)。
@@ -138,15 +159,17 @@ Windows 上遇到目录改名受限时，导出会先保留上一版快照，再
   [vgmstream](https://github.com/vgmstream/vgmstream/releases)
   [FFmpeg](https://ffmpeg.org/download.html)
 - `scripts/build-bgm-surface.mjs` 使用同版本 Scene Point 的楼层归属和 LayerRegion
-  体积重建地表视图。 `surfaceLayerExclusions` 保留楼层专属音区，`floorVolumeBindings`
-  同时保留有独立证据可在地表和楼层生效的状态。
+  体积重建地表视图。主世界还核对地图编辑器的地形高度，在已覆盖的范围内排除确定低于
+  地形的体积。楼层绑定按原始体积记录区分，同编号体积可有不同的归属。`surfaceViewConflicts`
+  保留高度未能确定的重叠交集，这些范围在地表没有音区命中，也不画出因排除产生的边线。
 - `scripts/build-bgm-floor-views.mjs` 用当前楼层 WebP 的 alpha 裁剪已核实归属的
   音区填色、命中和原有边线。楼层传送点若证实与地表使用同一状态，会在本层贴片上
   提供试听区域，并排除所有可能覆盖该状态的子区域。此类区域保留原音区编号，并以
   楼层实际名称显示。若贴片的部分范围在任意高度都命中同一音乐状态，该范围可供
   试听。页面使用 `floorViews`，边界与高度原始数据保存在 `volumes`。
   `floorAnchors` 记录按真实 XYZ 校验的传送点与音乐状态，`floorViewConflicts`
-  保留二维投影有歧义的条目。
+  保留二维投影有歧义的条目。不同高度状态在同一楼层贴片上互相覆盖时，优先排除交集，
+  保留可判定的其余范围。
   `scripts/verify-bgm-geometry.mjs` 可将重新生成的清单与已有清单按音区编号、
   音乐状态、传送点、填色范围和边线逐项比较。
 

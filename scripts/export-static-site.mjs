@@ -1,12 +1,16 @@
+import {createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
 import {constants} from 'node:fs';
-import {copyFile, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile} from 'node:fs/promises';
+import {copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, promisify} from 'node:util';
 import {setTimeout as wait} from 'node:timers/promises';
 import {normalizeAudioBase} from '../src/features/bgm/audioUrl.js';
-import {layerFileNames, tileFileNames} from './asset-layout.mjs';
+import {
+  INITIAL_MUSIC_PREVIEW_VERSION, INITIAL_MUSIC_PREVIEWS, mergedVerifiedTracks,
+} from '../src/features/bgm/verifiedTracks.js';
+import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
 
 const dist = path.resolve(import.meta.dirname, '../dist');
 const marker = 'data/site-export.json';
@@ -86,6 +90,17 @@ async function copyAsset(source, target) {
   await copyFile(source, target, constants.COPYFILE_EXCL | constants.COPYFILE_FICLONE);
 }
 
+async function preserveAsset(source, target) {
+  await mkdir(path.dirname(target), {recursive: true});
+  // The export directory is discarded right after preservation, so hard links keep
+  // the rollback snapshot without duplicating the previous site on disk.
+  try {
+    await link(source, target);
+  } catch (error) {
+    await copyFile(source, target, constants.COPYFILE_EXCL | constants.COPYFILE_FICLONE);
+  }
+}
+
 async function renameDirectory(source, target) {
   const retries = process.platform === 'win32' ? [50, 150, 400, 800, 1600] : [];
   for (const delay of retries) {
@@ -100,10 +115,10 @@ async function renameDirectory(source, target) {
   await rename(source, target);
 }
 
-async function copyFiles(source, target, files) {
+async function copyFiles(source, target, files, transfer = copyAsset) {
   for (let index = 0; index < files.length; index += 32) {
     const batch = await Promise.allSettled(files.slice(index, index + 32).map((relative) =>
-      copyAsset(path.join(source, relative), path.join(target, relative))));
+      transfer(path.join(source, relative), path.join(target, relative))));
     const failure = batch.find(({status}) => status === 'rejected');
     if (failure) throw failure.reason;
   }
@@ -128,13 +143,14 @@ async function missingSnapshotFiles(output, snapshot) {
   return [...missing];
 }
 
-async function copySite(source, target, snapshot) {
+async function copySite(source, target, snapshot, {preserve = false} = {}) {
+  const transfer = preserve ? preserveAsset : copyAsset;
   await mkdir(target);
   try {
     await createDirectories(target, snapshot.directories);
-    await copyFiles(source, target, snapshot.files.filter((name) => name !== 'index.html' && name !== marker));
+    await copyFiles(source, target, snapshot.files.filter((name) => name !== 'index.html' && name !== marker), transfer);
     for (const relative of ['index.html', marker]) {
-      if (snapshot.files.includes(relative)) await copyAsset(path.join(source, relative), path.join(target, relative));
+      if (snapshot.files.includes(relative)) await transfer(path.join(source, relative), path.join(target, relative));
     }
     if (JSON.stringify(await validateDestination(target)) !== JSON.stringify(snapshot)) {
       throw new Error(`复制后的站点文件不完整 ${target}`);
@@ -183,7 +199,7 @@ async function preserveDestination(output, prior, snapshot) {
     if (!isWindowsRenameLock(error)) throw error;
   }
   // Windows may block a directory rename while permitting removal of the generated snapshot.
-  await copySite(output, prior, snapshot);
+  await copySite(output, prior, snapshot, {preserve: true});
   try {
     const current = await validateDestination(output);
     if (JSON.stringify(current) !== JSON.stringify(snapshot)) throw new Error(`导出目录在打包时发生变化 ${output}`);
@@ -222,16 +238,17 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   const relativeFiles = [
     'favicon.svg', 'tiles/meta.json', 'data/map-data.json', 'layers/manifest.json', 'layers/basemaps.json',
   ];
-  const [index, tiles, layers, bgm, build] = await Promise.all([
+  const [index, tiles, layers, bgm, build, relief] = await Promise.all([
     readFile(path.join(source, 'index.html'), 'utf8'),
     readFile(path.join(source, 'tiles/meta.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'layers/manifest.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'data/genshin-region-bgm.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'data/build-assets.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(source, 'relief/index.json'), 'utf8').then(JSON.parse),
   ]);
   const assets = [...new Set(Object.values(build).flatMap((chunk) =>
     [chunk.file, ...(chunk.css ?? []), ...(chunk.assets ?? [])]))];
-  if (assets.some((file) => !/^assets\/[A-Za-z0-9_-]+\.(?:js|css|svg|webp|woff2)$/.test(file))) {
+  if (assets.some((file) => !/^assets\/[A-Za-z0-9_-]+\.(?:js|css|svg|webp|jpg|png|woff2)$/.test(file))) {
     throw new Error('发现未识别的构建资产路径');
   }
   const entries = Array.from(index.matchAll(/(?:src|href)="(?:\.\/|\/)?assets\/([^"]+)"/g),
@@ -245,7 +262,33 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   }
   bgm.musicGraph.audioBaseUrl = audioBaseUrl;
   const manifest = JSON.stringify(bgm);
-  relativeFiles.push(...assets, ...tileFileNames(tiles), ...layerFileNames(layers));
+  // 已核实兜底曲与初始试听补曲整组随站点导出（同站绝对路径试听）：先核对
+  // 现有音频指纹，与 dist/region-bgm-audio 下的完整音频大库相互独立，仅按
+  // 清单精确取文件。初始试听版本须与站点清单客户端版本一致，segment id
+  // 不得与图内音源冲突。
+  if (INITIAL_MUSIC_PREVIEW_VERSION !== bgm.clientVersion) {
+    throw new Error(`初始试听清单版本 ${INITIAL_MUSIC_PREVIEW_VERSION} 与客户端 ${bgm.clientVersion} 不一致`);
+  }
+  for (const track of INITIAL_MUSIC_PREVIEWS) {
+    if (Object.hasOwn(bgm.musicGraph.media, String(track.id))) {
+      throw new Error(`初始试听补曲 ${track.id} 与图内音源 id 冲突`);
+    }
+  }
+  const verified = mergedVerifiedTracks();
+  const verifiedFiles = verified.map((track) => `region-bgm-audio/${track.id}.opus`);
+  await Promise.all(verified.map(async (track, index) => {
+    const digest = createHash('sha256').update(
+      await readFile(path.join(source, verifiedFiles[index])),
+    ).digest('hex');
+    if (digest !== track.audioSha256.toLowerCase()) {
+      throw new Error(`已核实兜底音轨 ${track.id} 指纹不符`);
+    }
+  }));
+  const reliefFiles = reliefFileNames(relief, bgm);
+  const reliefSizes = await Promise.all(reliefFiles.map((relative) => assetSize(source, relative)));
+  if (reliefSizes[1] !== relief.bytes) throw new Error('分区点阵发布字节数不符');
+  const reliefBytes = reliefSizes[0] + reliefSizes[1];
+  relativeFiles.push(...assets, ...verifiedFiles, ...tileFileNames(tiles), ...layerFileNames(layers), ...reliefFiles);
   const stamp = JSON.stringify({format: markerFormat,
     files: [...relativeFiles, 'index.html', 'data/genshin-region-bgm.json']});
   let bytes = Buffer.byteLength(index) + Buffer.byteLength(manifest) + Buffer.byteLength(stamp);
@@ -288,7 +331,7 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   } finally {
     await discardGenerated(stage);
   }
-  return {output, bytes, files: relativeFiles.length + 3, audioBaseUrl};
+  return {output, bytes, reliefBytes, files: relativeFiles.length + 3, audioBaseUrl};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

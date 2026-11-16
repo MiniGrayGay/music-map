@@ -1,6 +1,8 @@
 import {markRaw} from 'vue';
 import {audioUrl, normalizeAudioBase} from './audioUrl.js';
 import {projectRings, ringsBBox, ringsPathData} from './zoneGeometry.js';
+import {withVerifiedTrack} from './musicGraph.js';
+import {verifiedTrackFor} from './verifiedTracks.js';
 
 export const BGM_STATUS = {
   LOADING: 'loading',
@@ -95,7 +97,12 @@ export function musicView(bgm, mapName, layerIds, floorSelected) {
   if (floorSelected) {
     const floorKeys = [...new Set(layerIds.map((id) => payload.layerFloor?.[id]).filter(Boolean))];
     return floorKeys.flatMap((id) => normalizeView(payload.floorViews?.[id] ?? [],
-      payload.music, payload.musicGraph, origin, areaNames, `layer-${id}-`).items);
+      payload.music, payload.musicGraph, origin, areaNames, `layer-${id}-`).items.map((zone) => {
+      // 仅在楼层 key 与区域 id 同时匹配核实关联行时，为该 zone 换上带核实
+      // 备用曲的 graph 包装；其余 zone 与非楼层视图保持原 graph。
+      const verified = verifiedTrackFor(id, typeof zone.id === 'number' ? zone.id : null);
+      return verified ? {...zone, graph: markRaw(withVerifiedTrack(zone.graph, verified))} : zone;
+    }));
   }
   if (mapName === 'Teyvat') return bgm.zones;
   return normalizeView(payload.scenes?.[map.sceneId] ?? [], payload.music, payload.musicGraph,

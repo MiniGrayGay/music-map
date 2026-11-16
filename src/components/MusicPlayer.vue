@@ -1,642 +1,1285 @@
 <script setup>
-import {computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, useId, watch} from 'vue';
-// 域 API 不再返回 alternatives：播放器只呈现选中地点在当前条件下的真实曲目。
-import {BGM_MODES} from '../features/bgm/bgmStatus.js';
-import {musicClockPreset, musicClockState, resolveMusic} from '../features/bgm/musicGraph.js';
-import {useMusicMediaSession} from '../features/bgm/useMusicMediaSession.js';
-import {useMusicTransport} from '../features/bgm/useMusicTransport.js';
+import {computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useId, watch} from 'vue';
+import {resolveMusic} from '../features/bgm/musicGraph.js';
+import {useMusicPlayback} from '../features/bgm/useMusicPlayback.js';
+import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
+import LiquidGlass from './LiquidGlass.vue';
+import RevealPanel from './RevealPanel.vue';
+import SegmentedChoice from './SegmentedChoice.vue';
 import {pushEscapeHandler} from './escapeStack.js';
-import ScrollPane from './ScrollPane.vue';
-import SelectMenu from './SelectMenu.vue';
 
 const props = defineProps({
   zone: {type: Object, required: true},
-  mode: {type: String, required: true},
+  mode: {type: String, default: 'exploration'},
+  preview: {type: Boolean, default: false},
 });
 const emit = defineEmits(['close', 'update:mode']);
-const modeLabels = {exploration: '探索', combat: '战斗'};
-const flyoutId = useId();
-const audioRef = ref(null);
-const trackIndex = ref(0);
-const drawer = ref(null);
-const drawerTrigger = ref(null);
-const clockInput = ref(null);
-const seekDraft = ref(null);
-const auditionMinute = ref(null);
-const clockDraft = ref(null);
-const overrides = reactive({});
-let loadedTrackId;
-let resumeAfterEmpty = false;
 
-const clock = computed(() => props.zone.graph?.clock);
-const selection = computed(() => {
-  if (props.zone.graph) {
-    const time = clock.value;
-    const states = time && auditionMinute.value !== null
-      ? {...overrides, [time.group]: musicClockState(time, auditionMinute.value)} : overrides;
-    return resolveMusic(props.zone.graph, props.zone.musicState, props.mode, states);
+const musicModes = [
+  {key: 'exploration', label: '探索'},
+  {key: 'combat', label: '战斗'},
+];
+const uid = useId();
+const glass = ref(null);
+const fluidBackdrop = shallowRef(null);
+provide(fluidBackdropKey, fluidBackdrop);
+let pendingBackdrop;
+let backdropTimer = 0;
+const detailsToggle = ref(null);
+const volumeToggle = ref(null);
+const volumePopover = ref(null);
+const volumeInput = ref(null);
+const detailsOpen = ref(false);
+const titleLine = ref(null);
+const departingTitle = ref(null);
+const trackCount = ref(null);
+const queueFrame = ref(null);
+const queueScroll = ref(null);
+const detailsBody = ref(null);
+const volumeOpen = ref(false);
+const mobileVolume = matchMedia('(max-width: 700px), (pointer: coarse)');
+const systemVolume = ref(mobileVolume.matches);
+const selectedId = ref(null);
+const overrides = shallowRef({});
+const browse = shallowRef({mode: props.mode, overrides: overrides.value});
+const zone = computed(() => props.zone);
+const phaseGroup = computed(() => zone.value.graph?.clock?.group);
+
+function resolveSelection(mode, conditions) {
+  const {graph, musicState, playlists} = zone.value;
+  if (graph) {
+    const resolved = resolveMusic(graph, musicState, mode, conditions);
+    // 窄规则：图沿未知条件的默认分支解析出零曲且无失败项时，回退到清单里
+    // 生成器已证的非默认变体（如蓝珀湖的隐藏分支），曲名用分支名，不猜条件。
+    if (!resolved.tracks.length && !resolved.incomplete) {
+      const variants = (playlists?.[mode] ?? []).flatMap((branch) => branch.tracks.map((item) => ({
+        ...item, name: item.name || branch.label.replace(/^曲单 /, ''),
+      })));
+      if (variants.length) return {tracks: variants, conditions: [], incomplete: false};
+    }
+    return resolved;
   }
-  const branch = props.zone.playlists[props.mode][0];
-  return {tracks: branch.tracks, conditions: [], incomplete: branch.incomplete};
-});
-const dayNight = computed(() => selection.value.conditions.find((group) => group.title === '昼夜'));
-const hasClock = computed(() => Boolean(clock.value && dayNight.value?.id === clock.value.group));
-const dayNightKey = computed(() => hasClock.value && auditionMinute.value !== null
-  ? musicClockState(clock.value, auditionMinute.value) : dayNight.value?.value);
-const clockMinute = computed(() => clockDraft.value ?? auditionMinute.value
-  ?? (hasClock.value ? musicClockPreset(clock.value, dayNightKey.value) : 0));
-// 「播放条件」只收已核实的开关：组名与全部选项 label 都经证实才展示。
-// 未命名开关的语义留在数据层，界面不出现「未命名条件 N」或拿曲名冒充的
-// 条件选项；变体曲目组合只通过曲目列表按当前条件试听。
-const advanced = computed(() => selection.value.conditions.filter((group) =>
-  group !== dayNight.value && group.named && group.entries.every((entry) => entry.label)));
-// 解析层已按源编号序列全局去重，这里直接透传，不再复制去重。
-const tracks = computed(() => selection.value.tracks);
-const track = computed(() => tracks.value[trackIndex.value]);
-const transport = useMusicTransport(audioRef, onEnd);
+  const branch = playlists?.[mode]?.[0];
+  return {tracks: branch?.tracks ?? [], conditions: [], incomplete: branch?.incomplete ?? true};
+}
+
+function playableTracks(selection) {
+  return selection.tracks.filter(({url}) => url).map((item) => ({
+    ...item,
+    displayName: item.name || '未核对曲名',
+  }));
+}
+
+const music = computed(() => resolveSelection(props.mode, overrides.value));
+const tracks = computed(() => playableTracks(music.value));
+const browseMusic = computed(() => browse.value.mode === props.mode && browse.value.overrides === overrides.value
+  ? music.value : resolveSelection(browse.value.mode, browse.value.overrides));
+const browseTracks = computed(() => browseMusic.value === music.value
+  ? tracks.value : playableTracks(browseMusic.value));
+const queueKey = computed(() => `${zone.value.key}:${browseTracks.value.map(({id}) => id).join(',')
+  || `empty-${browseMusic.value.incomplete}`}`);
+let queueHeightMotion;
+const activeIndex = computed(() => Math.max(
+  0,
+  tracks.value.findIndex(({id}) => id === selectedId.value),
+));
+const track = computed(() => tracks.value[activeIndex.value] ?? null);
+const emptyLabel = computed(() => music.value.incomplete ? '暂无可试听曲目' : '此分区没有对应曲目');
+const title = computed(() => track.value?.displayName ?? emptyLabel.value);
+let trackNavigation;
+let titleMotion;
+let departureMotion;
+let countMotion;
+const namedConditions = computed(() => browseMusic.value.conditions.filter(({named}) => named));
+const phaseCondition = computed(() => namedConditions.value.find(({id}) => id === phaseGroup.value));
+const phaseChoices = computed((previous = []) => phaseCondition.value?.entries ?? previous);
+const otherConditions = computed(() => namedConditions.value.filter(({id}) => id !== phaseGroup.value));
+const browseMatchesPlayback = computed(() => browse.value.mode === props.mode
+  && browseMusic.value.conditions.length === music.value.conditions.length
+  && browseMusic.value.conditions.every(({id, value}) =>
+    music.value.conditions.some((condition) => condition.id === id && condition.value === value)));
+
 const {
-  phase, requested, failed, current, duration, buffered, volume, adjustableVolume, muted, repeat,
-  load, play, pause, seek, setVolume, toggleMute, toggleRepeat,
-} = transport;
-const position = computed(() => seekDraft.value ?? current.value);
-const percent = (seconds) => duration.value > 0 ? Math.min(100, seconds / duration.value * 100) : 0;
-const message = computed(() => {
-  if (phase.value === 'blocked') return '点播放继续试听';
-  if (phase.value === 'timeout') return '音源响应超时';
-  if (phase.value === 'error') return '音源读取失败';
-  if (!track.value) return selection.value.incomplete ? '当前条件的音轨待核实' : '当前条件暂无音轨';
-  return '';
-});
-const playLabel = computed(() => requested.value ? '暂停' : failed.value ? '重试播放' : '播放');
+  audio, volume, muted, repeatMode, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
+  play, pause, retry, seek, readPosition, onPause, onPlaying, onEnded, onError,
+} = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume});
 
-// 曲目文案只允许两种：游戏内已核实的中文曲名，或自然的无曲名状态。
-// 不用素材文件名、Wwise 状态值或「地区 · 时段」式拼接充当曲名。
-function trackTitle(entry) {
-  return entry?.name ?? '未核对曲名';
-}
+const repeatLabel = computed(() => repeatMode.value === 'one' ? '单曲循环' : '列表循环');
 
-useMusicMediaSession(transport, () => ({
-  track: track.value,
-  title: trackTitle(track.value),
-  zone: props.zone.name,
-  previous: trackIndex.value > 0 ? () => selectTrack(trackIndex.value - 1) : null,
-  next: trackIndex.value + 1 < tracks.value.length ? () => selectTrack(trackIndex.value + 1) : null,
+const progressStyle = computed(() => ({
+  '--range-fill': duration.value ? `${Math.min(1, elapsed.value / duration.value) * 100}%` : '0%',
 }));
+const volumeStyle = computed(() => ({'--range-fill': `${volume.value * 100}%`}));
 
-// 条件选项同理：已核实的语义名（白天/夜间等）优先，否则用切换后可核对
-// 的首支曲名；两者都没有时保持无曲名状态，曲数在右侧独立展示。
-function conditionLabel(entry) {
-  return entry.label ?? entry.firstTrack ?? '未核对曲名';
+watch(() => zone.value.key, () => {
+  selectedId.value = null;
+  overrides.value = {};
+  browse.value = {mode: props.mode, overrides: overrides.value};
+  volumeOpen.value = false;
+}, {flush: 'sync'});
+
+// 记录真正解析出的音轨；切换条件时尽量保留仍在当前曲单里的曲目。
+watch(track, (next) => {
+  if (next) selectedId.value = next.id;
+}, {flush: 'post'});
+
+function cancelTrackMotion() {
+  titleMotion?.cancel();
+  departureMotion?.cancel();
+  countMotion?.cancel();
+  departureMotion = undefined;
+  departingTitle.value?.removeAttribute('data-title');
 }
 
-// 抽屉里的条件组（advanced 已保证组名与选项 label 均经证实）。选项右侧为
-// 切换后的曲数；已确认无曲目的分支写明「无曲目」，与曲名未核对区分开。
-const conditionGroups = computed(() => advanced.value.map((group) => ({
-  ...group,
-  options: group.entries.map((entry) => (entry.count === 0
-    ? {value: entry.key, label: '无曲目', meta: ''}
-    : {
-      value: entry.key,
-      label: conditionLabel(entry),
-      meta: `${entry.count} 首`,
-    })),
-})));
+watch([() => zone.value.key, () => track.value?.id, title, activeIndex],
+  ([zoneKey, id, , index], [previousZone, previousId, previousTitle, previousIndex]) => {
+    const navigation = trackNavigation;
+    trackNavigation = undefined;
+    if (zoneKey !== previousZone || id == null || previousId == null
+        || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      cancelTrackMotion();
+      return;
+    }
+    if (id === previousId || !titleLine.value || !departingTitle.value) return;
 
-function pickDefaultCondition() {
-  if (tracks.value.length || !dayNight.value || dayNight.value.value
-    || (clock.value && auditionMinute.value !== null)) return;
-  const daytime = dayNight.value.entries.find((entry) => entry.label === '白天');
-  if (daytime) overrides[dayNight.value.id] = daytime.key;
+    const direction = navigation?.id === id
+      ? navigation.direction
+      : Math.sign(index - previousIndex) || 1;
+    const current = titleLine.value;
+    const ghost = departingTitle.value;
+    const currentStyle = getComputedStyle(current);
+    const ghostStyle = getComputedStyle(ghost);
+    // On a rapid skip, continue from whichever of the two titles is most visible.
+    const keepGhost = ghost.dataset.title && Number(ghostStyle.opacity) > Number(currentStyle.opacity);
+    const visibleTitle = keepGhost ? ghost.dataset.title : previousTitle;
+    const {opacity, transform} = keepGhost ? ghostStyle : currentStyle;
+    const offset = 10 * direction;
+    cancelTrackMotion();
+
+    const easing = 'cubic-bezier(.2,.65,.27,1)';
+    ghost.dataset.title = visibleTitle;
+    const outgoing = ghost.animate([
+      {opacity, transform},
+      {opacity: 0, transform: `translateY(${-offset}px)`},
+    ], {duration: 150, easing});
+    departureMotion = outgoing;
+    outgoing.onfinish = () => {
+      if (departureMotion === outgoing) ghost.removeAttribute('data-title');
+    };
+    titleMotion = current.animate([
+      {opacity: 0, transform: `translateY(${offset}px)`},
+      {opacity: 1, transform: 'translateY(0)'},
+    ], {delay: 32, duration: 215, easing, fill: 'backwards'});
+    countMotion = trackCount.value?.animate([
+      {opacity: .45, transform: `translateY(${offset * .24}px)`},
+      {opacity: 1, transform: 'translateY(0)'},
+    ], {duration: 200, easing});
+  }, {flush: 'post'});
+
+function advance(delta, wrap = false) {
+  const length = tracks.value.length;
+  if (length < 2) return false;
+  const next = activeIndex.value + delta;
+  if (!wrap && (next < 0 || next >= length)) return false;
+  const {id} = tracks.value[(next + length) % length];
+  trackNavigation = {id, direction: delta};
+  selectedId.value = id;
+  return true;
 }
 
-watch([() => props.zone, () => props.mode], ([zone], [previous]) => {
-  const previousId = loadedTrackId;
-  trackIndex.value = 0;
-  pickDefaultCondition();
-  if (zone === previous && previousId) keepTrack(previousId);
-  loadTrack(zone !== previous || requested.value || resumeAfterEmpty);
-});
-
-function keepTrack(id) {
-  const index = tracks.value.findIndex((item) => String(item.id) === String(id));
-  trackIndex.value = Math.max(0, index);
+function toggleDetails() {
+  if (!detailsOpen.value) browse.value = {mode: props.mode, overrides: overrides.value};
+  detailsOpen.value = !detailsOpen.value;
 }
 
-function loadTrack(autoplay = requested.value || resumeAfterEmpty) {
-  seekDraft.value = null;
-  loadedTrackId = track.value?.id;
-  // A curve can temporarily select an unassigned branch, such as exact midnight.
-  resumeAfterEmpty = autoplay && !track.value;
-  load(track.value, {autoplay});
+function updateVolumeMode({matches}) {
+  systemVolume.value = matches;
+  if (matches) volumeOpen.value = false;
 }
 
-function togglePlay() {
-  if (requested.value) pause();
-  else void play();
+function browseCondition(id, value) {
+  browse.value = {...browse.value, overrides: {...browse.value.overrides, [id]: value}};
 }
 
-function selectTrack(index, autoplay = true) {
-  if (index < 0 || index >= tracks.value.length) return;
-  trackIndex.value = index;
-  loadTrack(autoplay);
+function queueScrollOwner() {
+  const scroll = queueScroll.value;
+  if (!scroll || getComputedStyle(scroll).overflowY !== 'visible') return scroll;
+  return detailsBody.value;
 }
 
-function selectCondition(group, value) {
-  if (group.value === value) return;
-  const previousId = track.value?.id;
-  overrides[group.id] = value;
-  keepTrack(previousId);
-  loadTrack();
+function prepareQueueExit(outgoing) {
+  outgoing.inert = true;
+  outgoing.setAttribute('aria-hidden', 'true');
+  const scroll = queueScrollOwner();
+  if (!queueFrame.value || !scroll) return;
+  const height = queueFrame.value.getBoundingClientRect().height;
+  queueHeightMotion?.cancel();
+  queueFrame.value.style.height = `${height}px`;
+  outgoing.style.setProperty('--queue-exit-top', `${-scroll.scrollTop}px`);
 }
 
-function setAuditionMinute(minute) {
-  const previousId = track.value?.id;
-  auditionMinute.value = minute;
-  clockDraft.value = null;
-  keepTrack(previousId);
-  if (track.value?.id !== previousId) loadTrack();
+function revealQueue(incoming) {
+  incoming.inert = false;
+  incoming.removeAttribute('aria-hidden');
+  const frame = queueFrame.value;
+  const scroll = queueScrollOwner();
+  if (!frame || !scroll) return;
+  const previousHeight = frame.getBoundingClientRect().height;
+  frame.style.height = '';
+  scroll.scrollTop = 0;
+  const nextHeight = frame.getBoundingClientRect().height;
+  if (!previousHeight || Math.abs(previousHeight - nextHeight) < 1
+      || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  queueHeightMotion = frame.animate(
+    [{height: `${previousHeight}px`}, {height: `${nextHeight}px`}],
+    {duration: 210, easing: 'cubic-bezier(.2,.65,.27,1)'},
+  );
 }
 
-function selectDayPhase(key) {
-  if (hasClock.value) setAuditionMinute(musicClockPreset(clock.value, key));
-  else selectCondition(dayNight.value, key);
+async function playFromList(item) {
+  overrides.value = browse.value.overrides;
+  selectedId.value = item.id;
+  emit('update:mode', browse.value.mode);
+  await nextTick();
+  if (track.value?.id === item.id && !canPause.value) play();
 }
 
-function clockLabel(minute) {
-  const hours = String(Math.floor(minute / 60)).padStart(2, '0');
-  const minutes = String(minute % 60).padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-function onEnd() {
-  const next = trackIndex.value + 1;
-  if (next < tracks.value.length) selectTrack(next);
-  else if (repeat.value) selectTrack(0);
-}
-
-function commitSeek(event) {
-  seek(Number(event.target.value));
-  seekDraft.value = null;
-}
-
-function fmt(seconds) {
-  const whole = Math.floor(seconds || 0);
+function timeLabel(seconds) {
+  const whole = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
-function close() {
-  pause();
-  drawer.value = null;
-  emit('close');
+function setVolume(event) {
+  volume.value = event.target.valueAsNumber;
+  muted.value = volume.value === 0;
 }
 
-function toggleDrawer(id, event) {
-  if (drawer.value === id) {
-    drawer.value = null;
-    return;
+function focusVolume() {
+  const active = document.activeElement;
+  if (active === volumeToggle.value || active === document.body) {
+    volumeInput.value?.focus({preventScroll: true});
   }
-  drawerTrigger.value = event.currentTarget;
-  drawer.value = id;
-  if (id === 'clock') void nextTick(() => clockInput.value?.focus());
 }
 
-watch([() => tracks.value.length, () => advanced.value.length, hasClock],
-  ([count, groups, canSetTime]) => {
-    if ((drawer.value === 'rules' && !groups)
-      || (drawer.value === 'tracks' && count < 2)
-      || (drawer.value === 'clock' && !canSetTime)
-      || (drawer.value === 'volume' && !count)) {
-      drawer.value = null;
-    }
+function toggleMute() {
+  if (volume.value === 0) {
+    volume.value = 0.65;
+    muted.value = false;
+  } else {
+    muted.value = !muted.value;
+  }
+}
+
+function closeOnEscape(open, opener) {
+  return pushEscapeHandler(() => {
+    if (!open.value) return false;
+    open.value = false;
+    void nextTick(() => opener.value?.focus({preventScroll: true}));
+    return true;
   });
+}
 
-// 抽屉打开时接管 Escape：先关抽屉，不把播放器一起关掉（escapeStack LIFO）。
-let releaseDrawerEscape = null;
-watch(drawer, (value) => {
-  releaseDrawerEscape?.();
-  releaseDrawerEscape = null;
-  if (value) {
-    releaseDrawerEscape = pushEscapeHandler(() => {
-      if (!drawer.value) return false;
-      drawer.value = null;
-      void nextTick(() => drawerTrigger.value?.focus());
-      return true;
-    });
+watch(detailsOpen, (open, _, cleanup) => {
+  if (open) cleanup(closeOnEscape(detailsOpen, detailsToggle));
+}, {flush: 'sync'});
+
+watch(volumeOpen, (open, _, cleanup) => {
+  if (!open) return;
+  const release = closeOnEscape(volumeOpen, volumeToggle);
+  function dismiss(event) {
+    if (volumePopover.value?.contains(event.target) || volumeToggle.value?.contains(event.target)) return;
+    volumeOpen.value = false;
   }
-});
+  document.addEventListener('pointerdown', dismiss, true);
+  cleanup(() => {
+    release();
+    document.removeEventListener('pointerdown', dismiss, true);
+  });
+}, {flush: 'post'});
 
-onMounted(() => {
-  pickDefaultCondition();
-  loadTrack(true);
-});
+function reactToControl(event) {
+  if (systemVolume.value || !(event.target instanceof Element)) return;
+  const clicked = event.type === 'click';
+  const control = event.target.closest(clicked ? 'button' : 'input[type="range"]');
+  if (!control || control.disabled || control.getAttribute('aria-label') === '关闭播放器') return;
+  if (control === detailsToggle.value || control === volumeToggle.value) return;
+  glass.value?.reactAt(control, clicked && event.detail ? event : null);
+}
+
+function updateBackdrop(canvas) {
+  pendingBackdrop = canvas;
+  if (!fluidBackdrop.value) {
+    fluidBackdrop.value = {canvas};
+  } else if (!backdropTimer) {
+    backdropTimer = window.setTimeout(() => {
+      backdropTimer = 0;
+      fluidBackdrop.value = {canvas: pendingBackdrop};
+    }, 90);
+  }
+}
+
+defineExpose({updateBackdrop, pause});
+onMounted(() => mobileVolume.addEventListener('change', updateVolumeMode));
 onBeforeUnmount(() => {
-  releaseDrawerEscape?.();
+  mobileVolume.removeEventListener('change', updateVolumeMode);
+  clearTimeout(backdropTimer);
+  queueHeightMotion?.cancel();
+  cancelTrackMotion();
 });
 </script>
 
 <template>
-  <section class="music-player" role="region" aria-label="分区音乐播放器">
-    <header class="player-head">
-      <h2 class="zone-name" :title="zone.name">{{ zone.name }}</h2>
-      <button type="button" class="icon-btn" aria-label="关闭播放器" @click="close">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6"
-                stroke-linecap="round" />
-        </svg>
-      </button>
-    </header>
-    <p v-if="zone.inheritedFromName" class="zone-inherit">音乐沿用{{ zone.inheritedFromName }}</p>
-
-    <div class="modes" role="group" aria-label="音乐模式">
-      <button v-for="entry in BGM_MODES" :key="entry" type="button" :aria-pressed="mode === entry"
-              @click="emit('update:mode', entry)">{{ modeLabels[entry] }}</button>
-    </div>
-
-    <div v-if="dayNight" class="modes" role="group" aria-label="昼夜">
-      <button v-for="entry in dayNight.entries" :key="entry.key" type="button"
-              :data-value="entry.key"
-              :aria-pressed="dayNightKey === entry.key" @click="selectDayPhase(entry.key)">
-        {{ conditionLabel(entry) }}
-      </button>
-      <button v-if="hasClock" type="button" class="clock-toggle"
-              aria-label="设置试听时间" :aria-expanded="drawer === 'clock'"
-              :aria-controls="drawer === 'clock' ? flyoutId : null"
-              @click="toggleDrawer('clock', $event)">
-        {{ auditionMinute === null || drawer === 'clock' ? '时刻' : clockLabel(auditionMinute) }}
-      </button>
-    </div>
-
-    <div class="now-playing">
-      <span class="track-name" :title="track?.name"
-            :data-source="track?.id" :aria-busy="phase === 'buffering' || undefined">
-        {{ track ? trackTitle(track) : message }}
-      </span>
-      <span v-if="tracks.length > 1" class="count">{{ trackIndex + 1 }} / {{ tracks.length }}</span>
-    </div>
-
-    <div class="transport">
-      <button type="button" class="icon-btn play" :aria-label="playLabel"
-              :aria-busy="phase === 'buffering' || undefined"
-              :disabled="!track" @click="togglePlay">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path :d="requested ? 'M4.5 3.5h2.4v9H4.5zM9.1 3.5h2.4v9H9.1z' : 'M5 3.2v9.6L12.6 8z'"
-                fill="currentColor" />
-        </svg>
-      </button>
-      <button v-if="tracks.length > 1" type="button" class="icon-btn previous" aria-label="上一首" :disabled="trackIndex === 0"
-              @click="selectTrack(trackIndex - 1)">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="M10 3.5 5.5 8l4.5 4.5" fill="none" stroke="currentColor"
-                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </button>
-      <button v-if="tracks.length > 1" type="button" class="icon-btn next" aria-label="下一首" :disabled="trackIndex + 1 >= tracks.length"
-              @click="selectTrack(trackIndex + 1)">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-          <path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor"
-                stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </button>
-      <input class="progress" type="range" aria-label="播放进度" :min="0" :max="duration || 1"
-             step="0.1" :value="position" :disabled="!track || !duration"
-             :aria-valuetext="`${fmt(position)}，共 ${fmt(duration)}`"
-             :style="{'--progress': `${percent(position)}%`, '--buffered': `${percent(buffered)}%`}"
-             @input="seekDraft = Number($event.target.value)" @change="commitSeek"
-             @pointercancel="seekDraft = null" @blur="seekDraft = null" />
-      <span class="time">{{ fmt(position) }} / {{ fmt(duration) }}</span>
-    </div>
-
-    <div v-if="advanced.length || track" class="player-footer">
-      <button v-if="advanced.length" type="button" class="conditions-toggle"
-              :aria-expanded="drawer === 'rules'" :aria-controls="drawer === 'rules' ? flyoutId : null"
-              @click="toggleDrawer('rules', $event)">播放条件</button>
-      <button v-if="tracks.length > 1" type="button" class="conditions-toggle"
-              :aria-expanded="drawer === 'tracks'" :aria-controls="drawer === 'tracks' ? flyoutId : null"
-              @click="toggleDrawer('tracks', $event)">歌曲列表</button>
-      <span v-if="track && message" class="playback-status" role="status">{{ message }}</span>
-      <div v-if="track" class="audio-options">
-        <button type="button" class="icon-btn"
-                aria-label="循环播放" :aria-pressed="repeat"
-                @click="toggleRepeat">
-          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"
-               stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 8V6a2 2 0 0 1 2-2h9m-2-2 2 2-2 2m3 6v2a2 2 0 0 1-2 2H5m2-2-2 2 2 2" />
-          </svg>
-        </button>
-        <button type="button" class="icon-btn" aria-label="音量设置"
-                :aria-expanded="drawer === 'volume'"
-                :aria-controls="drawer === 'volume' ? flyoutId : null"
-                @click="toggleDrawer('volume', $event)">
-          <svg width="17" height="17" viewBox="0 0 20 20" fill="none" aria-hidden="true"
-               stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 8h3l4-3v10l-4-3H3z" />
-            <path v-if="muted || volume === 0" d="m13.5 8 4 4m0-4-4 4" />
-            <path v-else d="M13.5 7.5a3.5 3.5 0 0 1 0 5M16 5a7 7 0 0 1 0 10" />
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <section v-if="drawer" :id="flyoutId" class="player-drawer"
-             :aria-label="{tracks: '歌曲列表', rules: '播放条件', volume: '音量设置', clock: '试听时间'}[drawer]">
-      <ScrollPane v-if="drawer === 'tracks'" label="歌曲列表滚动">
-        <ul class="track-list">
-          <li v-for="(entry, index) in tracks" :key="entry.id">
-            <button type="button" :aria-current="trackIndex === index || null"
-                    :title="entry.name" @click="selectTrack(index)">
-              <span>{{ trackTitle(entry) }}</span><span>{{ fmt(entry.duration) }}</span>
-            </button>
-          </li>
-        </ul>
-      </ScrollPane>
-      <ScrollPane v-else-if="drawer === 'rules'" label="播放条件滚动">
-        <div v-for="group in conditionGroups" :key="group.id" class="condition-row">
-          <span class="condition-label">{{ group.title }}</span>
-          <SelectMenu class="condition-select" :model-value="group.value" :options="group.options"
-                      :aria-label="group.title" placement="top"
-                      @update:model-value="(value) => selectCondition(group, value)" />
+  <section
+    class="music-player"
+    :class="{'music-player--preview': preview, 'music-player--system-volume': systemVolume}"
+    aria-label="区域音乐播放器"
+    @pointerdown.stop
+    @click.capture="reactToControl"
+    @click.stop
+    @change="reactToControl"
+    @dblclick.stop
+    @contextmenu.stop
+    @wheel.stop
+    @keydown.stop
+  >
+    <LiquidGlass ref="glass" />
+    <div class="player-body liquid-panel-body">
+      <header class="player-heading">
+        <div class="track-heading">
+          <div class="track-title-row">
+            <h2 ref="titleLine" class="track-name" :title="track?.displayName" :data-source="track?.id">
+              {{ title }}
+            </h2>
+            <span ref="departingTitle" class="track-title-outgoing" aria-hidden="true" />
+          </div>
+          <div class="zone-row">
+            <p class="zone-name" :title="zone.name">{{ zone.name }}</p>
+            <span v-if="tracks.length > 1" ref="trackCount" class="count">
+              {{ activeIndex + 1 }} / {{ tracks.length }}
+            </span>
+          </div>
         </div>
-      </ScrollPane>
-      <div v-else-if="drawer === 'clock'" class="volume-row clock-row">
-        <input ref="clockInput" class="progress" type="range" min="0" max="1439" step="1" aria-label="试听时间"
-               :aria-valuetext="clockLabel(clockMinute)" :value="clockMinute"
-               :style="{'--progress': `${clockMinute / 1439 * 100}%`}"
-               @input="clockDraft = Number($event.target.value)"
-               @change="setAuditionMinute(Number($event.target.value))"
-               @pointercancel="clockDraft = null" @blur="clockDraft = null" />
-        <output>{{ clockLabel(clockMinute) }}</output>
-      </div>
-      <div v-else class="volume-row">
-        <button type="button" class="conditions-toggle" :aria-pressed="muted"
-                @click="toggleMute">静音</button>
-        <input v-if="adjustableVolume" class="progress" type="range" min="0" max="100" step="1" aria-label="音量"
-               :value="Math.round((muted ? 0 : volume) * 100)"
-               :style="{'--progress': `${(muted ? 0 : volume) * 100}%`}"
-               @input="setVolume(Number($event.target.value) / 100)" />
-        <output v-if="adjustableVolume">{{ Math.round((muted ? 0 : volume) * 100) }}%</output>
-        <span v-else class="playback-status">请用系统音量键调节</span>
-      </div>
-    </section>
+        <button
+          v-if="!preview"
+          type="button"
+          class="icon-button"
+          aria-label="关闭播放器"
+          title="关闭播放器"
+          @click="emit('close')"
+        >
+          <FluidSourceSurface :orbit="systemVolume" />
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </header>
 
-    <audio ref="audioRef" preload="metadata"></audio>
+      <div class="seek-row">
+        <span aria-hidden="true">{{ timeLabel(elapsed) }}</span>
+        <input
+          class="player-range progress"
+          type="range"
+          min="0"
+          :max="duration || 1"
+          step="0.25"
+          :value="elapsed"
+          :style="progressStyle"
+          :disabled="!mediaDuration || !!failure"
+          aria-label="播放进度"
+          :aria-valuetext="`${timeLabel(elapsed)} / ${timeLabel(duration)}`"
+          @input="seek($event.target.valueAsNumber)"
+        >
+        <span aria-hidden="true">{{ duration ? timeLabel(duration) : '–:–' }}</span>
+      </div>
+
+      <div class="transport">
+        <div v-if="!systemVolume" class="volume-control">
+          <button
+            ref="volumeToggle"
+            type="button"
+            class="icon-button"
+            aria-label="音量设置"
+            title="音量设置"
+            :aria-expanded="volumeOpen"
+            :aria-controls="volumeOpen ? `${uid}-volume` : undefined"
+            @click="volumeOpen = !volumeOpen"
+          >
+            <FluidSourceSurface />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 9v6h4l5 4V5L7 9H3Z" />
+              <path v-if="muted || volume === 0" d="m16 10 5 5m0-5-5 5" />
+              <path v-else d="M16 9a4 4 0 0 1 0 6m2.7-8.6a8 8 0 0 1 0 11.2" />
+            </svg>
+          </button>
+          <RevealPanel :open="volumeOpen" class="volume-reveal" @shown="focusVolume">
+            <div
+              :id="`${uid}-volume`"
+              ref="volumePopover"
+              class="volume-popover volume-panel"
+              role="group"
+              aria-label="音量设置"
+            >
+              <LiquidGlass />
+              <button
+                type="button"
+                class="text-button mute-button"
+                :aria-pressed="muted"
+                @click="toggleMute"
+              >
+                <FluidSourceSurface shape="pill" />
+                <span class="mute-label">静音</span>
+              </button>
+              <input
+                class="player-range volume-slider"
+                ref="volumeInput"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="volume"
+                :style="volumeStyle"
+                aria-label="音量"
+                :aria-valuetext="`${Math.round(volume * 100)}%`"
+                @input="setVolume"
+              >
+              <span class="volume-value">{{ Math.round(volume * 100) }}%</span>
+            </div>
+          </RevealPanel>
+        </div>
+
+        <div class="playback">
+          <button
+            type="button"
+            class="icon-button previous-track"
+            aria-label="上一首"
+            title="上一首"
+            :disabled="activeIndex === 0"
+            @click="advance(-1)"
+          >
+            <FluidSourceSurface :orbit="systemVolume" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4v16m16-16L8 12l12 8V4Z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="icon-button play-toggle"
+            :aria-label="canPause ? '暂停' : '播放'"
+            :title="canPause ? '暂停' : '播放'"
+            :disabled="!track"
+            @click="canPause ? pause() : play()"
+          >
+            <FluidSourceSurface :orbit="systemVolume" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path v-if="canPause" d="M9 6v12m6-12v12" stroke-width="2.5" />
+              <path v-else d="M9 5.8 19 12 9 18.2V5.8Z" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="icon-button next-track"
+            aria-label="下一首"
+            title="下一首"
+            :disabled="activeIndex >= tracks.length - 1"
+            @click="advance(1)"
+          >
+            <FluidSourceSurface :orbit="systemVolume" />
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 4v16M4 4l12 8-12 8V4Z" />
+            </svg>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="icon-button repeat-toggle"
+          :aria-label="repeatMode === 'one' ? '单曲循环，切换到列表循环' : '列表循环，切换到单曲循环'"
+          :title="repeatLabel"
+          :data-mode="repeatMode"
+          @click="toggleRepeat"
+        >
+          <FluidSourceSurface :orbit="systemVolume" />
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m16 4 4 3-4 3M4 11v-1a3 3 0 0 1 3-3h13m-12 7-4 3 4 3M20 13v1a3 3 0 0 1-3 3H4" />
+            <path v-if="repeatMode === 'one'" data-repeat-one d="M10.25 10.8 12 9.5V15m-1.65 0h3.3" />
+          </svg>
+        </button>
+        <button
+          ref="detailsToggle"
+          type="button"
+          class="icon-button details-toggle"
+          aria-label="歌曲列表"
+          :title="detailsOpen ? '收起歌曲列表' : '歌曲列表'"
+          :aria-expanded="detailsOpen"
+          :aria-controls="detailsOpen ? `${uid}-details` : undefined"
+          @click="toggleDetails"
+        >
+          <FluidSourceSurface :orbit="systemVolume" />
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h15M4 10h10M4 15h7m6 1.5V10l4-1" />
+            <ellipse cx="15.5" cy="17" rx="1.5" ry="1.1" />
+          </svg>
+        </button>
+      </div>
+
+      <div v-if="failure" class="media-error">
+        <span class="playback-status" role="status">{{ failure }}</span>
+        <button type="button" class="text-button" aria-label="重试播放" @click="retry">重试</button>
+      </div>
+
+      <RevealPanel :open="detailsOpen" liquid class="details-reveal">
+        <div :id="`${uid}-details`" ref="detailsBody" class="player-details player-drawer scroll-viewport">
+          <div class="condition-row">
+            <SegmentedChoice label="音乐模式" :choices="musicModes" :value="browse.mode"
+                             @select="browse = {...browse, mode: $event}" />
+            <Transition name="phase-choice">
+              <div v-if="phaseChoices.length" v-show="phaseCondition" class="phase-choice"
+                   :inert="!phaseCondition">
+                <div class="phase-choice-content">
+                  <SegmentedChoice label="昼夜" :choices="phaseChoices" :value="phaseCondition?.value"
+                                   @select="browseCondition(phaseGroup, $event)" />
+                </div>
+              </div>
+            </Transition>
+          </div>
+          <SegmentedChoice
+            v-for="condition in otherConditions"
+            :key="condition.id"
+            :label="condition.title"
+            :choices="condition.entries"
+            :value="condition.value"
+            wrap
+            @select="browseCondition(condition.id, $event)"
+          />
+          <p v-if="zone.inheritedFromName" class="track-source">曲目来源于「{{ zone.inheritedFromName }}」</p>
+          <div ref="queueFrame" class="queue-frame">
+            <div ref="queueScroll" class="queue-scroll scroll-viewport">
+              <div class="queue-content">
+                <Transition name="queue-switch" @before-leave="prepareQueueExit" @enter="revealQueue">
+                  <ul v-if="browseTracks.length" :key="queueKey" class="track-list" aria-label="歌曲列表">
+                    <li v-for="item in browseTracks" :key="item.id">
+                      <button
+                        type="button"
+                        :aria-current="browseMatchesPlayback && item.id === track?.id ? 'true' : undefined"
+                        :title="item.displayName"
+                        @click="playFromList(item)"
+                      >
+                        <svg class="queue-marker" viewBox="0 0 16 16" aria-hidden="true">
+                          <path v-if="browseMatchesPlayback && item.id === track?.id" d="M3 6v4m5-7v10m5-8v6" />
+                          <path v-else d="M5 3.5 12 8l-7 4.5z" />
+                        </svg>
+                        <span class="queue-name">{{ item.displayName }}</span>
+                        <span v-if="item.duration" class="queue-duration">{{ timeLabel(item.duration) }}</span>
+                      </button>
+                    </li>
+                  </ul>
+                  <p v-else :key="queueKey" class="track-source">
+                    {{ browseMusic.incomplete ? '暂无可试听曲目' : '此条件下暂无曲目' }}
+                  </p>
+                </Transition>
+              </div>
+            </div>
+          </div>
+        </div>
+      </RevealPanel>
+    </div>
+    <audio
+      ref="audio"
+      preload="metadata"
+      :loop="repeatMode === 'one'"
+      @loadedmetadata="readPosition"
+      @durationchange="readPosition"
+      @timeupdate="readPosition"
+      @playing="onPlaying"
+      @pause="onPause"
+      @ended="onEnded"
+      @error="onError"
+    />
   </section>
 </template>
 
 <style scoped>
 .music-player {
+  --player-text: #fff;
+  --scroll-thumb: rgb(226 218 209 / .38);
+  --scroll-thumb-hover: rgb(226 218 209 / .55);
+  --player-secondary: rgb(255 255 255 / .8);
+  --player-selection: linear-gradient(145deg, rgb(231 211 192 / .28), rgb(210 200 195 / .13));
+  --player-hover: rgb(255 249 244 / .1);
   position: absolute;
-  left: 12px;
-  bottom: 12px;
-  z-index: 6;
-  width: 350px;
-  max-width: calc(100vw - 86px);
-  display: grid;
-  gap: 8px;
-  padding: 11px 12px 8px;
-  border-radius: 12px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--surface-overlay-border);
-  backdrop-filter: blur(6px);
-}
-.player-head, .now-playing, .transport, .player-footer {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-.player-head, .now-playing, .player-footer {
-  justify-content: space-between;
-}
-.zone-name, .track-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.zone-name {
+  inset-block-start: var(--player-top, 18px);
+  inset-inline-end: var(--map-inline-end, 18px);
+  width: min(var(--player-width, clamp(340px, 28vw, 428px)), calc(100% - 36px));
+  box-sizing: border-box;
+  border-radius: 32px;
+  color: var(--player-text);
+  color-scheme: dark;
+  text-shadow: 0 2px 12px rgb(0 0 0 / .4);
   font-size: 14px;
-  line-height: 1.35;
-  margin: 0;
+  line-height: 1.4;
+  touch-action: auto;
 }
-/* 楼层分区沿用来源分区音乐时的来历行；缺失时不渲染。 */
-.zone-inherit {
-  margin: -4px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.35;
+
+.player-body {
+  position: relative;
+  display: grid;
+  row-gap: 8px;
+  min-width: 0;
+  padding: 17px 17px 14px;
+  z-index: 1;
+}
+
+.player-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.track-heading {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 7px 0 0;
+  text-shadow: none;
+}
+
+.track-title-row {
+  position: relative;
+  overflow: clip;
+}
+
+.track-name, .track-title-outgoing, .zone-name {
   overflow: hidden;
+  margin: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.track-name {
-  color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  white-space: normal;
-  overflow-wrap: anywhere;
+
+.track-name, .track-title-outgoing {
+  font-size: 18px;
+  font-weight: 620;
+  line-height: 24px;
 }
-.now-playing { min-height: 38px; }
-.player-footer { min-height: 26px; }
-.icon-btn, .modes button, .conditions-toggle, .track-list button {
-  border: 1px solid transparent;
+
+.track-title-outgoing {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track-title-outgoing::before {
+  content: attr(data-title);
+}
+
+.zone-row {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 2px;
+  color: var(--player-secondary);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.zone-name {
+  min-width: 0;
+}
+
+.count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.music-player button {
+  min-width: 0;
+  border: 0;
+  border-radius: 999px;
   background: transparent;
-  color: var(--text-primary);
+  color: inherit;
+  font: inherit;
+  text-shadow: inherit;
   cursor: pointer;
-  border-radius: 7px;
+  transition: background-color 120ms ease, color 120ms ease,
+    transform 170ms var(--ease-glass-in);
 }
-button:focus-visible, .progress:focus-visible {
-  outline: 2px solid var(--control-focus);
-  outline-offset: -1px;
+
+.music-player button:active:not(:disabled) {
+  transform: scale(.965);
 }
-button:hover:not(:disabled) { background: var(--control-hover); }
-button:disabled { opacity: .38; cursor: default; }
-.icon-btn {
+
+.music-player button:hover:not(:disabled, :has(.fluid-source-surface)) {
+  background-color: var(--player-hover);
+}
+
+.music-player button[aria-pressed="true"],
+.music-player .icon-button[aria-expanded="true"] {
+  background-image: var(--player-selection);
+}
+
+.music-player :is(button, input):focus-visible {
+  outline: 2px solid var(--player-text);
+  outline-offset: 2px;
+}
+
+.music-player button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.music-player .icon-button {
+  position: relative;
+  isolation: isolate;
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
   padding: 0;
 }
-.transport .play {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(155, 232, 241, .12);
+
+.icon-button svg {
   position: relative;
+  z-index: 1;
+  display: block;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.transport .play[aria-busy="true"]::after {
-  content: '';
-  position: absolute;
-  inset: 1px;
-  border: 1px solid transparent;
-  border-top-color: var(--accent-cyan);
-  border-radius: 50%;
-  opacity: 0;
-  animation: audio-waiting 900ms linear 320ms infinite;
-  pointer-events: none;
-}
-@keyframes audio-waiting {
-  from { opacity: 1; transform: rotate(0deg); }
-  to { opacity: 1; transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .transport .play[aria-busy="true"]::after {
-    border-color: var(--surface-overlay-border);
-    opacity: 1;
-    animation: none;
-  }
-}
-.transport .icon-btn:not(.play) {
-  width: 34px;
-  height: 36px;
-}
-.modes { display: flex; gap: 5px; }
-.modes button {
-  flex: 1;
-  min-width: 0;
-  min-height: 30px;
-  padding: 3px 6px;
-  border-color: var(--surface-overlay-border);
-  font-size: 13px;
-}
-.modes button[aria-pressed="true"], .track-list button[aria-current],
-.audio-options button[aria-pressed="true"], .volume-row button[aria-pressed="true"],
-.modes .clock-toggle[aria-expanded="true"] {
-  border-color: rgb(155 232 241 / .38);
-  background: var(--control-hover);
-  color: var(--accent-cyan);
-}
-.modes .clock-toggle {
-  flex: 0 0 56px;
-  font-variant-numeric: tabular-nums;
-}
-.clock-row { min-height: 36px; }
-.clock-row output { min-width: 5ch; }
-/* 曲数只是状态文本：与时间同款排版，不包裹按钮、不接受焦点。 */
-.count, .time {
-  flex: none;
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.conditions-toggle {
-  flex: none;
-  min-height: 26px;
-  padding: 3px 6px;
-  border: 1px solid var(--surface-overlay-border);
-  border-radius: 7px;
-  background: transparent;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.audio-options, .volume-row {
-  display: flex;
+
+.seek-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
   align-items: center;
   gap: 8px;
-}
-.audio-options { margin-inline-start: auto; }
-.audio-options .icon-btn {
-  width: 34px;
-  height: 34px;
-}
-.volume-row { padding: 3px 8px; }
-.volume-row output, .playback-status {
-  color: var(--text-secondary);
+  min-height: 25px;
+  color: var(--player-secondary);
   font-size: 13px;
-}
-.volume-row output {
-  min-width: 4ch;
-  text-align: end;
   font-variant-numeric: tabular-nums;
 }
-.progress {
+
+.seek-row > :last-child {
+  text-align: end;
+}
+
+.player-range {
   appearance: none;
-  flex: 1;
-  min-width: 36px;
-  height: 24px;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 25px;
   margin: 0;
-  border-radius: 3px;
-  background: linear-gradient(to right, var(--accent-cyan) 0 var(--progress),
-    rgb(214 226 240 / .32) var(--progress) max(var(--progress), var(--buffered, 0%)),
-    rgb(214 226 240 / .16) max(var(--progress), var(--buffered, 0%)) 100%)
-    center / 100% 5px no-repeat;
+  border-radius: 6px;
+  background: transparent;
   cursor: pointer;
 }
-.progress::-webkit-slider-thumb {
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--accent-cyan);
+
+.player-range:disabled {
+  opacity: .43;
+  cursor: default;
 }
-.progress::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+
+.player-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 10px;
+  background: linear-gradient(to right, #e1d7ce var(--range-fill), rgb(248 242 236 / .23) 0);
+}
+
+.player-range::-moz-range-track {
+  height: 3px;
+  border-radius: 10px;
+  background: linear-gradient(to right, #e1d7ce var(--range-fill), rgb(248 242 236 / .23) 0);
+}
+
+.player-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -3.5px;
   border: 0;
   border-radius: 50%;
-  background: var(--accent-cyan);
+  background: #f1ebe7;
 }
-.player-drawer {
-  position: absolute;
-  inset-inline: 0;
-  bottom: calc(100% + 6px);
-  padding: 6px;
-  border-radius: 10px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--surface-overlay-border);
-  backdrop-filter: blur(6px);
-  --pane-limit: min(240px, calc(100dvh - 300px));
+
+.player-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1ebe7;
 }
-.track-list { margin: 0; padding: 0; list-style: none; }
-.track-list button {
-  width: 100%;
+
+.transport {
+  --transport-button-size: 36px;
+  --transport-gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.details-toggle {
+  grid-area: 1 / 3;
+  justify-self: end;
+}
+
+.volume-control {
+  display: contents;
+}
+
+.volume-control > button {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+
+.volume-reveal {
+  grid-area: 2 / 1 / 3 / -1;
+  width: min(204px, 100%);
+}
+
+.volume-popover {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 37px;
+  align-items: center;
+  gap: 8px;
+  margin-block-start: 4px;
+  padding: 6px 9px;
+  border-radius: 18px;
+  box-sizing: border-box;
+}
+
+.volume-popover > :not(.liquid-glass) {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .volume-reveal:is(.reveal-enter-active, .reveal-leave-active)
+      .volume-popover > :deep(.liquid-glass) {
+    transform-origin: top left;
+    transition: transform var(--reveal-duration) var(--reveal-easing),
+      border-radius var(--reveal-duration) var(--reveal-easing);
+  }
+
+  .volume-reveal:is(.reveal-enter-from, .reveal-leave-to)
+      .volume-popover > :deep(.liquid-glass) {
+    transform: scale(.2, .86);
+    border-radius: 50%;
+  }
+
+  .volume-reveal:is(.reveal-enter-active, .reveal-leave-active)
+      .volume-popover > :not(.liquid-glass) {
+    transition: opacity 120ms var(--ease-glass-in);
+  }
+
+  .volume-reveal.reveal-enter-active .volume-popover > :not(.liquid-glass) {
+    transition-delay: 100ms;
+  }
+
+  .volume-reveal:is(.reveal-enter-from, .reveal-leave-to)
+      .volume-popover > :not(.liquid-glass) {
+    opacity: 0;
+  }
+}
+
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .volume-reveal {
+      display: flex;
+      flex-direction: column;
+      block-size: auto;
+      interpolate-size: allow-keywords;
+    }
+
+    .volume-reveal :deep(.reveal-content) {
+      flex: none;
+    }
+
+    .volume-reveal:is(.reveal-enter-active, .reveal-leave-active) {
+      overflow: clip;
+      transition-property: block-size;
+    }
+
+    .volume-reveal:is(.reveal-enter-from, .reveal-leave-to) {
+      block-size: 0;
+    }
+  }
+}
+
+.mute-button {
+  isolation: isolate;
+}
+
+.mute-label {
+  position: relative;
+}
+
+.volume-value {
+  text-align: end;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-player .text-button {
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.playback {
+  display: contents;
+}
+
+.previous-track {
+  grid-area: 1 / 1;
+  justify-self: end;
+  margin-inline-end: var(--transport-gap);
+}
+
+.next-track {
+  grid-area: 1 / 3;
+  justify-self: start;
+  margin-inline-start: var(--transport-gap);
+}
+
+.music-player .play-toggle {
+  grid-area: 1 / 2;
+  width: 54px;
+  height: 54px;
+}
+
+.play-toggle svg {
+  width: 26px;
+  height: 26px;
+}
+
+.repeat-toggle {
+  grid-area: 1 / 3;
+  justify-self: start;
+  margin-inline-start: calc(var(--transport-button-size) + var(--transport-gap) * 2);
+}
+
+.repeat-toggle[data-mode="one"] {
+  background-image: var(--player-selection);
+}
+
+.media-error {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--player-secondary);
+}
+
+.media-error .text-button {
+  color: var(--player-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  row-gap: 7px;
+}
+
+.phase-choice {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 0;
+  margin-inline-start: 7px;
+}
+
+.phase-choice-content {
+  min-width: 0;
+}
+
+.phase-choice-enter-active,
+.phase-choice-leave-active {
+  transition: grid-template-columns 240ms var(--ease-glass-in),
+    margin-inline-start 240ms var(--ease-glass-in), opacity 160ms ease;
+}
+
+.phase-choice-enter-active .phase-choice-content,
+.phase-choice-leave-active .phase-choice-content {
+  overflow: clip;
+}
+
+.phase-choice-enter-from,
+.phase-choice-leave-to {
+  grid-template-columns: 0fr;
+  margin-inline-start: 0;
+  opacity: 0;
+}
+
+.details-reveal {
+  --reveal-gap: 8px;
+}
+
+.player-details {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.track-source {
+  margin: 0;
+  color: var(--player-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.queue-frame {
+  overflow: clip;
+}
+
+.queue-scroll {
+  min-width: 0;
+  max-height: clamp(48px, calc(100dvh - 270px), 190px);
+  padding: 2px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+.queue-content {
+  position: relative;
+  /* Keep the entering transform and outgoing list out of the native scroll range. */
+  overflow: clip;
+}
+
+.track-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-switch-enter-active,
+.queue-switch-leave-active {
+  transition: opacity 160ms ease, transform 210ms var(--ease-glass-in);
+}
+
+.queue-switch-enter-from {
+  transform: translateY(7px);
+  opacity: 0;
+}
+
+.queue-switch-leave-active {
+  position: absolute;
+  inset: var(--queue-exit-top, 0) 0 auto;
+  pointer-events: none;
+}
+
+.queue-switch-leave-to {
+  transform: translateY(-5px);
+  opacity: 0;
+}
+
+.track-list li, .queue-name {
+  min-width: 0;
+}
+
+.track-list button {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 34px;
-  padding: 4px 6px;
-  font-size: 13px;
-}
-.track-list button span:first-child {
-  min-width: 0;
-  text-align: start;
-  overflow-wrap: anywhere;
-}
-.track-list button span:last-child { flex: none; color: var(--text-secondary); }
-.condition-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
+  width: 100%;
   min-height: 36px;
-  padding: 2px 6px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  text-align: start;
 }
-.condition-label {
-  color: var(--text-secondary);
-  font-size: 12px;
+
+.track-list button:focus-visible {
+  outline-offset: -2px;
+}
+
+.queue-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.condition-select { min-width: 0; }
 
-@media (max-width: 360px) {
-  .transport {
-    display: grid;
-    grid-template-columns: 40px 34px 34px minmax(0, 1fr);
-    grid-template-areas: 'play previous next time' 'seek seek seek seek';
-    column-gap: 4px;
-    row-gap: 0;
+.queue-duration {
+  color: var(--player-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-marker {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .66;
+}
+
+.track-list button[aria-current="true"] {
+  background-image: var(--player-selection);
+}
+
+.music-player audio {
+  display: none;
+}
+
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
+  .music-player {
+    --player-bottom: max(10px, env(safe-area-inset-bottom));
+    --player-left: max(8px, env(safe-area-inset-left));
+    --player-right: max(8px, env(safe-area-inset-right));
+    inset-block-start: auto;
+    inset-block-end: var(--player-bottom);
+    inset-inline: var(--player-left) var(--player-right);
+    display: flex;
+    flex-direction: column;
+    width: min(calc(100% - var(--player-left) - var(--player-right)), 428px);
+    max-block-size: calc(100dvh - var(--player-top-clearance, 12px) - var(--player-bottom));
+    margin-inline: auto;
+    -webkit-tap-highlight-color: transparent;
   }
-  .transport .play { grid-area: play; }
-  .transport .previous { grid-area: previous; }
-  .transport .next { grid-area: next; }
-  .transport .time { grid-area: time; justify-self: end; }
-  .transport .progress { grid-area: seek; width: 100%; }
+
+  .player-body {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 0;
+    padding: 20px 20px 18px;
+  }
+
+  .player-body > :not(.details-reveal) {
+    flex: none;
+  }
+
+  .transport {
+    --transport-button-size: 44px;
+    --transport-gap: 7px;
+  }
+
+  .details-toggle {
+    grid-area: 1 / 1;
+    justify-self: start;
+  }
+
+  .track-name, .track-title-outgoing {
+    font-size: 26px;
+    line-height: 32px;
+  }
+
+  .music-player .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .music-player .play-toggle {
+    width: 54px;
+    height: 54px;
+  }
+
+  .player-range {
+    height: 36px;
+  }
+
+  .details-reveal {
+    min-block-size: 0;
+  }
+
+  .details-reveal > :deep(.reveal-content) {
+    display: flex;
+  }
+
+  .player-details {
+    flex: 1;
+    min-block-size: 0;
+    max-block-size: min(304px, 46dvh);
+    gap: 8px;
+    padding: 4px 0 2px;
+    align-content: start;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+  }
+
+  .player-details :deep(.mode-option) {
+    min-height: 40px;
+  }
+
+  .queue-scroll {
+    max-height: none;
+    padding: 0 0 2px;
+    overflow: visible;
+  }
+
+  .track-list button {
+    min-height: 44px;
+  }
+}
+
+.music-player--system-volume :is(.icon-button[aria-expanded="true"], .repeat-toggle[data-mode="one"]) {
+  background-image: linear-gradient(145deg, rgb(255 255 255 / .22), rgb(255 255 255 / .08));
+}
+
+@media (min-width: 520px) and (orientation: landscape) and (pointer: coarse) and (max-height: 500px) {
+  .music-player {
+    inset-inline-start: auto;
+    width: min(356px, 49vw);
+    margin-inline: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .music-player button,
+  .queue-switch-enter-active,
+  .queue-switch-leave-active,
+  .phase-choice-enter-active,
+  .phase-choice-leave-active {
+    transition: none;
+  }
+
+  .phase-choice-enter-from,
+  .phase-choice-leave-to {
+    grid-template-columns: 1fr;
+    margin-inline-start: 7px;
+    opacity: 1;
+  }
+
+  .queue-switch-enter-from {
+    transform: none;
+    opacity: 1;
+  }
+
+  .queue-switch-leave-active {
+    visibility: hidden;
+  }
+
+  .music-player button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .music-player, .volume-popover {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+
+  .music-player button[aria-pressed="true"] {
+    outline: 1px solid Highlight;
+    color: Highlight;
+  }
+
+  .player-range {
+    appearance: auto;
+  }
 }
 </style>

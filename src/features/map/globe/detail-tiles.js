@@ -1,0 +1,166 @@
+import {clamp, viewAtlasPoints} from './projection.js';
+
+const TILE = 512;
+export function detailTextures(gl, mapUnit = 1, atlasUnit = 2) {
+  const map = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + mapUnit);
+  gl.bindTexture(gl.TEXTURE_2D, map);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 1, 1, 0, gl.RED, gl.UNSIGNED_BYTE, new Uint8Array(1));
+  const atlas = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + atlasUnit);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, 1, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.activeTexture(gl.TEXTURE0);
+  return {map, atlas, mapUnit, atlasUnit};
+}
+
+export class DetailTiles {
+  constructor(gl, textures, invalidate, {capacity, concurrency, compact, native = false}) {
+    Object.assign(this, {gl, textures, invalidate, capacity, concurrency, compact, native});
+    this.size = [0, 0];
+    this.inflight = 0;
+    this.reset(null, 0);
+  }
+
+  reset(world, zoom) {
+    for (const controller of this.pending?.values() ?? []) controller.abort();
+    this.world = world;
+    this.zoom = zoom;
+    this.revision = {};
+    this.visible = new Map();
+    this.slots = new Map();
+    this.pending = new Map();
+    this.failed = new Set();
+    this.lastView = '';
+    if (!zoom) {
+      this.size = [0, 0];
+      return;
+    }
+    const raster = this.native ? world.pyramid.native : world.pyramid;
+    const {imageWidth, imageHeight, maxDim} = raster;
+    const factor = this.native ? 1 : 2 ** zoom * TILE / maxDim;
+    this.size = [Math.ceil(imageWidth * factor), Math.ceil(imageHeight * factor)];
+    this.sourceIdentity = raster.sourceIdentity;
+    this.nativeKeys = this.native ? new Set(raster.tiles) : null;
+    this.columns = Math.ceil(this.size[0] / TILE);
+    this.rows = Math.ceil(this.size[1] / TILE);
+    this.lookup = new Uint8Array(this.columns * this.rows);
+    this.uploadLookup();
+  }
+
+  update(world, view) {
+    const maxZoom = world.pyramid.maxTileZoom;
+    const native = world.pyramid.native;
+    const nativeThreshold = this.compact ? 5 : view.focused ? 1.85 : 3.8;
+    const eligible = native && world.projection !== 2 && view.zoom >= nativeThreshold;
+    const level = this.native ? (eligible ? native.level : 0) : maxZoom > 3 && view.zoom >= 1.85
+      ? Math.min(maxZoom, view.zoom >= 3.45 ? 5 : 4)
+      : 0;
+    if (world !== this.world || level !== this.zoom) this.reset(world, level);
+    if (!level) return;
+    const signature = [view.width, view.height, Math.round(view.cx), Math.round(view.cy),
+      view.lon.toFixed(3), view.lat.toFixed(3), view.zoom.toFixed(3)].join('/');
+    if (signature === this.lastView) return;
+    this.lastView = signature;
+    const {cx, cy, radius, basis, width, height} = view;
+    const candidates = new Map();
+    const left = Math.max(0, cx - radius);
+    const right = Math.min(width, cx + radius);
+    const top = Math.max(0, cy - radius);
+    const bottom = Math.min(height, cy + radius);
+    const rows = this.compact ? 6 : 10;
+    const columns = this.compact ? 9 : 15;
+    for (let row = 0; row <= rows; row += 1) {
+      for (let col = 0; col <= columns; col += 1) {
+        const x = (left + (right - left) * col / columns - cx) / radius;
+        const y = (cy - top - (bottom - top) * row / rows) / radius;
+        if (x * x + y * y > .998) continue;
+        for (const [u, v] of viewAtlasPoints(world, basis, view.zoom, x, y)) {
+          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+          const tx = clamp(Math.floor(u * this.size[0] / TILE), 0, this.columns - 1);
+          const ty = clamp(Math.floor(v * this.size[1] / TILE), 0, this.rows - 1);
+          if (this.nativeKeys && !this.nativeKeys.has(`${tx}/${ty}`)) continue;
+          const key = ty * this.columns + tx;
+          const distance = x * x + y * y;
+          if ((candidates.get(key) ?? Infinity) > distance) candidates.set(key, distance);
+        }
+      }
+    }
+    this.visible = new Map([...candidates].sort((a, b) => a[1] - b[1]).slice(0, this.capacity));
+    for (const [key, controller] of this.pending) if (!this.visible.has(key)) controller.abort();
+    this.pump();
+  }
+
+  pump() {
+    for (const key of this.visible.keys()) {
+      if (this.inflight >= this.concurrency) break;
+      if (this.slots.has(key) || this.pending.has(key) || this.failed.has(key)) continue;
+      this.inflight += 1;
+      const controller = new AbortController();
+      this.pending.set(key, controller);
+      const revision = this.revision;
+      const x = key % this.columns;
+      const y = Math.floor(key / this.columns);
+      const url = './tiles/' + this.world.id + '/' + this.zoom + '/' + x + '/' + y + '.webp?v=' + this.sourceIdentity.slice(0, 12);
+      void this.load(url, key, revision, controller);
+    }
+  }
+
+  async load(url, key, revision, controller) {
+    let image;
+    try {
+      const response = await fetch(url, {signal: controller.signal});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      image = await createImageBitmap(await response.blob(), {premultiplyAlpha: 'none'});
+      if (revision === this.revision && !controller.signal.aborted && this.visible.has(key)) {
+        this.uploadTile(key, image);
+      }
+    } catch (error) {
+      if (revision === this.revision && !controller.signal.aborted) this.failed.add(key);
+    } finally {
+      image?.close();
+      this.inflight -= 1;
+      if (revision === this.revision) this.pending.delete(key);
+      this.pump();
+    }
+  }
+
+  uploadTile(key, image) {
+    let slot = this.slots.size;
+    if (slot >= this.capacity) {
+      const expired = [...this.slots.keys()].find((other) => !this.visible.has(other));
+      if (expired === undefined) return;
+      slot = this.slots.get(expired);
+      this.slots.delete(expired);
+      this.lookup[expired] = 0;
+    }
+    const {gl, textures} = this;
+    gl.activeTexture(gl.TEXTURE0 + textures.atlasUnit);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, textures.atlas);
+    if (!this.allocated) {
+      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TILE, TILE, this.capacity, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      this.allocated = true;
+    }
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, slot, TILE, TILE, 1, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    this.slots.set(key, slot);
+    this.lookup[key] = slot + 1;
+    this.uploadLookup();
+    this.invalidate();
+  }
+
+  uploadLookup() {
+    const {gl, textures} = this;
+    gl.activeTexture(gl.TEXTURE0 + textures.mapUnit);
+    gl.bindTexture(gl.TEXTURE_2D, textures.map);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, this.columns, this.rows, 0, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.activeTexture(gl.TEXTURE0);
+  }
+}

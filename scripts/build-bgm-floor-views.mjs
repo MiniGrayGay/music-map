@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import {
   compareSourceOrder, components, covers, difference, emptyPolygon, geometryMark, intersection, intersects,
   lineFromPoints, pointAt, pointsFromLine, polygonFromRings, polygonRings, polygonsOnly,
-  rectangle, releaseGeometries, roundPositions, union,
+  rectangle, releaseGeometries, roundPositions, union, volumeKey,
 } from './bgm-geometry.mjs';
 
 function* alphaRuns(alpha, width, height, channels) {
@@ -138,7 +138,7 @@ function inheritedFloorZones(artwork, anchors, sceneVolumes, parents, occupied) 
   return result;
 }
 
-async function projectFloor(zones, layers, anchors, sceneVolumes, proven, parents, bindings, manifest, folder) {
+async function projectFloor(zones, layers, anchors, sceneVolumes, proven, parents, bindingsFor, manifest, folder) {
   const mark = geometryMark();
   try {
     const completed = await Promise.allSettled(layers.map(async (layer) =>
@@ -146,16 +146,39 @@ async function projectFloor(zones, layers, anchors, sceneVolumes, proven, parent
     const failure = completed.find((read) => read.status === 'rejected');
     if (failure) throw failure.reason;
     const footprints = new Map(completed.map(({value}) => value));
-    let occupied = emptyPolygon();
-    const visible = [];
+    const candidates = [];
     const conflicts = [];
     for (const zone of zones) {
-      const pieces = bindings[zone.id].filter((id) => footprints.has(id))
-        .map((id) => footprints.get(id).shape);
-      let artwork = polygonsOnly(difference(union(pieces), occupied));
+      const pieces = bindingsFor(zone).filter((id) => footprints.has(id))
+        .map((id) => footprints.get(id));
+      let artwork = polygonsOnly(union(pieces.map(({shape}) => shape)));
       const parent = parents.get(keyByParent(zone));
       if (parent) artwork = polygonsOnly(intersection(artwork, parent));
       const shape = polygonsOnly(intersection(polygonFromRings(zone.rings), artwork));
+      if (!shape.isEmpty()) {
+        const names = new Set(pieces.map(({name}) => name)
+          .filter((name) => typeof name === 'string' && name.trim() && !/^[?？\s]+$/u.test(name)));
+        const name = /^[?？\s]+$/u.test(zone.name) && names.size === 1 ? [...names][0] : zone.name;
+        candidates.push({zone, name, artwork, shape});
+      }
+    }
+    const uncertain = [];
+    for (const [index, a] of candidates.entries()) {
+      for (const b of candidates.slice(index + 1)) {
+        if (a.zone.state === b.zone.state || (a.zone.yRange[0] === b.zone.yRange[0]
+          && a.zone.yRange[1] === b.zone.yRange[1]) || !intersects(a.shape, b.shape)) continue;
+        const overlap = polygonsOnly(intersection(a.shape, b.shape));
+        const area = overlap.getArea();
+        if (area < 0.02) continue;
+        uncertain.push(overlap);
+        conflicts.push({areas: [a.zone.id, b.zone.id], squareMetres: Number(area.toFixed(2))});
+      }
+    }
+    let occupied = union(uncertain);
+    const visible = [];
+    for (const {zone, name, artwork, shape: fullShape} of candidates) {
+      const freeArtwork = polygonsOnly(difference(artwork, occupied));
+      const shape = polygonsOnly(difference(fullShape, occupied));
       if (shape.isEmpty()) continue;
 
       occupied = union([occupied, shape]);
@@ -167,10 +190,10 @@ async function projectFloor(zones, layers, anchors, sceneVolumes, proven, parent
         continue;
       }
       const lines = zone.rings.flatMap((ring) => components(
-        intersection(lineFromPoints([...ring, ring[0]]), artwork), 'LineString',
+        intersection(lineFromPoints([...ring, ring[0]]), freeArtwork), 'LineString',
       )).map((line) => roundPositions(pointsFromLine(line)));
       visible.push({
-        id: zone.id, name: zone.name, state: zone.state, areaIds: [zone.id],
+        id: zone.id, name, state: zone.state, areaIds: [zone.id],
         rings: polygonRings(shape).map((ring) => roundPositions(pointsFromLine(ring, {omitClosing: true}))),
         lines,
       });
@@ -179,7 +202,19 @@ async function projectFloor(zones, layers, anchors, sceneVolumes, proven, parent
     if (!visible.length && !conflicts.length) {
       visible.push(...heightIndependentFloorZones(footprints, proven, anchors));
     }
-    return {visible, conflicts};
+    const byId = new Map();
+    for (const zone of visible) {
+      const previous = byId.get(zone.id);
+      if (!previous) byId.set(zone.id, zone);
+      else if (previous.state === zone.state) {
+        previous.rings.push(...zone.rings);
+        previous.lines.push(...zone.lines);
+        previous.areaIds = [...new Set([...previous.areaIds, ...zone.areaIds])];
+      } else {
+        throw new Error(`楼层音区 ${zone.id} 同编号对应多个状态`);
+      }
+    }
+    return {visible: [...byId.values()], conflicts};
   } finally {
     releaseGeometries(mark);
   }
@@ -200,6 +235,8 @@ export async function buildFloorViews(bgm, manifest, folder) {
   const floorViews = {};
   const floorViewConflicts = {};
   const bindings = bgm.floorVolumeBindings ?? bgm.surfaceLayerExclusions;
+  const bindingsFor = (zone) => bgm.floorVolumeBindingsByVolume
+    ? bgm.floorVolumeBindingsByVolume[volumeKey(zone)] ?? [] : bindings[zone.id] ?? [];
   const volumesByScene = Map.groupBy(bgm.volumes, ({sceneId}) => sceneId);
   const invariants = new Map([...volumesByScene].map(([scene, volumes]) =>
     [scene, invariantRegions(volumes, parents)]));
@@ -208,12 +245,12 @@ export async function buildFloorViews(bgm, manifest, folder) {
     const scene = layers[0].sceneId;
     const sceneVolumes = volumesByScene.get(scene) ?? [];
     const zones = sceneVolumes.filter((zone) => zone.yRange !== null
-      && bindings[zone.id]?.some((id) => layerIds.has(id))).sort(compareSourceOrder);
+      && bindingsFor(zone).some((id) => layerIds.has(id))).sort(compareSourceOrder);
     const anchors = bgm.floorAnchors?.[key] ?? [];
     const proven = invariants.get(scene) ?? [];
     if (!zones.length && !anchors.length && !proven.length) continue;
     const {visible, conflicts} = await projectFloor(
-      zones, layers, anchors, sceneVolumes, proven, parents, bindings, manifest, folder,
+      zones, layers, anchors, sceneVolumes, proven, parents, bindingsFor, manifest, folder,
     );
     if (visible.length) floorViews[key] = visible;
     if (conflicts.length) floorViewConflicts[key] = conflicts;

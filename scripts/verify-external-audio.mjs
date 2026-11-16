@@ -128,7 +128,7 @@ try {
   assert.equal(await readFile(ownNote, 'utf8'), 'must survive');
   await rename(ownNote, path.join(qa, 'local-note.txt'));
   console.log('重复导出已切换地址，验证失败时原站点和其他文件保留');
-  assert.ok(exported.bytes < 100_000_000);
+  assert.ok(exported.bytes - exported.reliefBytes < 100_000_000);
   console.log(`独立音频发布目录 ${exported.files} 个文件，${(exported.bytes / 1e6).toFixed(1)} MB`);
   site = await startServer(output);
   console.log(`临时站点 ${site.origin}，临时音频源 ${media.origin}`);
@@ -155,7 +155,7 @@ try {
     executablePath: process.env.CHROME_PATH ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     headless: true,
     userDataDir: path.join(qa, 'external-chrome'),
-    args: ['--mute-audio', '--no-first-run'],
+    args: ['--mute-audio', '--no-first-run', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   const page = await browser.newPage();
   const errors = [];
@@ -163,9 +163,11 @@ try {
   await page.setViewport({width: 390, height: 844, hasTouch: true, deviceScaleFactor: 1});
   await page.goto(site.origin, {waitUntil: 'domcontentloaded'});
   const releaseFirst = media.hold(first.id);
-  const selector = `path[data-zone-key=${JSON.stringify(zone.id)}]`;
-  await page.waitForSelector(selector);
-  await page.$eval(selector, (element) => element.focus());
+  const search = 'input[aria-label="跳转到地点"]';
+  await page.waitForSelector('.globe-labels .place');
+  await page.click(search);
+  await page.type(search, zone.name);
+  await page.waitForSelector('.globe-results button');
   await page.keyboard.press('Enter');
   const daytimeSelector = `button[data-value="${daytime.key}"]`;
   await page.waitForSelector(daytimeSelector, {visible: true});

@@ -1,0 +1,31 @@
+{
+  "clientExecutableSha256": "8b014f64b5dc12fbc476e0c362b053abfdd7a1378cd282e4ad81057621dbd6b5",
+  "volumes": [
+    {
+      "sceneId": 3,
+      "state": "State_FD40_LeiShuiZhiCheng",
+      "ringsSha256": "385a18369b02f6e5c47765834f5cca5321ae3b97011ce959694c468694606b11",
+      "tiles": [
+        {
+          "sourceName": "BigWorldTerrain_3_4.bin",
+          "heightsSha256": "78ed296f1cb2cf968802515335f5bee0f9f6ed14110d4179d15d077d189fe340"
+        }
+      ]
+    },
+    {
+      "sceneId": 3,
+      "state": "State_KL60_CiLiXiaGu_YiKongJian_Two",
+      "ringsSha256": "a280c17b7c89bb038b8659c7a198393572091cb0f3cfcb4dfb6599a1a4de4c6d",
+      "tiles": [
+        {
+          "sourceName": "BigWorldTerrain_2_8.bin",
+          "heightsSha256": "281051e5b8c7b0a64dce88f7ec263fdea1bc09f08f41afe864456ce12b191a6e"
+        },
+        {
+          "sourceName": "BigWorldTerrain_2_9.bin",
+          "heightsSha256": "ebfb60e13acc941bba8c48ba19864f50ffe14c0a15e9959caac004001591c5e9"
+        }
+      ]
+    }
+  ]
+}

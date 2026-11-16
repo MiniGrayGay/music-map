@@ -8,6 +8,7 @@
 !/dist/data/
 !/dist/layers/
 !/dist/tiles/
+!/dist/relief/
 !/dist/region-bgm-audio/
 /dist/data/*
 !/dist/data/map-data.json

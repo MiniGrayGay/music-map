@@ -8,6 +8,7 @@ import {parseByteRange} from './scripts/byte-range.mjs';
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(projectDir, '..', '..');
 const tilesDir = path.join(projectDir, 'dist', 'tiles');
+const reliefDir = path.join(projectDir, 'dist', 'relief');
 const layersDir = path.join(projectDir, 'dist', 'layers');
 const workspaceAudio = path.join(workspaceRoot, 'dist', 'region-bgm-audio');
 const audioDir = fs.existsSync(workspaceAudio) ? workspaceAudio : path.join(projectDir, 'dist/region-bgm-audio');
@@ -87,6 +88,40 @@ function serveLayersDev(server) {
   });
 }
 
+function serveReliefDev(server) {
+  server.middlewares.use((req, res, next) => {
+    const url = new URL(req.url, 'http://localhost');
+    const match = url.pathname.match(/^\/relief\/(index\.json|points-[a-f0-9]{16}\.f32)$/);
+    if (req.method !== 'GET' || !match) return next();
+    const [, name] = match;
+    const file = path.join(reliefDir, name);
+    fs.stat(file, (error, stat) => {
+      if (error || !stat.isFile()) { res.statusCode = 404; res.end(); return; }
+      const metadata = name === 'index.json';
+      const range = metadata ? null : parseByteRange(req.headers.range, stat.size);
+      res.setHeader('Cache-Control', metadata ? 'no-cache' : 'public, max-age=31536000, immutable');
+      res.setHeader('Content-Type', metadata ? 'application/json; charset=utf-8' : 'application/octet-stream');
+      if (range?.unsatisfiable) {
+        res.statusCode = 416;
+        res.setHeader('Content-Range', `bytes */${stat.size}`);
+        res.end();
+        return;
+      }
+      const {start, end} = range ?? {start: 0, end: stat.size - 1};
+      if (range) {
+        res.statusCode = 206;
+        res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+      }
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Length', end - start + 1);
+      const stream = fs.createReadStream(file, {start, end});
+      res.on('close', () => stream.destroy());
+      stream.on('error', () => res.destroy());
+      stream.pipe(res);
+    });
+  });
+}
+
 function serveAudio(server) {
   server.middlewares.use((req, res, next) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -120,6 +155,7 @@ function serveAudio(server) {
 
 export default defineConfig({
   base: './',
+  esbuild: {jsx: 'automatic'},
   plugins: [
     vue(),
     {
@@ -127,6 +163,7 @@ export default defineConfig({
       configureServer(server) {
         serveTilesDev(server);
         serveLayersDev(server);
+        serveReliefDev(server);
         serveMusicData(server);
         serveAudio(server);
       },

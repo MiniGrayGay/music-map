@@ -306,16 +306,20 @@ function buildGroups(entries, manifestGroups) {
         const floors = [...group.floorsById.values()]
           .sort((a, b) => a.level - b.level)
           .map((floor) => ({...floor, entries: [...floor.entries].sort(compareDrawOrder)}));
-        const representative = [...group.nameEntries].sort(
+        const namedEntries = group.nameEntries.filter(({name}) => !/^[?？\s]+$/u.test(name));
+        const representative = [...namedEntries].sort(
           (a, b) => floorRepresentativePriority(a.level) - floorRepresentativePriority(b.level),
         )[0]?.name;
         const names = group.nameEntries.map((item) => item.name);
+        const unnamed = namedEntries.length === 0;
         return {
           key: group.key,
           groupId: group.groupId,
           defaultFloorId: group.defaultFloorId,
           backgroundGroupIds: group.backgroundGroupIds,
-          label: names.length > 0 ? commonGroupName(names, representative) : `组 ${group.key}`,
+          label: unnamed ? `未命名分层 ${floors.length === 1 ? floors[0].label : `${floors.length} 层`}`
+            : commonGroupName(namedEntries.map(({name}) => name), representative),
+          unnamed,
           searchText: [...new Set(names)].join(' '),
           floorText: [...group.floorLabels].join(' / '),
           floors,
@@ -325,7 +329,8 @@ function buildGroups(entries, manifestGroups) {
         };
       })
       // 工作室同款排序：组名 localeCompare（zh-CN, numeric）。
-      .sort((a, b) => a.label.localeCompare(b.label, 'zh-CN', {numeric: true}));
+      .sort((a, b) => Number(a.unnamed) - Number(b.unnamed)
+        || a.label.localeCompare(b.label, 'zh-CN', {numeric: true}));
   }
   return byMapOut;
 }

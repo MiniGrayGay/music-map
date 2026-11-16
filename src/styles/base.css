@@ -1,19 +1,57 @@
-/* 提瓦特区域图：全局样式与语义令牌。深色地图工作面，无装饰性层级。 */
+/* 地图上的工具使用浅色透光材质，地图边界由 RegionLines 单独绘制。 */
 
 :root {
-  --surface-page: #10141b;
-  --surface-overlay: rgba(16, 20, 27, 0.88);
-  --surface-overlay-border: rgba(214, 226, 240, 0.16);
-  --text-primary: #e8eef5;
-  --text-secondary: #a7b4c4;
-  --region-stroke: rgba(219, 244, 249, 0.62);
-  --region-stroke-hover: #cefcff;
-  --region-fill-hover: rgba(83, 215, 232, 0.24);
-  --region-fill-selected: rgba(83, 215, 232, 0.32);
-  --control-focus: #9be8f1;
-  --accent-cyan: #53d7e8;
-  --control-hover: rgba(155, 232, 241, 0.16);
-  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  --surface-page: #e9ebe5;
+  --surface-overlay: rgb(247 247 242 / .55);
+  --surface-overlay-open: rgb(249 248 243 / .82);
+  --surface-raised: rgb(249 248 243 / .88);
+  --text-primary: #212624;
+  --text-secondary: #3e4845;
+
+  /* 地图区域线与命中填色（内容层，非界面令牌）。 */
+  --region-stroke: rgb(237 242 233 / .65);
+  --region-stroke-hover: #fff1dd;
+  --region-fill-selected: rgb(245 165 114 / .43);
+
+  --control-hover: rgb(38 53 47 / .075);
+  --control-active: rgb(38 53 47 / .13);
+  --control-focus: rgb(38 53 47 / .20);
+  /* 偏心的暖色和乳白色在底色上交叠，文字所在的中部仍有连续底色。 */
+  --control-selected: radial-gradient(ellipse 79% 122% at 13% -13%,
+    rgb(255 184 132 / .86), rgb(255 204 162 / .25) 58%, transparent 100%),
+    radial-gradient(ellipse 76% 109% at 92% 114%,
+      rgb(255 245 222 / .64), transparent 100%),
+    linear-gradient(rgb(248 220 195 / .40), rgb(251 229 206 / .34));
+  --control-open: radial-gradient(ellipse 122% 150% at 18% -27%,
+    rgb(255 246 225 / .62), rgb(241 242 234 / .24));
+
+  --accent: #664b3e;
+  --accent-hover: #523b31;
+  --range-fill: linear-gradient(95deg, #de946b, #f7d7a5);
+
+  --glass-blur: 18px;
+  --glass-tone: saturate(110%) contrast(50%) brightness(108%);
+  --glass-effect: blur(var(--glass-blur)) var(--glass-tone);
+  /* 沿两处受光边缘向内衰减。高光和玻璃底色分层，四周没有连续亮线。 */
+  --glass-light: radial-gradient(ellipse 55% 23px at 12% -5px,
+    rgb(255 255 255 / .39), rgb(255 255 255 / .08) 63%, transparent 100%),
+    radial-gradient(ellipse 39% 21px at 96% calc(100% + 7px),
+      rgb(255 252 239 / .24), transparent 100%);
+  --shadow-glass: 0 20px 52px rgb(20 32 26 / .13), 0 5px 20px rgb(20 32 26 / .07);
+  --ease-glass-in: cubic-bezier(.18, .76, .25, 1);
+  --ease-glass-out: cubic-bezier(.42, 0, .72, .38);
+  --glass-reveal-duration: 240ms;
+  --glass-dismiss-duration: 140ms;
+
+  /* 结构令牌（design.md）：间距全取 8 的倍数；圆角两档 + 全屏 0。 */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --radius-card: 16px;
+  --radius-control: calc(var(--radius-card) / 2);
+
+  font-family: 'Inter', 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
 * {
@@ -26,11 +64,130 @@ body {
   height: 100%;
   background: var(--surface-page);
   color: var(--text-primary);
+  color-scheme: light;
   overflow: hidden;
+}
+
+/* The map controls use the same LiquidGlass material as the audio panel. */
+.map-glass {
+  --scroll-thumb: rgb(228 240 243 / .40);
+  --scroll-thumb-hover: rgb(228 240 243 / .56);
+  --map-glass-fill: rgb(8 24 39 / .27);
+  --map-glass-sheen: radial-gradient(ellipse 85% 55% at 25% 13%, rgb(213 235 255 / .18), transparent 87%);
+  --liquid-glass-backdrop: blur(5px) saturate(151%) brightness(1.08);
+  --text-primary: #edf5f2;
+  --text-secondary: #b8d0d0;
+  --control-hover: rgb(220 245 244 / .14);
+  --control-active: rgb(220 245 244 / .22);
+  --control-focus: rgb(220 245 244 / .24);
+  --control-selected: linear-gradient(145deg, rgb(174 232 226 / .28), rgb(129 179 194 / .12));
+  position: relative;
+  color-scheme: dark;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.map-glass > :not(.liquid-glass) { position: relative; z-index: 1; }
+[data-liquid-morph] > .liquid-glass.glass-surface {
+  inset: auto;
+  top: var(--panel-morph-y);
+  left: var(--panel-morph-x);
+  width: var(--panel-morph-width);
+  height: var(--panel-morph-height);
+  border-radius: var(--panel-morph-radius);
+}
+[data-liquid-morph][inert] { pointer-events: none; }
+:is([data-liquid-morph], [data-liquid-native-close]) > .liquid-glass > .rdev-pane > .rdev-warp,
+.music-player:has([data-liquid-drawer]) > .liquid-glass > .rdev-pane > .rdev-warp {
+  filter: none !important;
+}
+[data-liquid-native-close] > .liquid-glass { will-change: transform; }
+.map-glass:where(:not(:has(> .liquid-glass--clear)))::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--map-glass-sheen), var(--map-glass-fill);
+}
+.map-glass-popup { --map-glass-fill: rgb(9 23 38 / .56); }
+.app:has(.map-surface) .map-glass:not(.map-glass-popup) {
+  --map-glass-fill: rgb(7 25 38 / .45);
+}
+
+@media (forced-colors: active) {
+  .map-glass { color: CanvasText; background: Canvas; }
+  .map-glass::after { display: none; }
 }
 
 #app {
   height: 100%;
+}
+
+.scroll-viewport {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb, rgb(38 53 47 / .32)) transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .scroll-viewport {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  .scroll-viewport::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  .scroll-viewport::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .scroll-viewport::-webkit-scrollbar-track,
+  .scroll-viewport::-webkit-scrollbar-corner {
+    background-color: transparent;
+  }
+
+  .scroll-viewport::-webkit-scrollbar-thumb {
+    border-radius: 6px;
+    background-color: var(--scroll-thumb, rgb(38 53 47 / .32));
+  }
+
+  .scroll-viewport::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scroll-thumb-hover, rgb(38 53 47 / .46));
+  }
+}
+
+@media (forced-colors: active) {
+  .scroll-viewport {
+    scrollbar-color: auto;
+  }
+
+  .scroll-viewport::-webkit-scrollbar-thumb {
+    background-color: ButtonText;
+  }
+}
+
+@media (max-width: 700px), (pointer: coarse) {
+  .scroll-viewport {
+    scrollbar-gutter: auto;
+    scrollbar-width: none;
+  }
+
+  .scroll-viewport::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
+  #app {
+    height: 100dvh;
+  }
 }
 
 button {
@@ -38,10 +195,32 @@ button {
   color: inherit;
 }
 
-/* 键盘焦点统一可见；组件内可用更高优先级自定义样式，但不允许静默吞掉焦点。 */
+/* 地图焦点由分区洗色呈现。控件使用整块填色和文字对比。 */
 :focus-visible {
-  outline: 2px solid var(--control-focus);
-  outline-offset: 2px;
+  outline: none;
+}
+
+:is(button, input):focus-visible {
+  background: var(--control-focus);
+  color: var(--text-primary);
+}
+
+/* 入场动画（design.md 动效条款）：出现减速 200–240ms、瞬时消失（出现比
+   消失略慢）；浮层与 dock 入场只动 opacity——位移会触发点击时的
+   scrollIntoView 修正破坏坐标稳定性（实测）；页面级（fixed）可动 scale。
+   prefers-reduced-motion 由下方全局规则关停。 */
+@keyframes ui-page-in {
+  from { opacity: 0; transform: scale(.98); }
+}
+@keyframes ui-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes ui-glass-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(.985); }
 }
 
 /* 减少动效：跟随系统设置关闭过渡与动画，只保留状态切换的最终态。 */

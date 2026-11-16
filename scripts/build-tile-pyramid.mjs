@@ -54,7 +54,8 @@ async function cut(name, sourceIdentity, imageWidth, imageHeight, openImage) {
   const maxDim = Math.max(imageWidth, imageHeight);
   const maxTileZoom = Math.max(0, Math.floor(Math.log2(maxDim / tileSize)));
   const meta = {imageWidth, imageHeight, maxDim, maxTileZoom, tileSize, sourceIdentity, quality: 100};
-  const reuse = JSON.stringify(previous.maps?.[name]) === JSON.stringify(meta);
+  const {native, ...oldBase} = previous.maps?.[name] ?? {};
+  const reuse = JSON.stringify(oldBase) === JSON.stringify(meta);
   let decoded;
   let total = 0;
   for (let z = 0; z <= maxTileZoom; z += 1) {
@@ -93,7 +94,7 @@ async function cut(name, sourceIdentity, imageWidth, imageHeight, openImage) {
           .toFile(file)));
     }
   }
-  entries[name] = meta;
+  entries[name] = reuse && native ? {...meta, native} : meta;
   console.log(`${name} ${imageWidth}×${imageHeight}，${total} 张 512px 瓦片，0–${maxTileZoom} 级`);
 }
 

@@ -2,8 +2,11 @@ import {createHash} from 'node:crypto';
 import {constants, createReadStream} from 'node:fs';
 import {copyFile, link, lstat, mkdir, readFile, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {layerFileNames, tileFileNames} from './asset-layout.mjs';
+import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
 import {verifyOpus} from './opus-file.mjs';
+import {
+  INITIAL_MUSIC_PREVIEW_VERSION, INITIAL_MUSIC_PREVIEWS, VERIFIED_TRACKS, dedupeVerifiedTracks,
+} from '../src/features/bgm/verifiedTracks.js';
 
 const project = path.resolve(import.meta.dirname, '..');
 const workspace = path.resolve(project, '..', '..');
@@ -65,12 +68,13 @@ function playbackNode(node) {
   }
 }
 
-const [map, tiles, layers, basemaps, source] = await Promise.all([
+const [map, tiles, layers, basemaps, source, relief] = await Promise.all([
   json(path.join(output, 'data/map-data.json')),
   json(path.join(output, 'tiles/meta.json')),
   json(path.join(output, 'layers/manifest.json')),
   json(path.join(output, 'layers/basemaps.json')),
   json(manifestFile),
+  json(path.join(output, 'relief/index.json')),
 ]);
 
 const version = map.dataVersion;
@@ -86,6 +90,11 @@ if (source.schemaVersion !== 1 || source.sceneId !== 3 || !source.musicGraph
 
 const tilePaths = tileFileNames(tiles);
 const layerPaths = layerFileNames(layers);
+const [, reliefPoints] = reliefFileNames(relief, source);
+const pointFile = path.join(output, reliefPoints);
+if ((await regularFile(pointFile)).size !== relief.bytes || await digest(pointFile) !== relief.sha256) {
+  throw new Error('分区点阵文件指纹不符');
+}
 await batches(tilePaths, (name) => regularFile(path.join(output, name)));
 await batches(layers.layers, async (layer) => {
   const file = path.join(output, 'layers', layer.image);
@@ -143,6 +152,35 @@ await batches(media, async ([id, track]) => {
   await materialize(file, path.join(audioOutput, `${id}.opus`), info);
   audioBytes += info.size;
 });
+// 两处区域关联可能共用同一 media id：先按行校验，再以规范源 ID 去重，
+// 同源的时长或指纹冲突在此处直接报错，避免 Promise 批处理对同一目标重复落位。
+// 初始试听补曲在此基础上加两道防护：清单版本必须与发布素材客户端版本一致，
+// 且 segment id 不得与 graph.media 冲突（此处直接报错，不静默过滤）。
+if (INITIAL_MUSIC_PREVIEW_VERSION !== version) {
+  throw new Error(`初始试听清单版本 ${INITIAL_MUSIC_PREVIEW_VERSION} 与客户端 ${version} 不一致`);
+}
+for (const track of INITIAL_MUSIC_PREVIEWS) {
+  if (Object.hasOwn(graph.media, String(track.id))) {
+    throw new Error(`初始试听补曲 ${track.id} 与图内音源 id 冲突`);
+  }
+}
+const extras = dedupeVerifiedTracks([...VERIFIED_TRACKS, ...INITIAL_MUSIC_PREVIEWS]).filter(
+  (track) => !Object.hasOwn(graph.media, String(track.id)),
+);
+await batches(extras, async (track) => {
+  if (!/^\d+$/.test(String(track.id)) || !Number.isFinite(track.duration) || track.duration <= 0
+    || !/^[a-f0-9]{64}$/i.test(track.audioSha256 ?? '')) {
+    throw new Error(`非法已核实兜底音轨 ${track.id}`);
+  }
+  const file = path.join(audioSource, `${track.id}.opus`);
+  const info = await regularFile(file);
+  if (await digest(file) !== track.audioSha256) {
+    throw new Error(`已核实兜底音轨 ${track.id} 指纹不符`);
+  }
+  await verifyOpus(file, info.size, track.duration);
+  await materialize(file, path.join(audioOutput, `${track.id}.opus`), info);
+  audioBytes += info.size;
+});
 
 const {
   schemaVersion, clientVersion, sceneId, zones, scenes, maps, layerFloor, floorViews,
@@ -178,4 +216,4 @@ await Promise.all([
     executableSha256: basemaps.executableSha256, maps: basemaps.maps,
   }),
 ]);
-console.log(`静态交付已核对 ${tilePaths.length} 张瓦片、${layerPaths.length} 张楼层贴片、${media.length} 首音轨（音频 ${Math.round(audioBytes / 1e6)} MB）`);
+console.log(`静态交付已核对 ${tilePaths.length} 张瓦片、${layerPaths.length} 张楼层贴片、${media.length} 首音轨、${extras.length} 首同站补曲（含 ${INITIAL_MUSIC_PREVIEWS.length} 首初始试听，音频 ${Math.round(audioBytes / 1e6)} MB）`);

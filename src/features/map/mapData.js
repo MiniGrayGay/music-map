@@ -1,4 +1,4 @@
-const SUPPORTED_DATA_VERSION = '7.2.0';
+export const SUPPORTED_DATA_VERSION = '7.2.0';
 
 export async function loadMapData() {
   const [dataResponse, indexResponse] = await Promise.all([

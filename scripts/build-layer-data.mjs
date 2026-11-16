@@ -158,7 +158,7 @@ for (const layerId of ordered) {
     backgroundGroupIds: backgroundField && group[backgroundField]?.length
       ? group[backgroundField] : undefined,
   };
-  const base = {layerId, groupId, floorId, floorLevel, floorLabel, name: localization[floor[display.name]],
+  const base = {layerId, groupId, floorId, floorLevel, floorLabel, name: display.resolveName(floor),
     region: regions.get(layerId) ?? null};
   if (unavailable.has(layerId)) {
     noImageLayers.push({...base, sceneId: unavailable.get(layerId).sceneId,

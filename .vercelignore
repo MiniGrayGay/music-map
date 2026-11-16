@@ -1,3 +1,12 @@
 .git/
-dist/region-bgm-audio/
+dist/region-bgm-audio/*
+!dist/region-bgm-audio/618610642.opus
+!dist/region-bgm-audio/216656593.opus
+!dist/region-bgm-audio/484873486.opus
+!dist/region-bgm-audio/534670398.opus
+!dist/region-bgm-audio/548054274.opus
+!dist/region-bgm-audio/566513575.opus
+!dist/region-bgm-audio/643771607.opus
+!dist/region-bgm-audio/848869252.opus
+!dist/region-bgm-audio/947850140.opus
 dist/site/

@@ -95,7 +95,7 @@ function expectedZoneTracks(manifest, stateName, mode) {
 
 async function openFloorGroup(page, name) {
   await page.click('button[aria-label="切换分层地图"]');
-  const searchSelector = 'input[aria-label="搜索分层区域"]';
+  const searchSelector = '#layer-group-panel[data-panel-open] input[aria-label="搜索分层区域"]';
   await page.waitForFunction((selector) => document.querySelector(selector)
     || document.querySelector('.layer-piece'), {}, searchSelector);
   if (await page.evaluate((name) => document.querySelector('button[aria-label="分层区域"]')
@@ -103,11 +103,20 @@ async function openFloorGroup(page, name) {
   if (!await page.$(searchSelector)) await page.click('button[aria-label="分层区域"]');
   await page.type(searchSelector, name);
   // 键盘流验证：回车必须选中可见的匹配项，而不是置顶的旧已选组。
-  await page.waitForFunction((name) => document.querySelector('[role="option"]')
+  await page.waitForFunction((name) => document.querySelector('#layer-group-panel[data-panel-open] [role="option"]')
     ?.textContent.includes(name), {}, name);
   await page.keyboard.press('Enter');
   await page.waitForFunction((name) => document.querySelector('button[aria-label="分层区域"]')
     ?.title.includes(name), {}, name);
+}
+
+async function panelClosed(page, selector) {
+  try {
+    await page.waitForSelector(selector, {hidden: true, timeout: 2500});
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function openMeropide(page) {
@@ -119,7 +128,11 @@ async function openMeropide(page) {
 function inspectFloor(page, desiredKeys) {
   return page.evaluate(async (entries) => {
     const desired = new Map(entries);
-    const art = [...document.querySelectorAll('.layer-piece')].map((img) => {
+    const images = [...document.querySelectorAll('.layer-piece')];
+    await Promise.all(images.map((image) => image.decode()));
+    // Let the compositor present the decoded artwork and the SVG hit layer before sampling.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const art = images.map((img) => {
       const canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
@@ -207,6 +220,95 @@ async function waitForAudio(page, source) {
   }
 }
 
+function playerDetailsVisible(page) {
+  return page.evaluate(() => Boolean(document.querySelector('.player-drawer')?.getClientRects().length));
+}
+
+// 播放器在地图内联展开。展开区在 DOM 中常驻，按实际可见性判断。
+async function openPlayerDetails(page, {songs = false} = {}) {
+  await page.waitForSelector('.glass-player-enter-active', {hidden: true});
+  if (!await playerDetailsVisible(page)) await page.click('button.details-toggle');
+  await page.waitForSelector('.player-drawer', {visible: true});
+  await page.waitForSelector('.details-reveal.reveal-enter-active', {hidden: true});
+  if (songs) {
+    await page.waitForSelector('.player-drawer .track-list:not([inert])', {visible: true});
+  }
+}
+
+async function collapsePlayerDetails(page) {
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.player-drawer', {hidden: true});
+  return page.evaluate(() => {
+    const button = document.querySelector('button.details-toggle');
+    return button?.getAttribute('aria-expanded') === 'false' && button === document.activeElement
+      && button.title === '歌曲列表' && Boolean(button.querySelector('svg'));
+  });
+}
+
+const volumeTrigger = 'button[aria-label="音量设置"]';
+const volumeRange = '.volume-panel input[aria-label="音量"]';
+
+async function openPlayerVolume(page) {
+  await page.click(volumeTrigger);
+  await page.waitForSelector(volumeRange, {visible: true});
+  await page.waitForSelector('.volume-reveal.reveal-enter-active', {hidden: true});
+  await page.waitForFunction((selector) => document.activeElement === document.querySelector(selector),
+    {timeout: 5000}, volumeRange);
+  return page.evaluate(() => {
+    const player = document.querySelector('.music-player');
+    const panel = player.querySelector('.volume-panel').getBoundingClientRect();
+    const ranges = [...player.querySelectorAll('input[type="range"][aria-label="音量"]')]
+      .filter((element) => !element.disabled && element.getClientRects().length);
+    const unobstructed = ['[aria-label="关闭播放器"]', 'input[aria-label="播放进度"]']
+      .every((selector) => {
+        const control = player.querySelector(selector);
+        const bounds = control?.getBoundingClientRect();
+        if (!bounds?.width || !bounds.height) return false;
+        const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        const overlaps = panel.left < bounds.right && panel.right > bounds.left
+          && panel.top < bounds.bottom && panel.bottom > bounds.top;
+        return !overlaps && control.contains(hit);
+      });
+    return ranges.length === 1 && ranges[0] === document.activeElement && unobstructed
+      && panel.left >= 0 && panel.right <= innerWidth && panel.top >= 0 && panel.bottom <= innerHeight;
+  });
+}
+
+async function closePlayerVolume(page) {
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.volume-panel', {hidden: true});
+  return page.$eval(volumeTrigger, (button) =>
+    button.getAttribute('aria-expanded') === 'false' && button === document.activeElement);
+}
+
+async function chooseTab(page, label, value) {
+  await openPlayerDetails(page);
+  const selector = `button.modes-toggle[aria-label=${JSON.stringify(label)}]`;
+  await page.waitForSelector(selector, {visible: true});
+  const count = await page.$eval(selector, (button) => button.querySelectorAll('.mode-option').length);
+  const desired = String(value);
+  let current = await page.$eval(selector, (button) => button.dataset.value);
+  for (let attempt = 0; attempt < count && current !== desired; attempt += 1) {
+    await page.click(selector);
+    await page.waitForFunction((target, previous) =>
+      document.querySelector(target)?.dataset.value !== previous, {}, selector, current);
+    current = await page.$eval(selector, (button) => button.dataset.value);
+  }
+  if (current !== desired) throw new Error(`无法切换到${label}的 ${desired} 项`);
+}
+
+async function playFirstListed(page) {
+  await openPlayerDetails(page, {songs: true});
+  const selector = '.player-drawer .track-list:not([inert]) button';
+  await page.waitForFunction((target) => {
+    const button = document.querySelector(target);
+    const rect = button?.getBoundingClientRect();
+    if (!rect?.width || !rect.height) return false;
+    return button.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2));
+  }, {}, selector);
+  await page.click(selector);
+}
+
 async function openMondstadt(page) {
   const key = await page.evaluate(async () => {
     const data = await (await fetch('/data/genshin-region-bgm.json')).json();
@@ -215,7 +317,8 @@ async function openMondstadt(page) {
   const selector = `path[data-zone-key=${JSON.stringify(key)}]`;
   await page.$eval(selector, (element) => element.focus());
   await page.keyboard.press('Enter');
-  await page.click('.modes[aria-label="音乐模式"] button:first-child');
+  await page.waitForSelector('.music-player', {visible: true, timeout: 5000});
+  await chooseTab(page, '音乐模式', 'exploration');
 }
 
 async function main() {
@@ -245,11 +348,159 @@ async function main() {
     executablePath: chromePath,
     headless: true,
     userDataDir: chromeProfile,
-    args: ['--no-first-run', '--disable-background-timer-throttling', '--mute-audio'],
+    args: ['--no-first-run', '--disable-background-timer-throttling', '--mute-audio',
+      '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   const context = await browser.createBrowserContext();
+  const home = `http://127.0.0.1:${port}/`;
+  const globe = await context.newPage();
+  try {
+    await globe.setViewport({width: 1440, height: 900});
+    await globe.emulateMediaFeatures([{name: 'prefers-reduced-motion', value: 'reduce'}]);
+    await globe.goto(home, {waitUntil: 'domcontentloaded'});
+    await globe.waitForSelector('.globe-labels .place');
+    check(await globe.$('.map-surface') === null && await globe.$('.zoom-controls button[aria-label="球面地图"]') === null,
+      '首页直接显示球面，工具栏无平面切换按钮');
+    const regionNames = ['蒙德', '璃月', '稻妻', '须弥', '枫丹', '纳塔', '至冬', '挪德卡莱'].sort();
+    const visibleRegions = await globe.$$eval('.globe-labels .place', (labels) => labels.map((label) => label.textContent).sort());
+    check(JSON.stringify(visibleRegions) === JSON.stringify(regionNames), '球面首页只标注七国和挪德卡莱');
+    const inazumaSea = await globe.evaluate(async () => {
+      const response = await fetch('./tiles/meta.json');
+      const {maps: {Teyvat: {native}}} = await response.json();
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d', {willReadFrequently: true});
+      // This sea patch crosses native rows 62–63, beyond 4 GiB in the source raster.
+      for (const key of ['80/62', '81/62', '82/62', '83/62', '80/63', '81/63', '82/63', '83/63']) {
+        const tile = await fetch(`./tiles/Teyvat/${native.level}/${key}.webp`);
+        if (!tile.ok) return false;
+        const image = await createImageBitmap(await tile.blob());
+        context.drawImage(image, image.width / 2, image.height * .75, 1, 1, 0, 0, 1, 1);
+        image.close();
+        const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
+        if (a !== 255 || g < 36 || b < 36 || g <= r) return false;
+      }
+      return true;
+    });
+    check(inazumaSea, '稻妻南边 8 张原像素瓦片的海面可解码且没有黑块');
+    await globe.screenshot({path: path.join(shotDir, '00-default-globe.png')});
+    const moonLink = 'button[aria-label="进入霜月"]:not([hidden])';
+    const resetMoon = 'button[aria-label="复位到霜月全览"]';
+    const returnToWorld = 'button[aria-label="返回全局预览"]';
+    const currentMapName = () => globe.$eval('.map-switcher .select-value', (label) => label.textContent.trim());
+    await globe.waitForSelector(moonLink, {visible: true});
+    await globe.click(moonLink);
+    await globe.waitForSelector(returnToWorld);
+    await globe.waitForSelector(moonLink, {hidden: true});
+    await globe.click('button[aria-label="放大"]');
+    await globe.waitForSelector(resetMoon);
+    await globe.click(resetMoon);
+    await globe.waitForSelector(returnToWorld);
+    check(await currentMapName() === '霜月', '霜月放大后复位回到霜月全览');
+    await globe.click(returnToWorld);
+    await globe.waitForSelector('.globe-labels .place');
+    check(await currentMapName() === '提瓦特' && await globe.$('.lunar-transition:not([hidden])') === null,
+      '霜月全览复位返回提瓦特，减少动态效果时直接切换');
+    const search = 'input[aria-label="跳转到地点"]';
+    await globe.click(search);
+    await globe.type(search, '枫丹廷');
+    await globe.waitForSelector('.globe-results button');
+    check(await globe.$$eval('.globe-results button', (buttons) =>
+      buttons.filter((button) => button.querySelector('span')?.textContent === '枫丹廷区').length === 1),
+    '球面搜索合并同名同音乐状态的重复结果');
+    await globe.keyboard.press('ArrowDown');
+    check(await globe.$eval(search, (node) =>
+      document.getElementById(node.getAttribute('aria-activedescendant'))?.textContent === '枫丹廷区'),
+    '搜索方向键可选择下一条结果');
+    await globe.click('.map-switcher .select-trigger');
+    await globe.waitForSelector('.select-popup', {visible: true});
+    check(await globe.$('.globe-results') === null, '地图菜单打开时搜索结果关闭');
+    await globe.keyboard.press('Escape');
+    await globe.click(search);
+    await globe.keyboard.down('Control');
+    await globe.keyboard.press('KeyA');
+    await globe.keyboard.up('Control');
+    await globe.type(search, '新基捷城');
+    await globe.waitForSelector('.globe-results button');
+    await globe.keyboard.press('Enter');
+    const activeLabel = await globe.waitForSelector('.globe-labels .active-zone-label', {visible: true});
+    check(await activeLabel.evaluate((label) => label.textContent) === '新基捷城'
+      && await globe.$('.music-player') === null, '搜索只定位和标注音乐分区');
+    await globe.waitForSelector('.relief-dock canvas[aria-label="新基捷城地形高程点阵"]', {visible: true});
+    await globe.focus('.globe-canvas');
+    await globe.keyboard.press('Enter');
+    await globe.waitForSelector('.music-player', {visible: true});
+    check(await globe.$('.music-player') !== null, '从原有地图入口选中分区才打开播放器');
+    const dragSample = await globe.evaluateHandle(() => {
+      const label = document.querySelector('.active-zone-label');
+      const initialTransform = label.style.transform;
+      const drawing = CanvasRenderingContext2D.prototype;
+      const original = drawing.drawImage;
+      const sample = {frames: 0, retained: true, lifted: true, moved: false};
+      drawing.drawImage = function (source, ...coords) {
+        if (source?.matches?.('.globe-canvas') && coords.length === 8 && source.width < source.clientWidth) {
+          sample.frames += 1;
+          sample.retained &&= document.querySelector('.active-zone-label') === label;
+          sample.lifted &&= coords[1] * source.clientHeight / source.height - coords[5] > 0;
+        }
+        return original.call(this, source, ...coords);
+      };
+      return {
+        finish() {
+          drawing.drawImage = original;
+          sample.moved = label.style.transform !== initialTransform;
+          return sample;
+        },
+      };
+    });
+    await globe.mouse.move(594, 429);
+    await globe.mouse.down();
+    await globe.mouse.move(666, 429, {steps: 10});
+    await globe.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    const dragged = await dragSample.evaluate((probe) => probe.finish());
+    await globe.mouse.up();
+    await dragSample.dispose();
+    check(dragged.frames > 0 && dragged.retained && dragged.lifted && dragged.moved,
+      '球面拖动时浮层继续绘制，文字保留同一节点并随地图移动');
+    await globe.click('button[aria-label="关闭播放器"]');
+    await globe.waitForSelector('.globe-labels .active-zone-label', {hidden: true});
+    await globe.waitForSelector('button[aria-label="切换分层地图"]', {visible: true});
+    const layerButton = 'button[aria-label="切换分层地图"]';
+    check(await globe.evaluate(() => {
+      const map = document.querySelector('.map-switcher').getBoundingClientRect();
+      const layers = document.querySelector('.layer-picker .bar').getBoundingClientRect();
+      const search = document.querySelector('.globe-search-field').getBoundingClientRect();
+      return map.top === layers.top && map.right < layers.left && search.top > layers.bottom
+        && search.left === map.left && search.right === layers.right;
+    }), '地图下拉与分层同处左上一行，搜索框和整行等宽');
+    await globe.click(layerButton);
+    await globe.waitForSelector('#layer-group-panel', {visible: true});
+    await globe.click(layerButton);
+    await globe.waitForSelector('#layer-group-panel', {hidden: true});
+    check(await globe.$eval(layerButton, (button) =>
+      button.getAttribute('aria-expanded') === 'false' && document.activeElement === button),
+    '分层入口再次点击收起目录并保持焦点');
+    await globe.click(layerButton);
+    await globe.waitForSelector('#layer-group-list [role="option"]', {visible: true});
+    await globe.click('#layer-group-list [role="option"]');
+    await globe.waitForSelector('.layer-piece');
+    await globe.click(layerButton);
+    await globe.waitForSelector('.globe-labels .place');
+    check(await globe.$('.layer-piece') === null, '退出分层回到球面');
+  } finally {
+    await globe.close();
+  }
+
   const page = await context.newPage();
   await page.setViewport({width: 1440, height: 900, deviceScaleFactor: 1, hasTouch: true});
+  // 后续地表瓦片和 SVG 命中用例覆盖 WebGL 2 不可用时的降级入口。
+  await page.evaluateOnNewDocument(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (kind, ...options) {
+      if (kind === 'webgl2' && this.classList.contains('globe-canvas')) return null;
+      return getContext.call(this, kind, ...options);
+    };
+  });
 
   const consoleErrors = [];
   page.on('console', (message) => {
@@ -266,7 +517,7 @@ async function main() {
     if (response.status() >= 400) resourceErrors.push({url, status: response.status()});
   });
 
-  await page.goto(`http://127.0.0.1:${port}/`, {waitUntil: 'domcontentloaded'});
+  await page.goto(home, {waitUntil: 'domcontentloaded'});
   const bgmManifest = await (await fetch(`http://127.0.0.1:${port}/data/genshin-region-bgm.json`)).json();
   const audioUrl = `http://127.0.0.1:${port}/region-bgm-audio/128266555.opus`;
   const [fullAudio, range] = await Promise.all([
@@ -323,33 +574,40 @@ async function main() {
   check(mapChoices.filter((o) => o.selected).length === 1 && mapChoices[0].selected,
     '地图下拉恰有当前项（提瓦特）选中');
   await page.keyboard.press('Escape');
-  check(await page.$('.select-popup') === null, 'Escape 只关地图下拉');
+  check(await panelClosed(page, '.select-popup'), 'Escape 只关地图下拉');
   check(await page.$eval('.map-switcher .select-trigger', (b) => document.activeElement === b),
     '地图下拉关闭后焦点回到触发器');
   await page.click('.map-switcher .select-trigger');
   await page.waitForSelector('.select-popup', {visible: true});
   await page.mouse.click(20, 880); // 空白海面：点外部关闭下拉
-  check(await page.$('.select-popup') === null, '点击下拉外部关闭地图菜单');
+  check(await panelClosed(page, '.select-popup'), '点击下拉外部关闭地图菜单');
 
   await page.click('button[aria-label="切换分层地图"]');
   const layerScroller = '.panel .group-scroll .scroll-viewport';
   await page.waitForSelector(layerScroller, {visible: true});
+  await page.waitForSelector('#layer-group-panel[data-liquid-morph]', {hidden: true});
   const scrolling = await page.$eval(layerScroller, (node) => {
     const style = getComputedStyle(node);
     const rect = node.getBoundingClientRect();
     const track = getComputedStyle(node, '::-webkit-scrollbar-track');
+    const arrows = getComputedStyle(node, '::-webkit-scrollbar-button');
+    const hidden = matchMedia('(max-width: 700px), (pointer: coarse)').matches;
     return {
       top: node.scrollTop,
       range: node.scrollHeight - node.clientHeight,
       space: node.offsetWidth - node.clientWidth,
-      separate: style.scrollbarGutter === 'stable' && style.scrollbarWidth === 'thin',
+      hidden,
+      correctScrollbar: hidden ? style.scrollbarWidth === 'none'
+        : style.scrollbarGutter === 'stable' && arrows.display === 'none',
       frame: style.borderRightWidth + ' ' + track.borderLeftWidth,
+      bottomGap: node.closest('.panel').getBoundingClientRect().bottom - rect.bottom,
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     };
   });
-  check(scrolling.range > 0 && scrolling.space > 0 && scrolling.separate && scrolling.frame === '0px 0px',
-    `楼层列表实际留出 ${scrolling.space}px 滚动空间，无轨道边线`);
+  check(scrolling.range > 0 && (scrolling.hidden ? scrolling.space === 0 : scrolling.space > 0)
+    && scrolling.correctScrollbar && scrolling.frame === '0px 0px' && scrolling.bottomGap >= 10,
+  `分层目录可滚动，${scrolling.hidden ? '触屏隐藏滚动条' : `桌面细滑块占 ${scrolling.space}px 且无箭头`}`);
   const fixedMap = await worldState(page);
   await page.mouse.move(scrolling.x, scrolling.y);
   await page.mouse.wheel({deltaY: 240});
@@ -360,7 +618,7 @@ async function main() {
     '楼层列表滚动不会平移或缩放地图');
   await page.screenshot({path: path.join(shotDir, '14-floor-scrollbar.png')});
   await page.keyboard.press('Escape');
-  check(await page.$('.panel') === null, '滚动后 Escape 关闭分层目录');
+  check(await panelClosed(page, '#layer-group-panel'), '滚动后 Escape 关闭分层目录');
 
   // 只通过当前清单中的真实音乐分区检查悬停。
   const hoverPoint = await page.evaluate(() => {
@@ -386,7 +644,8 @@ async function main() {
     state = await worldState(page);
     check(state.selectedRegion === hoverPoint.key, '鼠标左键点选打开分区播放器');
     await page.keyboard.press('Escape');
-    check(await page.$('.music-player') === null, 'Escape 收起左键打开的播放器');
+    await page.waitForSelector('.music-player', {hidden: true});
+    check(await panelClosed(page, '.music-player'), 'Escape 收起左键打开的播放器');
   } else {
     check(await page.$('.music-player') === null, '没有可点击分区时隐藏播放器');
   }
@@ -473,13 +732,20 @@ async function main() {
   await page.focus('.map-surface');
   const beforePlus = await worldState(page);
   for (let i = 0; i < 4; i += 1) await page.keyboard.press('+');
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await page.waitForFunction((startScale) => {
+    const world = document.querySelector('.world');
+    return new DOMMatrixReadOnly(getComputedStyle(world).transform).a > startScale * 3;
+  }, {timeout: 5000}, beforePlus.scale);
   const afterPlus = await worldState(page);
   check(afterPlus.scale > beforePlus.scale * 3, `键盘 + 放大生效（${beforePlus.scale.toFixed(3)} → ${afterPlus.scale.toFixed(3)}）`);
   const beforeKeys = await worldState(page);
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowDown');
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await page.waitForFunction(({tx, ty}) => {
+    const world = document.querySelector('.world');
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(world).transform);
+    return matrix.e < tx - 50 && matrix.f < ty - 50;
+  }, {timeout: 5000}, beforeKeys);
   const afterKeys = await worldState(page);
   check(afterKeys.tx < beforeKeys.tx - 50 && afterKeys.ty < beforeKeys.ty - 50,
     `键盘方向键平移生效（tx ${beforeKeys.tx.toFixed(0)}→${afterKeys.tx.toFixed(0)}，ty ${beforeKeys.ty.toFixed(0)}→${afterKeys.ty.toFixed(0)}）`);
@@ -523,10 +789,11 @@ async function main() {
   await page.click('button[aria-label="复位到全图"]');
 
   await openMondstadt(page);
-  await page.waitForSelector('[aria-label="昼夜"]', {visible: true});
-  await page.click('[aria-label="昼夜"] button[data-value="582789890"]');
+  await chooseTab(page, '昼夜', '582789890');
+  await playFirstListed(page);
   await waitForAudio(page, 994723831);
-  await page.click('[aria-label="昼夜"] button[data-value="3815942830"]');
+  await chooseTab(page, '昼夜', '3815942830');
+  await playFirstListed(page);
   await waitForAudio(page, 168715686);
   check((await page.$eval('.track-name', (label) => label.textContent)).trim() === '蒙德的一日',
     '蒙德城区按昼夜分支切播，并显示游戏内中文曲名');
@@ -539,11 +806,11 @@ async function main() {
     bgmManifest.music.State_MengDe?.wwiseId, 'exploration', overrides);
   const mondstadtDay = (() => {
     const group = mondstadtResolve().conditions.find((candidate) => candidate.title === '昼夜');
-    const key = group?.entries.find((entry) => entry.key === '3815942830')?.key;
+    const key = group?.entries.find((entry) => entry.label === '白天')?.key;
     return key ? mondstadtResolve({[group.id]: key}) : mondstadtResolve();
   })();
   if (mondstadtDay.tracks.length > 1) {
-    const count = await page.$eval('.now-playing .count', (node) => ({
+    const count = await page.$eval('.music-player .count', (node) => ({
       tag: node.tagName, text: node.textContent.trim(),
     }));
     check(count.tag === 'SPAN' && count.text === `1 / ${mondstadtDay.tracks.length}`,
@@ -553,15 +820,16 @@ async function main() {
     await page.click('button[aria-label="上一首"]');
     await waitForAudio(page, mondstadtDay.tracks[0].id);
     check(true, '蒙德前后曲按钮只在当前条件曲单内切换');
-    await page.evaluate(() => [...document.querySelectorAll('.player-footer .conditions-toggle')]
-      .find((button) => button.textContent.trim() === '歌曲列表')?.click());
-    await page.waitForSelector('.player-drawer', {visible: true});
+    await openPlayerDetails(page, {songs: true});
+    check(await page.$eval('.player-drawer', (drawer) => {
+      const map = document.elementFromPoint(innerWidth * .65, innerHeight * .4);
+      return Boolean(drawer.closest('.music-player') && map?.closest('.map-surface'));
+    }), '歌曲列表在播放器内展开，地图仍可操作');
     await page.screenshot({path: path.join(shotDir, '12-music-conditions.png')});
-    await page.keyboard.press('Escape');
-    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-      'Escape 只关歌曲列表抽屉，播放器保留');
+    check(await collapsePlayerDetails(page), 'Escape 只收歌曲列表并恢复入口焦点');
   } else {
-    check(true, '蒙德当前条件为单曲，前后曲按钮与列表入口按数据隐藏');
+    const count = await page.$$eval('.player-drawer .track-list button', (items) => items.length);
+    check(count === 1, '单曲曲单提供可点击的歌曲行');
   }
 
   // 播放条件抽屉只收已核实的开关（组名与全部选项 label 均经证实）。按实际
@@ -584,17 +852,10 @@ async function main() {
     await page.keyboard.press('Enter');
     await page.waitForSelector('.music-player', {visible: true, timeout: 5000});
   };
-  const footerButton = async (label) => {
-    for (const handle of await page.$$('.player-footer .conditions-toggle')) {
-      if (await handle.evaluate((button) => button.textContent.trim()) === label) return handle;
-    }
-    return null;
-  };
   if (namedConditionZone) {
     await openZoneByState(namedConditionZone.state);
-    await page.waitForSelector('.conditions-toggle', {visible: true});
-    await (await footerButton('播放条件')).click();
-    await page.waitForSelector('.player-drawer', {visible: true});
+    await openPlayerDetails(page);
+    await page.waitForSelector('.condition-row', {visible: true});
     const drawerText = await page.$eval('.player-drawer', (node) => node.innerText);
     check(!drawerText.includes('0x') && !drawerText.includes('Wwise') && !drawerText.includes('未命名'),
       '条件抽屉组名只用已核实名称，无内部标识或未命名条件');
@@ -610,11 +871,12 @@ async function main() {
       const rect = popup.getBoundingClientRect();
       const trigger = document.querySelector('.condition-row .select-trigger')
         .getBoundingClientRect();
-      const player = document.querySelector('.music-player').getBoundingClientRect();
+      const transport = document.querySelector('.music-player .transport').getBoundingClientRect();
       return {
         inViewport: rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight,
         aboveTrigger: rect.bottom <= trigger.top + 1,
-        overlapsPlayer: rect.bottom > player.top,
+        overlapsTransport: rect.left < transport.right && rect.right > transport.left
+          && rect.top < transport.bottom && rect.bottom > transport.top,
         count: options.length,
         chosen: options.filter((li) => li.getAttribute('aria-selected') === 'true').length,
         metaOk: options.every((li) => {
@@ -631,7 +893,7 @@ async function main() {
     check(popupInfo.chosen === 1, '下拉恰有一项当前选中');
     check(popupInfo.inViewport, '下拉弹层完整落在视口内');
     check(popupInfo.aboveTrigger, '条件下拉优先向上展开（不遮触发行）');
-    check(popupInfo.overlapsPlayer === false, '条件下拉不遮盖播放器，播放状态与选项同屏');
+    check(popupInfo.overlapsTransport === false, '条件下拉不遮盖播放控制，播放状态与选项同屏');
     await page.screenshot({path: path.join(shotDir, '15-conditions-select-open.png')});
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
@@ -669,13 +931,12 @@ async function main() {
     const distinctHeights = [...new Set(panelHeights)];
     check(!panelHeights.includes(-1) && distinctHeights.length <= 2,
       `条件切换播放面板连续（高度序列 ${distinctHeights.join('→')}，节点与音频不重建）`);
-    check(await page.$('.select-popup') === null && await page.$('.player-drawer') !== null,
+    check(await panelClosed(page, '.select-popup') && await playerDetailsVisible(page),
       '选择后下拉关闭，条件抽屉保留');
+    check(await collapsePlayerDetails(page), 'Escape 只收试听选项并恢复入口焦点');
     await page.keyboard.press('Escape');
-    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-      'Escape 只关条件抽屉，播放器保留');
-    await page.keyboard.press('Escape');
-    check(await page.$('.music-player') === null, '再次 Escape 关闭播放器');
+    await page.waitForSelector('.music-player', {hidden: true});
+    check(await panelClosed(page, '.music-player'), '再次 Escape 关闭播放器');
   } else {
     check(true, '当前清单没有已核实的非昼夜条件开关，播放条件按钮按数据出现');
   }
@@ -688,6 +949,7 @@ async function main() {
   check(cityZone !== undefined, '清单中存在枫丹廷分区');
   if (cityZone) {
     await openZoneByState(cityZone.state);
+    await openPlayerDetails(page);
     await page.waitForSelector('[aria-label="昼夜"]', {visible: true});
     const cityResolve = (mode = 'exploration', overrides = {}) => resolveMusic(
       bgmManifest.musicGraph, bgmManifest.music[cityZone.state].wwiseId, mode, overrides);
@@ -695,22 +957,16 @@ async function main() {
     const dayEntry = dayNightGroup.entries.find((entry) => entry.label === '白天');
     const nightEntry = dayNightGroup.entries.find((entry) => entry.label === '夜间');
     const cityTracks = (key) => cityResolve('exploration', {[dayNightGroup.id]: key}).tracks;
-    const openSongList = async () => {
-      await page.evaluate(() => [...document.querySelectorAll('.player-footer .conditions-toggle')]
-        .find((button) => button.textContent.trim() === '歌曲列表')?.click());
-      await page.waitForSelector('.player-drawer', {visible: true});
-    };
-
-    // 打开抽屉核对列表内容、滚动区外观与页脚入口。抽屉保持打开供后续交互。
+    // 核对内联曲目列表，展开区保留供后续试听。
     const auditSongDrawer = async (key, label) => {
       const expected = cityTracks(key);
-      await openSongList();
+      await openPlayerDetails(page, {songs: true});
       const drawer = await page.evaluate(() => ({
         text: document.querySelector('.player-drawer').innerText,
-        names: [...document.querySelectorAll('.player-drawer .track-list > li > button > span:first-child')]
+        names: [...document.querySelectorAll('.player-drawer .track-list:not([inert]) .queue-name')]
           .map((span) => span.textContent.trim()),
-        footer: [...document.querySelectorAll('.player-footer .conditions-toggle')]
-          .map((button) => button.textContent.trim()),
+        player: document.querySelector('.music-player').innerText,
+        disclosure: document.querySelector('button.details-toggle').title,
       }));
       check(drawer.names.length === expected.length && expected.length === 4,
         `${label}歌曲列表只列当前条件 4 首真实曲目（${drawer.names.length} 行）`);
@@ -719,120 +975,101 @@ async function main() {
       check(!drawer.text.includes('轻雨何故落') && !drawer.text.includes('未命名')
         && !drawer.text.includes('0x'),
       `${label}列表无备选曲目、未命名条件或内部标识`);
-      check(!drawer.footer.includes('其他曲单') && !drawer.footer.includes('返回主曲单'),
-        '页脚无其他曲单/返回主曲单入口');
+      check(!drawer.player.includes('其他曲单') && !drawer.player.includes('返回主曲单'),
+        '播放器无其他曲单或返回主曲单入口');
+      check(drawer.disclosure === '收起歌曲列表', '展开时列表图标的提示明确显示收起动作');
       const scrollBox = await page.$eval('.player-drawer .scroll-viewport', (node) => {
         const style = getComputedStyle(node);
-        return {gutter: style.scrollbarGutter, borderX: style.borderLeftWidth,
+        const hidden = matchMedia('(max-width: 700px), (pointer: coarse)').matches;
+        const arrowStyle = getComputedStyle(node, '::-webkit-scrollbar-button');
+        return {
+          correct: hidden ? style.scrollbarWidth === 'none'
+            : style.scrollbarGutter === 'stable' && arrowStyle.display === 'none',
+          borderX: style.borderLeftWidth,
           rail: Boolean(document.querySelector('.scroll-rail'))};
       });
-      check(scrollBox.gutter === 'stable' && scrollBox.borderX === '0px' && !scrollBox.rail,
-        `歌曲列表滚动区只留稳定槽位、无边线与自绘轨道（gutter=${scrollBox.gutter}）`);
+      check(scrollBox.correct && scrollBox.borderX === '0px' && !scrollBox.rail,
+        '歌曲列表沿用共享的原生滚动样式');
     };
 
-    // 白天：众水之诗起播，计数为非交互文本，列表入口在页脚。
-    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
+    // 白天：众水之诗起播，计数为非交互文本。
+    await chooseTab(page, '昼夜', dayEntry.key);
+    await playFirstListed(page);
     await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
     check((await page.$eval('.track-name', (node) => node.textContent.trim()))
       === cityTracks(dayEntry.key)[0].name,
     `枫丹廷白天起播当前条件首曲（${cityTracks(dayEntry.key)[0].name}）`);
-    check((await page.$eval('.now-playing .count', (node) => node.textContent.trim()))
+    check((await page.$eval('.music-player .count', (node) => node.textContent.trim()))
       === `1 / ${cityTracks(dayEntry.key).length}`,
     '白天曲数计数按当前条件显示');
     await auditSongDrawer(dayEntry.key, '白天');
     await page.screenshot({path: path.join(shotDir, '14-song-list-drawer.png')});
-    await page.keyboard.press('Escape');
-    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-      'Escape 只关歌曲列表抽屉，播放器保留');
+    check(await collapsePlayerDetails(page), 'Escape 收起歌曲列表并恢复入口焦点');
 
-    // 夜间：月夕花朝起播，列表同样只含当前条件曲目；点列表曲目直接试听。
-    await page.click(`[aria-label="昼夜"] button[data-value="${nightEntry.key}"]`);
-    await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
-    check((await page.$eval('.track-name', (node) => node.textContent.trim()))
-      === cityTracks(nightEntry.key)[0].name,
-    `切夜间立即播放该时段首曲（${cityTracks(nightEntry.key)[0].name}）`);
+    // 浏览夜间曲单时，白天歌曲继续播放，点曲目才提交夜间曲单。
+    await openPlayerDetails(page);
+    await page.waitForSelector('[aria-label="昼夜"]', {visible: true});
+    const playingDay = await page.$eval('.music-player audio', (node) => ({
+      src: node.src, time: node.currentTime,
+    }));
+    await page.click('button[aria-label="昼夜"] .mode-option--selected');
     await auditSongDrawer(nightEntry.key, '夜间');
-    await page.click('.player-drawer .track-list > li:nth-child(2) > button');
+    check(await page.$eval('.music-player audio', (node, original) =>
+      node.src === original.src && node.currentTime >= original.time, playingDay),
+    '点已选的白天一侧可浏览夜间曲单，当前音源和进度保持连续');
+    check(await page.$eval('.music-player .count', (node) => node.textContent.trim())
+      === `1 / ${cityTracks(dayEntry.key).length}`, '浏览夜间曲单时播放区仍显示白天曲单');
+    await playFirstListed(page);
+    await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
+    const secondSong = '.player-drawer .track-list:not([inert]) > li:nth-child(2) > button';
+    await page.click(secondSong);
     await waitForAudio(page, cityTracks(nightEntry.key)[1].id);
-    check(await page.$eval('.player-drawer .track-list > li:nth-child(2) > button',
-      (button) => button.getAttribute('aria-current') === 'true'),
+    check(await page.$eval(secondSong, (button) => button.getAttribute('aria-current') === 'true'),
     '点选列表曲目直接试听并标记当前项');
+    await auditSongDrawer(nightEntry.key, '切歌后');
 
-    // 切回白天：立即播放白天首曲，播放器与 audio 元素不重挂。
+    // 切回白天，点曲目提交队列，播放器与 audio 元素身份保持。
     await page.evaluate(() => {
       window.__panelEl = document.querySelector('.music-player');
       window.__audioEl = document.querySelector('.music-player audio');
     });
-    await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
+    await chooseTab(page, '昼夜', dayEntry.key);
+    await playFirstListed(page);
     await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
     check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
       && document.querySelector('.music-player audio') === window.__audioEl),
     '昼夜切换播放器与 audio 元素不重挂');
-    check((await page.$eval('.now-playing .count', (node) => node.textContent.trim()))
+    check((await page.$eval('.music-player .count', (node) => node.textContent.trim()))
       === `1 / ${cityTracks(dayEntry.key).length}`,
     '切回白天计数回到白天曲目数');
 
-    if (bgmManifest.musicGraph.clock) {
-      const trigger = 'button[aria-label="设置试听时间"]';
-      const range = 'input[aria-label="试听时间"]';
-      await page.click(trigger);
-      await page.waitForSelector(range, {visible: true});
-      check(await page.$eval(range, (input) => input === document.activeElement),
-        '打开试听时间后键盘直接调节时钟');
-      await page.$eval(range, (input) => {
-        input.value = '302';
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-      });
-      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
-      await page.keyboard.press('ArrowRight');
-      await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
-      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '05:03'),
-        '枫丹廷按音乐曲线在 05:02 与 05:03 之间切换到白天');
-      await page.$eval(range, (input) => {
-        input.value = '1020';
-        input.dispatchEvent(new Event('change', {bubbles: true}));
-      });
-      await page.keyboard.press('ArrowRight');
-      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
-      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '17:01'),
-        '枫丹廷按音乐曲线在 17:00 与 17:01 之间切换到夜间');
-      await page.screenshot({path: path.join(shotDir, '19-audition-clock.png')});
-      await page.keyboard.press('Home');
-      await page.waitForFunction(() => !document.querySelector('.music-player audio')?.hasAttribute('src'));
-      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '00:00'),
-        '00:00 使用 Wwise 缺省分支');
-      await page.keyboard.press('ArrowRight');
-      await waitForAudio(page, cityTracks(nightEntry.key)[0].id);
-      check(await page.$eval(range, (input) => input.getAttribute('aria-valuetext') === '00:01'),
-        '跨过缺省分支后恢复正在试听的意图');
-      const viewport = page.viewport();
-      await page.setViewport({...viewport, width: 320, height: 640});
-      check(await page.$eval('.clock-row', (row) => {
-        const bounds = row.getBoundingClientRect();
-        return bounds.top >= 0 && bounds.right <= innerWidth
-          && row.querySelector('input').getBoundingClientRect().width >= 90;
-      }), '320px 窄窗中试听时间的滑杆与读数完整显示');
-      await page.screenshot({path: path.join(shotDir, '20-narrow-audition-clock.png')});
-      await page.setViewport(viewport);
-      await page.keyboard.press('Escape');
-      check(await page.$(range) === null
-        && await page.$eval(trigger, (button) => button === document.activeElement),
-      'Escape 关闭试听时间并归还焦点');
-      await page.click(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`);
-      await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
-    }
+    check(await page.$eval('.music-player', (player) =>
+      !player.querySelector('[aria-label*="试听时间"]') && !player.innerText.includes('试听时间')),
+    '昼夜音区的播放器及歌曲列表无试听时间入口');
 
     // 战斗回探索：身份保持，尊重前次昼夜选择。
-    await page.click('.modes[aria-label="音乐模式"] button:nth-child(2)');
+    const modeToggle = 'button.modes-toggle[aria-label="音乐模式"]';
+    const edge = await page.$eval(modeToggle, (button) => {
+      const bounds = button.getBoundingClientRect();
+      return {x: bounds.left + 1, y: bounds.top + bounds.height / 2};
+    });
+    await page.mouse.click(edge.x, edge.y);
+    await page.waitForFunction((selector) => document.querySelector(selector)?.dataset.value === 'combat',
+      {}, modeToggle);
+    check(true, '点音乐模式 Tab 的边缘也能切换');
     const combatTracks = cityResolve('combat');
-    if (combatTracks.tracks.length) await waitForAudio(page, combatTracks.tracks[0].id);
-    await page.click('.modes[aria-label="音乐模式"] button:nth-child(1)');
+    if (combatTracks.tracks.length) {
+      await playFirstListed(page);
+      await waitForAudio(page, combatTracks.tracks[0].id);
+    }
+    await chooseTab(page, '音乐模式', 'exploration');
+    await playFirstListed(page);
     await waitForAudio(page, cityTracks(dayEntry.key)[0].id);
     check(await page.evaluate(() => document.querySelector('.music-player') === window.__panelEl
       && document.querySelector('.music-player audio') === window.__audioEl),
     '战斗回探索播放器与 audio 元素不重挂');
-    check(await page.$eval(`[aria-label="昼夜"] button[data-value="${dayEntry.key}"]`,
-      (button) => button.getAttribute('aria-pressed') === 'true'),
+    check(await page.$eval('button[aria-label="昼夜"]',
+      (button, key) => button.dataset.value === String(key), dayEntry.key),
     '战斗回探索尊重前次昼夜选择');
 
     // 切区：优先蒙德（该区已在地表地图可达时），身份保持且标题更新。
@@ -849,9 +1086,12 @@ async function main() {
         `切区后播放器标题更新为新分区（${nextZone.name}）`);
     }
 
-    // Escape 关闭播放器收尾，后续楼层回归从无播放器状态开始。
+    // 先收展开区，再关闭播放器，后续楼层回归从无播放器状态开始。
+    check(await playerDetailsVisible(page), '切换分区保留已展开的试听选项');
+    check(await collapsePlayerDetails(page), '切区后 Escape 先收试听选项并恢复入口焦点');
     await page.keyboard.press('Escape');
-    check(await page.$('.music-player') === null, 'Escape 关闭播放器');
+    await page.waitForSelector('.music-player', {hidden: true});
+    check(await panelClosed(page, '.music-player'), 'Escape 关闭播放器');
   }
 
   const sourcePath = process.env.TEYVAT_BGM_MANIFEST ?? path.join(workspaceRoot, 'dist/genshin-region-bgm.json');
@@ -881,7 +1121,7 @@ async function main() {
   await page.waitForSelector('.tile-layer.floor-context ~ .layer-piece[src*="3740001"]');
   const caveKey = 'layer-3:3740001-70500';
   await page.waitForSelector(`path[data-zone-key="${caveKey}"]`);
-  check(await page.$('.music-player') === null
+  check(await panelClosed(page, '.music-player')
     && !(await page.$eval('.region-boundaries', (edge) => edge.getAttribute('d'))),
     '残辉岩窟打开时使用本层贴片，地表边线不跟随');
   const cave = sourceBgm.floorViews['3:3740001'][0];
@@ -897,7 +1137,8 @@ async function main() {
   check(await page.$eval('button.reset', (b) => b.getAttribute('aria-label')) === '复位到当前楼层',
     '分层模式复位按钮名称与真实行为一致（当前楼层）');
   await page.click('button[aria-label="切换分层地图"]');
-  check(await page.$('.music-player') === null, '回到地表清理楼层播放选择');
+  await page.waitForSelector('.music-player', {hidden: true});
+  check(await panelClosed(page, '.music-player'), '回到地表清理楼层播放选择');
   check(await page.$eval('button.reset', (b) => b.getAttribute('aria-label')) === '复位到全图',
     '回地表后复位按钮名称恢复（全图）');
 
@@ -907,16 +1148,16 @@ async function main() {
     const label = button.querySelector('.group-label');
     return {font: getComputedStyle(label).fontSize, clipped: label.scrollWidth > label.clientWidth + 1};
   });
-  check(groupLabelBox.font === '13px', `长组名保持基准字号不缩字（${groupLabelBox.font}）`);
+  check(groupLabelBox.font === '14px', `长组名保持基准字号不缩字（${groupLabelBox.font}）`);
   check(groupLabelBox.clipped === false, '长组名在按钮内完整显示');
   await page.click('button[aria-label="分层区域"]');
   await page.type('input[aria-label="搜索分层区域"]', 'zzzz');
   await page.waitForSelector('.no-match', {visible: true});
-  const staleOptions = await page.$$eval('[role="option"]', (lis) => lis.length);
+  const staleOptions = await page.$$eval('#layer-group-panel [role="option"]', (lis) => lis.length);
   check(staleOptions === 0, `搜索不匹配时不置顶旧已选组（${staleOptions} 项残留）`);
   check(true, '搜索无匹配显示自然空状态');
   await page.keyboard.press('Escape');
-  check(await page.$('.panel') === null, 'Escape 关闭分组搜索面板');
+  check(await panelClosed(page, '#layer-group-panel'), 'Escape 关闭分组搜索面板');
   check(await page.$eval('button[aria-label="分层区域"]', (b) => document.activeElement === b),
     '分组面板关闭后焦点回到分组按钮');
   await page.click('button[aria-label="切换分层地图"]');
@@ -943,6 +1184,12 @@ async function main() {
   await page.mouse.click(floor.target.x, floor.target.y, {button: 'right'});
   await waitForAudio(page, floor.expectedSources[0]);
   check(await page.$('.region-tooltip') === null, '播放器打开后收起同一区域的提示');
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('.music-player');
+    if (!panel || panel.classList.contains('glass-player-enter-active')) return false;
+    const style = getComputedStyle(panel);
+    return style.transform === 'none' && style.opacity === '1';
+  });
   await page.evaluate(() => {
     const panel = document.querySelector('.music-player');
     const audio = panel.querySelector('audio');
@@ -962,6 +1209,7 @@ async function main() {
   await waitForAudio(page, floor.expectedSources[1]);
   await page.click('button[aria-label="下一首"]');
   await waitForAudio(page, floor.expectedSources[2]);
+  await page.waitForFunction(() => window.__playerFrameSample.length > 2);
   const stable = await page.evaluate(() => {
     window.__stopPlayerSample = true;
     return window.__playerFrameSample.length > 2 && window.__playerFrameSample.every(Boolean);
@@ -971,15 +1219,54 @@ async function main() {
     '监舍区通过右键试听同一播放列表内的三首音轨');
   await page.screenshot({path: path.join(shotDir, '09-floor-player.png')});
   if (floor.expectedCombat) {
-    const combat = await page.$('.modes[aria-label="音乐模式"] button:nth-child(2)');
-    await combat.click();
+    await openPlayerDetails(page);
+    await chooseTab(page, '音乐模式', 'combat');
+    await playFirstListed(page);
     await waitForAudio(page, floor.expectedCombat);
     check(true, '切到战斗时播放对应的战斗音轨');
+    check(await collapsePlayerDetails(page), 'Escape 收起楼层试听选项并恢复入口焦点');
   }
   await page.click('button[aria-label="切换分层地图"]');
   await page.waitForFunction(() => !document.querySelector('.layer-piece, path[data-zone-key^="layer-"], .music-player'));
   check(await page.$('path[aria-label*="梅洛彼得堡"]') === null, '返回地表后无梅洛彼得堡楼层区边线或命中');
   await page.click('button[aria-label="复位到全图"]');
+
+  const desktopVolume = await context.newPage();
+  try {
+    await desktopVolume.setViewport({width: 1100, height: 750});
+    await desktopVolume.goto(`http://127.0.0.1:${port}/`);
+    await desktopVolume.waitForSelector('button[aria-label="切换分层地图"]', {visible: true});
+    await openMeropide(desktopVolume);
+    const {target} = await inspectFloor(desktopVolume, meropideDesired);
+    if (!target) throw new Error('桌面音量验证缺少可试听分区');
+    await desktopVolume.mouse.click(target.x, target.y);
+    await desktopVolume.waitForSelector(volumeTrigger, {visible: true});
+    await desktopVolume.waitForSelector('.glass-player-enter-active', {hidden: true});
+    const desktopTransport = await desktopVolume.evaluate(() => {
+      const panel = document.querySelector('.music-player');
+      const list = panel.querySelector('.transport .details-toggle');
+      if (!list) return false;
+      const bounds = panel.getBoundingClientRect();
+      const right = bounds.right - parseFloat(getComputedStyle(panel.querySelector('.player-body')).paddingRight);
+      const play = panel.querySelector('.play-toggle').getBoundingClientRect();
+      const next = panel.querySelector('[aria-label="下一首"]').getBoundingClientRect();
+      const repeatControl = panel.querySelector('.repeat-toggle');
+      const repeat = repeatControl.getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(repeatControl.parentElement).getPropertyValue('--transport-gap'));
+      return Math.abs(list.getBoundingClientRect().right - right) < 1
+        && Math.abs(repeat.left - next.right - gap) < 1
+        && Math.abs((play.left + play.right) / 2 - (bounds.left + bounds.right) / 2) < 1;
+    });
+    check(desktopTransport, '桌面主播放键居中，循环紧接下一首，歌曲列表靠右');
+    check(await openPlayerVolume(desktopVolume), '桌面音量展开后滑杆可用，关闭和进度无遮挡');
+    await desktopVolume.keyboard.press('Home');
+    await desktopVolume.keyboard.press('ArrowRight');
+    check(await desktopVolume.$eval('.music-player audio', (audio) =>
+      audio.volume === 0.01 && !audio.muted), '桌面键盘音量控制真实改变音频音量');
+    check(await closePlayerVolume(desktopVolume), '桌面 Escape 关闭音量并还原焦点');
+  } finally {
+    await desktopVolume.close();
+  }
 
   // 390×844 窄窗：无横向溢出、控件在视口内、悬停命中仍正确。
   await page.setViewport({width: 390, height: 844, deviceScaleFactor: 2, hasTouch: true});
@@ -1021,21 +1308,29 @@ async function main() {
   narrowFloor.target);
   check(tapMark === 'rgba(0, 0, 0, 0)', '触屏分区只用矢量高亮，浏览器点击矩形为透明');
   await page.touchscreen.tap(narrowFloor.target.x, narrowFloor.target.y);
-  await page.click('.modes[aria-label="音乐模式"] button:first-child');
+  await openPlayerDetails(page);
+  await chooseTab(page, '音乐模式', 'exploration');
+  await openPlayerDetails(page, {songs: true});
+  await playFirstListed(page);
   await waitForAudio(page, narrowFloor.expectedSources[0]);
   await page.screenshot({path: path.join(shotDir, '10-narrow-floor-player.png')});
 
   // 390px：播放器与条件抽屉、下拉弹层完整落在视口内，Escape 分层关闭。
   const narrowPlayerBox = await page.$eval('.music-player', (node) => {
     const rect = node.getBoundingClientRect();
-    return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
+    const mapControls = document.querySelectorAll('.zoom-controls, .layer-picker .floors');
+    const overlapsControls = [...mapControls].some((control) => {
+      const bounds = control.getBoundingClientRect();
+      return rect.left < bounds.right && rect.right > bounds.left
+        && rect.top < bounds.bottom && rect.bottom > bounds.top;
+    });
+    return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, overlapsControls};
   });
   check(narrowPlayerBox.left >= 0 && narrowPlayerBox.right <= 390
-    && narrowPlayerBox.top >= 0 && narrowPlayerBox.bottom <= 844,
-    `窄窗播放器完整落在视口内（${JSON.stringify(narrowPlayerBox)}）`);
-  if (await page.$('.conditions-toggle')) {
-    await page.click('.conditions-toggle');
-    await page.waitForSelector('.player-drawer', {visible: true});
+    && narrowPlayerBox.top >= 0 && narrowPlayerBox.bottom <= 844
+    && narrowPlayerBox.overlapsControls === false,
+    `窄窗播放器完整可见且不遮挡地图与分层控件（${JSON.stringify(narrowPlayerBox)}）`);
+  if (await playerDetailsVisible(page)) {
     const narrowDrawerBox = await page.evaluate(() => {
       const rect = document.querySelector('.player-drawer').getBoundingClientRect();
       const rows = [...document.querySelectorAll('.player-drawer li button, .player-drawer .condition-row')]
@@ -1045,43 +1340,42 @@ async function main() {
     });
     check(narrowDrawerBox.left >= 0 && narrowDrawerBox.right <= 390
       && narrowDrawerBox.top >= 0 && narrowDrawerBox.bottom <= 844,
-      `窄窗播放条件或歌曲列表抽屉落在视口内（${JSON.stringify(narrowDrawerBox)}）`);
+      `窄窗试听展开区完整落在视口内（${JSON.stringify(narrowDrawerBox)}）`);
     check(narrowDrawerBox.rowHeight >= 30,
-      `窄窗抽屉行高可触达（${narrowDrawerBox.rowHeight.toFixed(0)}px）`);
+      `窄窗队列行高可触达（${narrowDrawerBox.rowHeight.toFixed(0)}px）`);
     if (await page.$('.condition-row .select-trigger')) {
-      // 已核实条件开关存在时，保留完整下拉几何回归（向上展开、不遮播放器）。
+      // 下拉层独立定位，检查它与视口、触发器和播放控制的关系。
       await page.click('.condition-row .select-trigger');
       await page.waitForSelector('.select-popup', {visible: true});
       const narrowPopupBox = await page.evaluate(() => {
         const popup = document.querySelector('.select-popup').getBoundingClientRect();
         const trigger = document.querySelector('.condition-row .select-trigger')
           .getBoundingClientRect();
-        const player = document.querySelector('.music-player').getBoundingClientRect();
+        const transport = document.querySelector('.music-player .transport').getBoundingClientRect();
         const first = document.querySelector('.select-popup li[role="option"]');
         return {
           left: popup.left, right: popup.right, top: popup.top, bottom: popup.bottom,
           aboveTrigger: popup.bottom <= trigger.top + 1,
-          overlapsPlayer: popup.bottom > player.top,
+          overlapsTransport: popup.left < transport.right && popup.right > transport.left
+            && popup.top < transport.bottom && popup.bottom > transport.top,
           optionHeight: first ? first.getBoundingClientRect().height : 0,
         };
       });
       check(narrowPopupBox.left >= 0 && narrowPopupBox.right <= 390
         && narrowPopupBox.top >= 0 && narrowPopupBox.bottom <= 844,
         `窄窗下拉弹层落在视口内（${JSON.stringify(narrowPopupBox)}）`);
-      check(narrowPopupBox.aboveTrigger && narrowPopupBox.overlapsPlayer === false,
-        '窄窗条件下拉同样向上展开且不遮播放器');
+      check(narrowPopupBox.aboveTrigger && narrowPopupBox.overlapsTransport === false,
+        '窄窗条件下拉向上展开且不遮挡播放控制');
       check(narrowPopupBox.optionHeight >= 30,
         `窄窗下拉选项行高可触达（${narrowPopupBox.optionHeight.toFixed(0)}px）`);
       await page.screenshot({path: path.join(shotDir, '16-narrow-conditions.png')});
       await page.keyboard.press('Escape');
-      check(await page.$('.select-popup') === null && await page.$('.player-drawer') !== null,
-        '窄窗 Escape 先关下拉，条件抽屉保留');
+      check(await panelClosed(page, '.select-popup') && await playerDetailsVisible(page),
+        '窄窗 Escape 先关下拉，试听展开区保留');
     } else {
       await page.screenshot({path: path.join(shotDir, '16-narrow-drawer.png')});
     }
-    await page.keyboard.press('Escape');
-    check(await page.$('.player-drawer') === null && await page.$('.music-player') !== null,
-      '窄窗 Escape 再关抽屉，播放器保留');
+    check(await collapsePlayerDetails(page), '窄窗 Escape 收起展开区并恢复入口焦点');
   }
 
   await page.click('button[aria-label="暂停"]');
@@ -1090,36 +1384,56 @@ async function main() {
   await page.keyboard.press('ArrowRight');
   check(await page.$eval('.music-player audio', (audio) => audio.paused && audio.currentTime > 0.1),
     '暂停时可以调节进度，播放意图保持暂停');
-  await page.click('button[aria-label="音量设置"]');
-  await page.focus('input[aria-label="音量"]');
-  await page.keyboard.press('Home');
-  await page.keyboard.press('ArrowRight');
-  check(await page.$eval('.music-player audio', (audio) => audio.volume === 0.01 && !audio.muted),
-    '键盘音量控制真实改变音频音量');
-  await page.click('button[aria-label="音量设置"]');
+  check(await page.$(volumeTrigger) === null && await page.$('.volume-panel') === null,
+    '移动端无应用音量入口或滑杆');
+  check(await page.$eval('.music-player audio', (audio) => audio.volume === 1 && !audio.muted),
+    '移动端播放由系统音量控制');
   await page.click('button[aria-label="播放"]');
   await page.waitForFunction(() => !document.querySelector('.music-player audio').paused);
   await page.$eval('.music-player audio', (audio) => { audio.currentTime = audio.duration - 0.08; });
   await waitForAudio(page, narrowFloor.expectedSources[1]);
   check(true, '曲目结束后继续播放曲单的下一首');
-  await page.click('button[aria-label="循环播放"]');
+  const repeatButton = '.music-player .repeat-toggle';
+  check(await page.$eval(repeatButton, (button) => button.title === '列表循环'),
+    '播放器默认列表循环');
   await page.click('button[aria-label="下一首"]');
   await waitForAudio(page, narrowFloor.expectedSources[2]);
   await page.$eval('.music-player audio', (audio) => { audio.currentTime = audio.duration - 0.08; });
   await waitForAudio(page, narrowFloor.expectedSources[0]);
   check(true, '循环播放在曲单结尾回到第一首');
-  await page.click('button[aria-label="音量设置"]');
-  await page.screenshot({path: path.join(shotDir, '17-narrow-volume.png')});
+  await page.click(repeatButton);
+  check(await page.$eval(repeatButton, (button) => button.title === '单曲循环'
+    && Boolean(button.querySelector('[data-repeat-one]')))
+    && await page.$eval('.music-player audio', (audio) => audio.loop),
+  '单曲循环显示带 1 的图标并启用原生循环');
+  const loopingSource = await page.$eval('.music-player audio', (audio) => {
+    audio.currentTime = audio.duration - 0.08;
+    return audio.src;
+  });
+  await page.waitForFunction((source) => {
+    const audio = document.querySelector('.music-player audio');
+    return audio.src === source && !audio.paused && audio.currentTime < 1;
+  }, {timeout: 5000}, loopingSource);
+  check(true, '单曲循环回到当前曲目的开头');
   await page.click('button[aria-label="关闭播放器"]');
+  await page.waitForSelector('.music-player', {hidden: true});
+  await page.waitForFunction(() => !document.querySelector('.music-player audio'), {timeout: 3500});
   check(!(await page.$('.music-player audio')), '关闭播放器释放音频节点');
   check(resourceErrors.length === 0 && consoleErrors.length === 0,
     `无意外加载失败（资源 ${JSON.stringify(resourceErrors)}；控制台 ${consoleErrors.length} 条）`);
 
   await page.touchscreen.tap(narrowFloor.target.x, narrowFloor.target.y);
   await waitForAudio(page, narrowFloor.expectedSources[0]);
-  check(await page.$eval('.music-player audio', (audio) => audio.volume === 0.01)
-    && await page.$eval('button[aria-label="循环播放"]', (button) => button.getAttribute('aria-pressed')) === 'true',
-  '重开播放器保留音量和循环设置');
+  await openPlayerDetails(page);
+  check(await page.$eval('.music-player audio', (audio) => audio.volume === 1 && !audio.muted)
+    && await page.$eval(repeatButton, (button) => button.title === '单曲循环'),
+  '移动端重开播放器仍用系统音量并保留单曲循环');
+  check(await collapsePlayerDetails(page), '复查循环设置后可收起歌曲列表');
+  await page.click(repeatButton);
+  check(await page.$eval(repeatButton, (button) => button.title === '列表循环'
+    && !button.querySelector('[data-repeat-one]'))
+    && await page.$eval('.music-player audio', (audio) => !audio.loop),
+  '从单曲循环直接切回列表循环');
   await page.click('button[aria-label="下一首"]');
   await page.click('button[aria-label="上一首"]');
   await waitForAudio(page, narrowFloor.expectedSources[0]);
@@ -1142,7 +1456,8 @@ async function main() {
     await page.click('button[aria-label="下一首"]');
     await page.waitForSelector('button[aria-label="重试播放"]', {visible: true});
     check(await page.$eval('.track-name', (node) => node.dataset.source) === String(failedSource)
-      && await page.$eval('.playback-status', (node) => node.textContent) === '音源读取失败',
+      && await page.$eval('.playback-status[role="status"]',
+        (node) => node.textContent.trim()) === '音源读取失败',
     '音源断开时保留选中的曲目，并显示可重试状态');
     injectFailure = false;
     await page.click('button[aria-label="重试播放"]');
@@ -1154,16 +1469,40 @@ async function main() {
   }
 
   await page.setViewport({width: 320, height: 640, deviceScaleFactor: 1, hasTouch: true});
+  await page.waitForFunction(() => innerWidth === 320 && innerHeight === 640
+    && document.querySelector('.app')?.clientHeight === innerHeight);
   const compact = await page.evaluate(() => {
-    const panel = document.querySelector('.music-player').getBoundingClientRect();
-    return [...document.querySelectorAll('.transport button, .transport input, .transport .time')]
-      .every((control) => {
+    const player = document.querySelector('.music-player');
+    const panel = player.getBoundingClientRect();
+    const insideViewport = panel.left >= 0 && panel.top >= 0
+      && panel.right <= innerWidth && panel.bottom <= innerHeight;
+    const controls = [...player.querySelectorAll('.transport button, .transport input, .transport .time')]
+      .filter((control) => !control.closest('[inert]'));
+    controls.push(player.querySelector('button[aria-label="关闭播放器"]'),
+      player.querySelector('input[aria-label="播放进度"]'));
+    const blockedControls = controls
+      .filter((control) => {
+        if (!control) return true;
         const bounds = control.getBoundingClientRect();
-        return bounds.width > 0 && bounds.left >= panel.left && bounds.right <= panel.right;
-      });
+        const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        return !bounds.width || !bounds.height || bounds.left < panel.left
+          || bounds.right > panel.right || bounds.top < panel.top || bounds.bottom > panel.bottom
+          || !control.contains(hit);
+      }).map((control) => control?.getAttribute('aria-label') ?? '缺少控件');
+    return {
+      insideViewport,
+      blockedControls,
+      viewport: [innerWidth, innerHeight],
+      panel: [panel.left, panel.top, panel.right, panel.bottom],
+    };
   });
-  check(compact, '320px 下的播放和进度控件都完整可用');
+  check(compact.insideViewport && compact.blockedControls.length === 0,
+    `320px 下的播放、关闭和进度控件均在屏内且可命中（${JSON.stringify(compact)}）`);
   await page.screenshot({path: path.join(shotDir, '18-compact-player.png')});
+  check(await page.$(volumeTrigger) === null && await page.$(volumeRange) === null,
+    '320px 下音量控件不进入布局或焦点顺序');
+  check(await page.evaluate(() => JSON.parse(localStorage.getItem('teyvat-bgm-playback')).volume === 0.01),
+    '移动端播放不覆盖保存的桌面音量');
 
   const retryPage = await context.newPage();
   let failManifest = true;
@@ -1177,10 +1516,10 @@ async function main() {
   });
   await retryPage.goto(`http://127.0.0.1:${port}/`, {waitUntil: 'domcontentloaded'});
   await retryPage.waitForSelector('.music-unavailable', {visible: true});
-  check(await retryPage.$('.map-surface') !== null, '音乐清单失败时地图仍可使用');
+  check(await retryPage.$('.globe-canvas') !== null, '音乐清单失败时地图仍可使用');
   failManifest = false;
   await retryPage.click('.music-unavailable button');
-  await retryPage.waitForSelector('path[data-zone-key]', {timeout: 10000});
+  await retryPage.waitForSelector('.music-unavailable', {hidden: true, timeout: 10000});
   check(await retryPage.$('.music-unavailable') === null, '音乐清单重试后恢复分区');
   await retryPage.close();
 

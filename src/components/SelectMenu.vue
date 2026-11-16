@@ -5,14 +5,17 @@
 // ScrollPane 的原生滚动与预留槽位。弹层 fixed 定位到 body，避免被抽屉的滚动
 // 容器裁剪，空间不足时向上翻转。
 import {computed, nextTick, onBeforeUnmount, ref, useId, watch} from 'vue';
+import LiquidGlass from './LiquidGlass.vue';
 import ScrollPane from './ScrollPane.vue';
 import {pushEscapeHandler} from './escapeStack.js';
+import {useAnchoredPanel} from './panelMotion.js';
 
 const props = defineProps({
   modelValue: {type: [Number, String], default: null},
   options: {type: Array, required: true}, // [{value, label, meta?}]
   ariaLabel: {type: String, required: true},
   placeholder: {type: String, default: ''},
+  glass: {type: Boolean, default: false},
   // 'auto' 优先下方、空间不足翻上；'top' 优先上方（下方播放器等状态需要
   // 与选项同屏可见的场景），上方空间不足才回退向下。
   placement: {type: String, default: 'auto'},
@@ -26,6 +29,7 @@ const listRef = ref(null);
 const open = ref(false);
 const activeIndex = ref(0);
 const popupStyle = ref(null);
+const popupMotion = useAnchoredPanel(() => triggerRef.value);
 
 const selected = computed(() =>
   props.options.find((option) => option.value === props.modelValue) ?? null);
@@ -187,6 +191,7 @@ watch(open, (value) => {
       ref="triggerRef"
       type="button"
       class="select-trigger"
+      :class="{'map-glass glassed': glass}"
       aria-haspopup="listbox"
       :aria-expanded="open ? 'true' : 'false'"
       :aria-controls="open ? listboxId : null"
@@ -195,6 +200,7 @@ watch(open, (value) => {
       @click="toggle"
       @keydown="onTriggerKeydown"
     >
+      <LiquidGlass v-if="glass" variant="clear" :light=".87" />
       <span class="select-value" :data-empty="!selected ? '' : null">{{ triggerLabel }}</span>
       <span class="select-arrow" aria-hidden="true">
         <svg viewBox="0 0 16 16" width="16" height="16">
@@ -204,35 +210,40 @@ watch(open, (value) => {
       </span>
     </button>
     <Teleport to="body">
-      <div
-        v-if="open"
-        :id="listboxId"
-        ref="popupRef"
-        class="select-popup"
-        role="listbox"
-        :aria-label="ariaLabel"
-        :style="popupStyle"
-        @pointerdown.prevent
-      >
-        <ScrollPane class="select-scroll" :label="`${ariaLabel}选项滚动`">
-          <ul ref="listRef" class="select-options">
-            <li
-              v-for="(option, index) in options"
-              :id="optionId(index)"
-              :key="option.value"
-              role="option"
-              :aria-selected="option.value === modelValue ? 'true' : 'false'"
-              :class="{active: index === activeIndex, chosen: option.value === modelValue}"
-              :title="option.label"
-              @click="choose(option)"
-              @pointermove="activeIndex = index"
-            >
-              <span class="option-label">{{ option.label }}</span>
-              <span v-if="option.meta" class="option-meta">{{ option.meta }}</span>
-            </li>
-          </ul>
-        </ScrollPane>
-      </div>
+      <Transition :css="false" v-bind="glass ? popupMotion : {}">
+        <div
+          v-show="open"
+          :id="listboxId"
+          ref="popupRef"
+          :inert="!open"
+          class="select-popup"
+          :class="{'map-glass map-glass-popup glassed': glass}"
+          role="listbox"
+          :aria-label="ariaLabel"
+          :style="popupStyle"
+          @pointerdown.prevent
+        >
+          <LiquidGlass v-if="glass" variant="clear" />
+          <ScrollPane class="select-scroll liquid-panel-body" :label="`${ariaLabel}选项滚动`">
+            <ul ref="listRef" class="select-options">
+              <li
+                v-for="(option, index) in options"
+                :id="optionId(index)"
+                :key="option.value"
+                role="option"
+                :aria-selected="option.value === modelValue ? 'true' : 'false'"
+                :class="{active: index === activeIndex, chosen: option.value === modelValue}"
+                :title="option.label"
+                @click="choose(option)"
+                @pointermove="activeIndex = index"
+              >
+                <span class="option-label">{{ option.label }}</span>
+                <span v-if="option.meta" class="option-meta">{{ option.meta }}</span>
+              </li>
+            </ul>
+          </ScrollPane>
+        </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -241,23 +252,27 @@ watch(open, (value) => {
 .select-trigger {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-1);
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 4px 4px 4px 10px;
-  border: 1px solid var(--surface-overlay-border);
-  border-radius: 8px;
-  background: var(--surface-overlay);
+  min-height: 44px;
+  padding: 0 var(--space-1) 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--glass-light), var(--surface-overlay);
+  -webkit-backdrop-filter: var(--glass-effect);
+  backdrop-filter: var(--glass-effect);
   color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 14px;
+  line-height: 1.5;
   cursor: pointer;
+  transition: background-color 120ms ease;
 }
-.select-trigger:hover { background: var(--control-hover); }
+.select-trigger:hover,
+.select-trigger[aria-expanded='true'] { background: var(--glass-light), var(--surface-overlay-open); }
+.select-trigger:active { background: var(--glass-light), var(--surface-overlay-open); }
 .select-trigger:focus-visible {
-  outline: 2px solid var(--control-focus);
-  outline-offset: -1px;
+  background: linear-gradient(var(--control-focus), var(--control-focus)), var(--surface-overlay-open);
 }
 .select-value {
   flex: 1;
@@ -276,18 +291,24 @@ watch(open, (value) => {
   height: 20px;
   color: var(--text-secondary);
 }
-.select-arrow path { transition: transform 120ms ease; }
+.select-arrow path {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
 .select-arrow path.up { transform: rotate(180deg); }
 
 .select-popup {
   position: fixed;
   z-index: 40;
-  padding: 5px;
-  border-radius: 10px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--surface-overlay-border);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 8px 24px rgba(4, 8, 14, 0.4);
+  padding: var(--space-1);
+  border-radius: var(--radius-card);
+  background: var(--glass-light), var(--surface-raised);
+  -webkit-backdrop-filter: var(--glass-effect);
+  backdrop-filter: var(--glass-effect);
+  box-shadow: var(--shadow-glass);
+  transform-origin: top center;
+  animation: ui-glass-pop var(--glass-reveal-duration) var(--ease-glass-in);
 }
 .select-options {
   list-style: none;
@@ -298,14 +319,15 @@ watch(open, (value) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 32px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-control);
   color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 14px;
+  line-height: 1.5;
   cursor: pointer;
+  border: 0;
 }
 .select-options li .option-label {
   min-width: 0;
@@ -322,7 +344,33 @@ watch(open, (value) => {
 .select-options li:hover,
 .select-options li.active { background: var(--control-hover); }
 .select-options li.chosen {
-  background: rgba(155, 232, 241, 0.18);
-  color: var(--accent-cyan);
+  background-image: var(--control-selected);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.select-trigger.glassed, .select-popup.glassed {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.select-trigger.glassed { border-radius: 18px; }
+.select-popup.glassed {
+  --liquid-glass-tint: rgb(7 22 29 / .54);
+  --liquid-glass-clear-backdrop: blur(18px) saturate(118%) brightness(.9);
+  animation: none;
+}
+.select-trigger.glassed:focus-visible { outline: 2px solid var(--text-secondary); outline-offset: -2px; }
+
+@media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
+  .select-trigger.glassed {
+    border-radius: var(--radius-card);
+    padding-inline: 12px 8px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .select-popup.glassed {
+    padding: 6px;
+  }
 }
 </style>

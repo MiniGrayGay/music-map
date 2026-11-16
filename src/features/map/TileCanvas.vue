@@ -1,5 +1,6 @@
 <script setup>
 import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {groundPatch, loadGroundPatch} from './ground-patch.js';
 
 const props = defineProps({
   mapName: {type: String, required: true},
@@ -10,14 +11,22 @@ const props = defineProps({
   seaColor: {type: String, required: true},
 });
 
+const emit = defineEmits(['canvas-frame']);
 const surface = ref(null);
 const bitmaps = new Map();
 const requested = new Map();
 const failures = new Set();
-const CACHE_LIMIT = 160;
-const CONCURRENCY = 8;
+const compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
+const cacheLimit = compact ? 48 : 128;
+const concurrency = compact ? 4 : 8;
 let frameId = 0;
 let visible = [];
+let nativeVisible = [];
+let backdropTimer;
+let backdropAt = -Infinity;
+let nativeIndex;
+let nativeKeys;
+let patchImage;
 let active = true;
 
 const keyFor = (z, x, y) => `${z}/${x}/${y}`;
@@ -38,7 +47,9 @@ async function fetchTile(key) {
   const controller = new AbortController();
   requested.set(key, controller);
   try {
-    const version = props.pyramid.sourceIdentity.slice(0, 12);
+    const native = props.pyramid.native;
+    const version = (native && key.startsWith(`${native.level}/`)
+      ? native.sourceIdentity : props.pyramid.sourceIdentity).slice(0, 12);
     const response = await fetch(`/tiles/${props.mapName}/${key}.webp?v=${version}`, {
       signal: controller.signal,
     });
@@ -49,7 +60,7 @@ async function fetchTile(key) {
       return;
     }
     bitmaps.set(key, image);
-    while (bitmaps.size > Math.max(CACHE_LIMIT, visible.length + 24)) {
+    while (bitmaps.size > Math.max(cacheLimit, visible.length + nativeVisible.length + 12)) {
       const oldest = bitmaps.keys().next().value;
       if (oldest === keyFor(0, 0, 0)) {
         readTile(oldest);
@@ -71,15 +82,59 @@ async function fetchTile(key) {
 
 function schedule() {
   const root = keyFor(0, 0, 0);
-  const next = new Set([root, ...visible.map((tile) => tile.key)]);
+  const next = new Set([root, ...visible.map((tile) => tile.key), ...nativeVisible]);
   for (const [key, controller] of requested) {
     if (!next.has(key)) controller.abort();
   }
   for (const key of next) {
-    if (requested.size >= CONCURRENCY) break;
+    if (requested.size >= concurrency) break;
     if (!bitmaps.has(key) && !requested.has(key) && !failures.has(key)) {
       void fetchTile(key);
     }
+  }
+}
+
+function drawNative(ctx, native, tx, ty, scale, dpr) {
+  nativeVisible = [];
+  if (!native || scale * dpr < 5.7) return 0;
+  if (nativeIndex !== native) {
+    nativeIndex = native;
+    nativeKeys = new Set(native.tiles);
+  }
+  const span = native.tileSize * props.canvas.width / native.imageWidth * scale;
+  const maxX = Math.min(Math.ceil(native.imageWidth / native.tileSize) - 1,
+    Math.floor((props.viewport.width - tx) / span));
+  const maxY = Math.min(Math.ceil(native.imageHeight / native.tileSize) - 1,
+    Math.floor((props.viewport.height - ty) / span));
+  let ready = 0;
+  for (let y = Math.max(0, Math.floor(-ty / span)); y <= maxY; y += 1) {
+    for (let x = Math.max(0, Math.floor(-tx / span)); x <= maxX; x += 1) {
+      if (!nativeKeys.has(`${x}/${y}`)) continue;
+      const key = keyFor(native.level, x, y);
+      nativeVisible.push(key);
+      const image = readTile(key);
+      if (!image) continue;
+      const px = (column) => Math.round((tx + column * span) * dpr) / dpr;
+      const py = (row) => Math.round((ty + row * span) * dpr) / dpr;
+      ctx.drawImage(image, px(x), py(y), px(x + 1) - px(x), py(y + 1) - py(y));
+      ready += 1;
+    }
+  }
+  return ready;
+}
+
+function emitBackdrop(element) {
+  const now = performance.now();
+  if (now - backdropAt >= 200) {
+    backdropAt = now;
+    clearTimeout(backdropTimer);
+    backdropTimer = null;
+    emit('canvas-frame', element);
+  } else if (!backdropTimer) {
+    backdropTimer = setTimeout(() => {
+      backdropTimer = null;
+      if (active) emitBackdrop(element);
+    }, Math.ceil(200 - (now - backdropAt)));
   }
 }
 
@@ -109,7 +164,7 @@ function draw() {
   const level = props.pyramid;
   const {width, height} = props.viewport;
   const {tx, ty, scale} = props.transform;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, compact ? 1.35 : 2);
   const rasterWidth = Math.round(width * dpr);
   const rasterHeight = Math.round(height * dpr);
   if (element.width !== rasterWidth) element.width = rasterWidth;
@@ -150,21 +205,36 @@ function draw() {
       if (drawTile(ctx, tile, level)) ready += 1;
     }
   }
+  const nativeReady = drawNative(ctx, level.native, tx, ty, scale, dpr);
+  if (patchImage) {
+    const {left, top, width, height} = groundPatch;
+    ctx.drawImage(patchImage, tx + left * scale, ty + top * scale, width * scale, height * scale);
+    element.dataset.groundPatch = 'natlan-49-01';
+  }
   ctx.restore();
   visible.sort((a, b) => Math.hypot(a.left + size / 2 - width / 2, a.top + size / 2 - height / 2)
     - Math.hypot(b.left + size / 2 - width / 2, b.top + size / 2 - height / 2));
   element.dataset.level = z;
   element.dataset.visible = visible.length;
   element.dataset.ready = ready;
+  element.dataset.nativeVisible = nativeVisible.length;
+  element.dataset.nativeReady = nativeReady;
+  emitBackdrop(element);
   schedule();
 }
 
 watch(() => [props.transform.tx, props.transform.ty, props.transform.scale,
   props.viewport.width, props.viewport.height], dirty);
-onMounted(dirty);
+onMounted(() => {
+  dirty();
+  if (props.mapName === groundPatch.map) {
+    loadGroundPatch().then((image) => { patchImage = image; dirty(); }).catch(console.warn);
+  }
+});
 onBeforeUnmount(() => {
   active = false;
   cancelAnimationFrame(frameId);
+  clearTimeout(backdropTimer);
   for (const controller of requested.values()) controller.abort();
   for (const image of bitmaps.values()) image.close();
 });
