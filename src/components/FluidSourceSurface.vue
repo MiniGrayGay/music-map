@@ -31,10 +31,7 @@
  * SOFTWARE.
  */
 
-import {createElement} from 'react';
-import {createRoot} from 'react-dom/client';
 import {inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import FluidGlass from './react-bits/FluidGlass.jsx';
 
 const props = defineProps({
   shape: {type: String, default: 'lens'},
@@ -59,9 +56,27 @@ let sample;
 let lastSource;
 let lastSize;
 let backdropFilter = 'none';
-// 与播放器的移动判定一致；配合 aria-label 只对关闭键做对比防护。
+// 与播放器的移动判定一致；移动/粗指针改用 CSS 高光玻璃，跳过 React/WebGL 与背景采样。
 const mobileLayout = matchMedia('(max-width: 700px), (pointer: coarse)');
 let contrastGuard = false;
+// 桌面依赖（react / react-dom / FluidGlass）按需动态加载，移动端不再拉取。
+let react;
+let createRoot;
+let FluidGlass;
+let desktopRuntime;
+
+function loadDesktopRuntime() {
+  desktopRuntime ??= Promise.all([
+    import('react'),
+    import('react-dom/client'),
+    import('./react-bits/FluidGlass.jsx'),
+  ]).then(([reactModule, reactDomModule, glassModule]) => {
+    react = reactModule.default ?? reactModule;
+    createRoot = reactDomModule.createRoot;
+    FluidGlass = glassModule.default;
+  });
+  return desktopRuntime;
+}
 
 function refresh() {
   if (!frame) frame = requestAnimationFrame(render);
@@ -71,11 +86,19 @@ function render() {
   frame = 0;
   const bounds = host.value?.getBoundingClientRect();
   if (!bounds?.width || !bounds.height) return;
+  if (mobileLayout.matches) {
+    teardownGlass();
+    renderFlat();
+    return;
+  }
+  host.value.classList.remove('fluid-source-surface--flat', 'fluid-source-surface--flat-dark');
+  if (!FluidGlass) {
+    loadDesktopRuntime().then(refresh, () => {});
+    return;
+  }
   const size = Math.round(bounds.width * (props.shape === 'pill' ? 1 : .94));
   const extent = Math.ceil(size / .72 + 6);
   stage.value.style.width = stage.value.style.height = `${extent}px`;
-  contrastGuard = mobileLayout.matches
-    && control?.getAttribute('aria-label') === '关闭播放器';
 
   const source = backdrop?.value?.canvas;
   let src;
@@ -96,13 +119,6 @@ function render() {
       // Include the blur's surroundings without filtering the entire map for each button.
       context.drawImage(source, (left - margin - scene.left) * scaleX, (top - margin - scene.top) * scaleY,
         span * scaleX, span * scaleY, -margin, -margin, span, span);
-      // 亮背景（海面/白底）经折射会聚后可把镜头洗成纯白，浅色图标失去对比。
-      // 仅移动/窄窗的播放器关闭键叠这层半透明深色；其余按钮与桌面保持原玻璃观感。
-      if (contrastGuard) {
-        context.filter = 'none';
-        context.fillStyle = 'rgba(9, 23, 38, 0.5)';
-        context.fillRect(-margin, -margin, span, span);
-      }
       src = sample.toDataURL();
     }
   }
@@ -114,12 +130,29 @@ function render() {
   renderGlass();
 }
 
+function teardownGlass() {
+  if (!root) return;
+  const canvas = stage.value?.querySelector('canvas');
+  root.unmount();
+  root = undefined;
+  canvas?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  lastSource = undefined;
+  lastSize = undefined;
+}
+
+function renderFlat() {
+  // 关闭键在亮背景上需要深色兜底，其余按钮保持高光透明玻璃。
+  contrastGuard = control?.getAttribute('aria-label') === '关闭播放器';
+  host.value.classList.add('fluid-source-surface--flat');
+  host.value.classList.toggle('fluid-source-surface--flat-dark', contrastGuard);
+}
+
 function renderGlass() {
   // The hover endpoint uses the upstream demo's Heavy optics.
   const position = hovered && !props.centered && !reducedMotion.matches
     ? hoveredPosition
     : restingPosition;
-  root.render(createElement(FluidGlass, {
+  root.render(react.createElement(FluidGlass, {
     shape: props.shape,
     size: lastSize,
     src: lastSource,
@@ -196,6 +229,7 @@ onMounted(() => {
   control?.addEventListener('pointerleave', leaveControl);
   control?.addEventListener('click', sweepReflection);
   reducedMotion.addEventListener('change', updateHover);
+  mobileLayout.addEventListener('change', refresh);
   observer = new ResizeObserver(refresh);
   observer.observe(host.value);
   refresh();
@@ -207,10 +241,9 @@ onBeforeUnmount(() => {
   control?.removeEventListener('pointerleave', leaveControl);
   control?.removeEventListener('click', sweepReflection);
   reducedMotion?.removeEventListener('change', updateHover);
+  mobileLayout?.removeEventListener('change', refresh);
   observer?.disconnect();
-  const canvas = stage.value?.querySelector('canvas');
-  root?.unmount();
-  canvas?.getContext('webgl2')?.getExtension('WEBGL_lose_context')?.loseContext();
+  teardownGlass();
 });
 defineExpose({refresh});
 </script>
@@ -246,6 +279,24 @@ export const fluidBackdropKey = Symbol('fluid-glass-source-canvas');
 
 .fluid-source-surface--orbit .fluid-source-stage {
   filter: saturate(.52);
+}
+
+/* 移动/粗指针降级：不再跑 React/WebGL，用纯 CSS 高光透明玻璃代替。 */
+.fluid-source-surface--flat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / .34), rgb(255 255 255 / .08) 52%, transparent 74%),
+    linear-gradient(160deg, rgb(255 255 255 / .18), rgb(255 255 255 / .04) 58%, rgb(255 255 255 / .12));
+  box-shadow: inset 0 1px 1px rgb(255 255 255 / .28);
+}
+
+/* 亮背景（海面/白底）下关闭键的深色兜底，保持浅色图标的对比度。 */
+.fluid-source-surface--flat-dark::before {
+  background: rgb(9 23 38 / .5);
+  box-shadow: none;
 }
 
 .fluid-source-reflection {

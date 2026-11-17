@@ -74,6 +74,34 @@ const {
 
 const repeatLabel = computed(() => repeatMode.value === 'one' ? '单曲循环' : '列表循环');
 
+// 音源读取失败改为页面短通知：监听 failure，Teleport 到页面顶部，约 4 秒自动消失。
+const failureToast = ref(false);
+let failureToastTimer = 0;
+
+function closeFailureToast() {
+  clearTimeout(failureToastTimer);
+  failureToastTimer = 0;
+  failureToast.value = false;
+}
+
+function showFailureToast() {
+  if (!failure.value) {
+    // 重试/恢复会把 failure 清空，立即收起通知，避免留下空文字的 toast。
+    closeFailureToast();
+    return;
+  }
+  failureToast.value = true;
+  clearTimeout(failureToastTimer);
+  failureToastTimer = window.setTimeout(() => {
+    failureToastTimer = 0;
+    failureToast.value = false;
+  }, 4000);
+}
+
+watch(failure, showFailureToast, {flush: 'post'});
+// 换曲后不再保留旧通知。
+watch(track, closeFailureToast, {flush: 'post'});
+
 const progressStyle = computed(() => ({
   '--range-fill': duration.value ? `${Math.min(1, elapsed.value / duration.value) * 100}%` : '0%',
 }));
@@ -275,6 +303,8 @@ function reactToControl(event) {
 }
 
 function updateBackdrop(canvas) {
+  // 移动端不用 WebGL 玻璃按钮，跳过背景采样，避免多余的画布与编码开销。
+  if (mobileVolume.matches) return;
   pendingBackdrop = canvas;
   if (!fluidBackdrop.value) {
     fluidBackdrop.value = {canvas};
@@ -290,6 +320,7 @@ defineExpose({updateBackdrop, pause});
 onMounted(() => mobileVolume.addEventListener('change', updateVolumeMode));
 onBeforeUnmount(() => {
   mobileVolume.removeEventListener('change', updateVolumeMode);
+  clearTimeout(failureToastTimer);
   clearTimeout(backdropTimer);
   queueHeightMotion?.cancel();
   cancelTrackMotion();
@@ -499,10 +530,14 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div v-if="failure" class="media-error">
-        <span class="playback-status" role="status">{{ failure }}</span>
-        <button type="button" class="text-button" aria-label="重试播放" @click="retry">重试</button>
-      </div>
+      <Teleport to="body">
+        <Transition name="failure-toast">
+          <div v-if="failureToast" class="failure-toast" role="status">
+            <span>{{ failure }}</span>
+            <button type="button" class="retry-button" aria-label="重试播放" @click="retry">重试</button>
+          </div>
+        </Transition>
+      </Teleport>
 
       <RevealPanel :open="detailsOpen" liquid class="details-reveal">
         <div :id="`${uid}-details`" ref="detailsBody" class="player-details player-drawer scroll-viewport">
@@ -971,18 +1006,55 @@ onBeforeUnmount(() => {
   background-image: var(--player-selection);
 }
 
-.media-error {
+.failure-toast {
+  position: fixed;
+  inset-block-start: max(12px, env(safe-area-inset-top));
+  inset-inline: 0;
+  z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: var(--player-secondary);
+  gap: 10px;
+  width: max-content;
+  max-width: min(420px, calc(100% - 24px));
+  margin-inline: auto;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgb(12 24 34 / .78);
+  box-shadow: 0 6px 18px rgb(0 0 0 / .35);
+  color: #fff;
+  font-size: 13px;
+  text-shadow: none;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
 }
 
-.media-error .text-button {
-  color: var(--player-text);
+/* Teleport 到 body 后继承不到播放器内的按钮样式，通知按钮独立成套。 */
+.failure-toast .retry-button {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #ffd9a8;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .failure-toast-enter-active,
+  .failure-toast-leave-active {
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+
+  .failure-toast-enter-from,
+  .failure-toast-leave-to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .phase-control {

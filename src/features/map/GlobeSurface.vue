@@ -318,7 +318,8 @@ onMounted(() => {
         if (key === lastView) return;
         lastView = key;
         emit('view', {canZoomIn, canZoomOut, magnified, globeMap: installedMap});
-      }});
+      },
+      onContextLost: () => emit('unavailable', '球面渲染已中断，已切换为平面地图')});
   } catch (error) {
     emit('unavailable', error.message);
     return;
@@ -328,7 +329,8 @@ onMounted(() => {
   document.addEventListener('focusin', dismissOutsideSearch);
   void showWorld();
   loadGroundPatch().then((image) => globe?.setGroundPatch(image, groundPatch)).catch(console.warn);
-  texture('lroc-color-2k.jpg').then((image) => globe?.setMoon(image)).catch(() => {});
+  // 装饰月球的 0.44MB 纹理只在不建第二 WebGL 上下文的桌面端预载。
+  if (!globe.compact) texture('lroc-color-2k.jpg').then((image) => globe?.setMoon(image)).catch(() => {});
 });
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', dismissOutsideSearch, true);

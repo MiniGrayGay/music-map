@@ -105,6 +105,41 @@ export function viewAtlasPoints(world, basis, zoom, x, y) {
   return [chart.map((value, index) => globe[index] * (1 - blend) + value * blend)];
 }
 
+// Use angular coordinates through the globe-to-chart blend, and use the
+// physical ray on the Moon so an atlas seam does not move the pinch anchor.
+export function viewportAngles(world, basis, zoom, x, y) {
+  if (chartFlattening(world, zoom)) {
+    return atlasAngles(world, ...viewAtlasPoints(world, basis, zoom, x, y)[0]);
+  }
+  const [nx, ny, nz] = surfaceRay(x, y, basis);
+  return [Math.atan2(nx, nz), Math.asin(clamp(ny, -1, 1))];
+}
+
+export function cameraAtAnchor(world, zoom, x, y, anchor, lon, lat) {
+  const limit = PI / 2 - .001;
+  lat = clamp(lat, -limit, limit);
+  const step = .0001;
+  const sample = (azimuth, elevation) =>
+    viewportAngles(world, cameraBasis(azimuth, elevation), zoom, x, y);
+  for (let i = 0; i < 7; i += 1) {
+    const current = sample(lon, lat);
+    const dx = wrap(anchor[0] - current[0]);
+    const dy = anchor[1] - current[1];
+    if (Math.abs(dx) + Math.abs(dy) < .00001) break;
+    const side = sample(lon + step, lat);
+    const vertical = sample(lon, lat + step);
+    const a = wrap(side[0] - current[0]) / step;
+    const b = wrap(vertical[0] - current[0]) / step;
+    const c = (side[1] - current[1]) / step;
+    const d = (vertical[1] - current[1]) / step;
+    const det = a * d - b * c;
+    if (Math.abs(det) < .00001) break;
+    lon = wrap(lon + clamp((d * dx - b * dy) / det, -.6, .6));
+    lat = clamp(lat + clamp((a * dy - c * dx) / det, -.6, .6), -limit, limit);
+  }
+  return [lon, lat];
+}
+
 // Invert the same blended texture lookup used by the fragment shader. This
 // keeps the labels, hit areas and block outline attached to the atlas pixels.
 export function projectAtlas(world, basis, zoom, uv, normal) {

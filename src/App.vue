@@ -10,7 +10,6 @@ import SelectMenu from './components/SelectMenu.vue';
 import ZoomControls from './components/ZoomControls.vue';
 import {useAnchoredPanel} from './components/panelMotion.js';
 import {pushEscapeHandler} from './components/escapeStack.js';
-import MapSurface from './features/map/MapSurface.vue';
 import {BGM_STATUS, loadRegionBgm} from './features/bgm/bgmStatus.js';
 import {loadMapData} from './features/map/mapData.js';
 import {layerModeActive, loadLayers, reloadLayers} from './features/layers/layerSelection.js';
@@ -19,6 +18,8 @@ import {isMobileDevice} from './features/map/isMobileDevice.js';
 
 const GlobeSurface = defineAsyncComponent(() => import('./features/map/GlobeSurface.vue'));
 const ReliefPreview = defineAsyncComponent(() => import('./features/map/ReliefPreview.vue'));
+// 平面地图只在分层模式或球面不可用时挂载，走异步分包不占首屏 JS。
+const MapSurface = defineAsyncComponent(() => import('./features/map/MapSurface.vue'));
 
 const mapData = ref(null);
 const baseMaps = ref({});
@@ -134,7 +135,15 @@ async function initialize() {
     preloadToyRelief();
     void loadLayers({appCanvas: mapData.value.canvas});
     void loadLayerBases(mapData.value).then((maps) => { baseMaps.value = maps; });
-    void loadMusic();
+    // 手机首帧带宽紧张：0.66MB 的音乐元数据等到首帧后空闲再拉，分区与
+    // 搜索在清单到达时照常由响应式监听补上。
+    if (isMobileDevice()) {
+      const start = () => void loadMusic();
+      if ('requestIdleCallback' in window) requestIdleCallback(start, {timeout: 3000});
+      else setTimeout(start, 1500);
+    } else {
+      void loadMusic();
+    }
   } catch (error) {
     loadError.value = error.message;
   }

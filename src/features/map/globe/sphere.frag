@@ -15,7 +15,6 @@ uniform vec3 u_up;
 uniform vec3 u_front;
 uniform vec3 u_sea;
 uniform vec2 u_span;
-uniform float u_points;
 uniform float u_zoom;
 uniform float u_flatten;
 uniform vec2 u_chartScale;
@@ -30,12 +29,6 @@ uniform vec3 u_occluder;
 out vec4 pixel;
 
 const float PI = 3.14159265359;
-
-float hash(vec2 p) {
-  vec3 k = fract(vec3(p.xyx) * .1031);
-  k += dot(k, k.yzx + 33.33);
-  return fract((k.x + k.y) * k.z);
-}
 
 vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
   if (u_nativeSize.x > 0.) {
@@ -189,7 +182,6 @@ void main() {
   if (r >= 1.001) discard;
 
   vec3 ice = vec3(.49, .79, .82);
-  vec3 mint = vec3(.76, .92, .78);
 
   float z = sqrt(max(0., 1. - dot(p, p)));
   vec3 n = normalize(u_right * p.x + u_up * p.y + u_front * z);
@@ -248,21 +240,6 @@ void main() {
   float closeView = smoothstep(1.3, 4.4, u_zoom);
   graticule *= 1. - closeView * .92;
   rgb = mix(rgb, ice, graticule * (1. - land * .65));
-
-  // Sample the chart on a latitude/longitude lattice to light the terrain as points.
-  vec2 lattice = vec2(lon, lat) * 63.7 * mix(1., sqrt(max(1., u_zoom)), u_points);
-  vec2 id = floor(lattice);
-  float seed = hash(id);
-  vec2 delta = fract(lattice) - .5;
-  float d = length(delta);
-  float filtered = min(.19, max(fwidth(d), .01) * .6);
-  float dotLight = 1. - smoothstep(.08 + seed * .09, .12 + seed * .1 + filtered, d);
-  float starlight = dotLight * (land * (.40 + .60 * seed) + .072 * step(.89, seed));
-  vec3 night = mix(vec3(.023, .048, .057), rgb * .66, .68 + land * .17);
-  vec3 pointColor = mix(ice, mint, fract(seed * 4.));
-  night += pointColor * starlight * (.37 + daylight * .36);
-  rgb += pointColor * starlight * (.025 + daylight * .065) * (1. - closeView);
-  rgb = mix(rgb, night, u_points);
 
   rgb = mix(rgb, vec3(.046, .102, .128), pow(1. - z, 2.6) * .43);
   float opacity = 1. - smoothstep(.997, 1.001, r);

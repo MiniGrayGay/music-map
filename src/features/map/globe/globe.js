@@ -4,8 +4,8 @@ import {frameZone} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
 import {
-  cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, dot, fullSpan,
-  projectAtlas, projectVisibleOutline, surfaceRay, viewAtlasPoints, wrap,
+  cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, dot, fullSpan,
+  projectAtlas, projectVisibleOutline, surfaceRay, viewAtlasPoints, viewportAngles, wrap,
 } from './projection.js';
 
 const TAU = 2 * Math.PI;
@@ -94,7 +94,7 @@ function initialize(canvas, fragment) {
   gl.deleteShader(material);
   gl.useProgram(program);
   const uniforms = Object.fromEntries(
-    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'points', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder'].map(
+    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
   );
@@ -141,7 +141,7 @@ function uploadAtlas({gl, texture}, image, wrapLongitude = false) {
 
 function renderSphere(renderer, canvas, view) {
   const {gl, uniforms} = renderer;
-  const {cx, cy, radius, ratio, world, basis, points, zoom = 1, detailSize = [0, 0],
+  const {cx, cy, radius, ratio, world, basis, zoom = 1, detailSize = [0, 0],
     nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0]} = view;
   const extent = radius * 1.002;
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
@@ -161,7 +161,6 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform3fv(uniforms.front, basis.front);
   gl.uniform3fv(uniforms.sea, world.sea);
   gl.uniform2fv(uniforms.span, world.span);
-  gl.uniform1f(uniforms.points, points);
   gl.uniform1f(uniforms.zoom, zoom);
   const flatten = chartFlattening(world, zoom);
   gl.uniform1f(uniforms.flatten, flatten);
@@ -179,10 +178,15 @@ function renderSphere(renderer, canvas, view) {
 }
 
 export class Globe {
-  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment, labelObstacles, onSelect, onView, onFrame}) {
-    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels, labelObstacles, onSelect, onView, onFrame});
+  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment, labelObstacles, onSelect, onView, onFrame, onContextLost}) {
+    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels, labelObstacles, onSelect, onView, onFrame, onContextLost});
     Object.assign(this, initialize(canvas, fragment));
     this.compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
+    // 资源紧张时浏览器直接收走上下文：交给上层切换到 2D 平面地图，而不是停在白屏。
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      this.onContextLost?.();
+    });
     const invalidate = () => {
       this.sphereState = null;
       this.requestFrame();
@@ -194,15 +198,16 @@ export class Globe {
       compact: this.compact, capacity: this.compact ? 12 : 16, concurrency: this.compact ? 2 : 4, native: true,
     });
     this.orbitStarted = performance.now();
-    try {
-      this.moonRenderer = initialize(satellite, fragment);
-    } catch (error) {
-      console.warn('霜月轨道渲染不可用', error);
+    // 紧凑设备不再为装饰月球常驻第二个 WebGL 上下文；霜月入口保留在地图菜单。
+    if (!this.compact) {
+      try {
+        this.moonRenderer = initialize(satellite, fragment);
+      } catch (error) {
+        console.warn('霜月轨道渲染不可用', error);
+      }
     }
     this.context = signals.getContext('2d');
     this.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    this.points = 0;
-    this.styleTarget = 0;
     this.lon = 0;
     this.lat = 0;
     this.zoom = 1;
@@ -370,7 +375,7 @@ export class Globe {
 
   resize() {
     const {width, height} = this.canvas.getBoundingClientRect();
-    const ratio = Math.min(devicePixelRatio, this.compact ? 1.3 : 1.45);
+    const ratio = Math.min(devicePixelRatio, this.compact ? 1.15 : 1.45);
     this.width = width;
     this.height = height;
     this.ratio = ratio;
@@ -429,11 +434,6 @@ export class Globe {
     this.requestFrame();
   }
 
-  setStyle(style) {
-    this.styleTarget = Number(style === 'points');
-    this.requestFrame();
-  }
-
   setPlaying(playing) {
     this.playing = playing;
     this.requestFrame();
@@ -488,8 +488,6 @@ export class Globe {
 
   advance(time, elapsed) {
     const ease = this.reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / 84);
-    this.points = interpolate(this.points, this.styleTarget, ease);
-    if (Math.abs(this.points - this.styleTarget) < .001) this.points = this.styleTarget;
     if (this.flight) {
       const {route, duration, from, to, center, startCenter} = this.flight;
       const progress = clamp((time - this.flight.time) / duration, 0, 1);
@@ -525,7 +523,7 @@ export class Globe {
     this.lastFrame = time;
     const overview = this.world.id === 'Teyvat' && this.zoom <= 1.5;
     const autoSpin = overview && !this.selected && this.zoom >= 1 && this.zoomTarget >= 1 && this.zoomTarget <= 1.5
-      && !this.reducedMotion.matches;
+      && !this.compact && !this.reducedMotion.matches;
     if (autoSpin && time >= this.spinAfter && !this.pointer && !this.flight && !this.velocity) {
       this.spinTime ??= time;
       if (time - this.spinTime >= 32) {
@@ -537,8 +535,11 @@ export class Globe {
     }
     const {ratio, cx, cy, width, height} = this;
     const radius = this.radius * this.zoom;
+    // 双指事件在一帧内可能连发多次：这里统一聚合应用一次，锚点始终是手势
+    // 开始时固定的地图坐标；跨球面/平面混合过渡同样由 cameraAtAnchor 保持。
+    this.applyPinch();
     const basis = cameraBasis(this.lon, this.lat);
-    const moving = Boolean(this.flight || this.velocity || this.pointer?.moved || this.zoom !== this.zoomTarget);
+    const moving = Boolean(this.flight || this.velocity || this.pointer?.moved || this.pinch || this.zoom !== this.zoomTarget);
     const settled = this.cameraMoving && !moving;
     const worldChanged = this.lastTileWorld !== this.world;
     const focused = Boolean(this.selected);
@@ -547,12 +548,15 @@ export class Globe {
     // Only the moving WebGL raster is sampled at a lower resolution.
     // 紧凑设备拖动期保持更低的采样率换帧率；静止后回到完整 ratio。
     const rasterRatio = moving ? ratio * (this.compact ? .62 : .72) : ratio;
-    const pose = [this.lon, this.lat, radius, cx, cy, this.points, rasterRatio];
+    const pose = [this.lon, this.lat, radius, cx, cy, rasterRatio];
     const changed = !this.sphereState || pose.some((value, index) => value !== this.sphereState[index]);
     // 拖动中密集重算可见瓦片会不断中止在途请求（弱网浪费且打断解码），
     // 紧凑设备在移动期间放宽到飞行航拍的同一节奏，静止后照常补齐。
+    // 捏合期间 zoom 逐帧变化会反复整层重置瓦片，直接暂停更新，抬指后由
+    // settled 一次性补齐（2048 原生层照常在静止后进入）。
     const tileInterval = this.flight || (this.compact && moving) ? 200 : 110;
-    if (worldChanged || settled || detailFocusChanged || (changed && time - (this.tileUpdateAt ?? -Infinity) >= tileInterval)) {
+    if (!this.pinch
+      && (worldChanged || settled || detailFocusChanged || (changed && time - (this.tileUpdateAt ?? -Infinity) >= tileInterval))) {
       const detailView = {cx, cy, width, height, radius, ratio, basis, focused, zoom: this.zoom, lon: this.lon, lat: this.lat};
       this.tiles.update(this.world, detailView);
       this.nativeTiles.update(this.world, detailView);
@@ -566,7 +570,7 @@ export class Globe {
       if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
       if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
       renderSphere(this, this.canvas, {
-        cx, cy, ratio: rasterRatio, radius, world: this.world, basis, points: this.points,
+        cx, cy, ratio: rasterRatio, radius, world: this.world, basis,
         zoom: this.zoom, detailSize: this.tiles.size, nativeSize: this.nativeTiles.size,
         patchRect: this.patchInAtlas(),
       });
@@ -587,11 +591,28 @@ export class Globe {
     const pulse = lockVisible
       && (this.compact ? time - this.lockTime < 1750 : (this.playing || time - this.lockTime < 1750))
       && !this.reducedMotion.matches;
-    if (this.flight || this.velocity || this.zoom !== this.zoomTarget || this.points !== this.styleTarget || pulse
+    if (this.flight || this.velocity || this.zoom !== this.zoomTarget || pulse
       || (this.selected && this.raiseStarted != null && this.raise < 1)
       || autoSpin || (orbit && !this.reducedMotion.matches)) {
       this.requestFrame();
     }
+  }
+
+  // 捏合的每帧聚合结果只在 draw()（或手势结束）里消费一次。
+  applyPinch() {
+    const latest = this.pinchLatest;
+    if (!this.pinch || !latest) return;
+    this.pinchLatest = null;
+    const zoom = clamp(this.pinch.zoom * latest.distance / this.pinch.distance, MIN_ZOOM, MAX_ZOOM);
+    this.zoom = this.zoomTarget = zoom;
+    if (this.pinch.anchored && this.world === this.pinch.world) {
+      const x = (latest.center[0] - this.cx) / (this.radius * zoom);
+      const y = (this.cy - latest.center[1]) / (this.radius * zoom);
+      if (x * x + y * y < 1.1) {
+        [this.lon, this.lat] = cameraAtAnchor(this.world, zoom, x, y, this.pinch.anchored, this.lon, this.lat);
+      }
+    }
+    this.spinAfter = performance.now() + 2150;
   }
 
   orbitPoint(angle, radius) {
@@ -626,6 +647,11 @@ export class Globe {
       return;
     }
     if (this.orbitTime !== null && time - this.orbitTime < 32) return;
+    if (this.moonRenderer?.gl.isContextLost()) {
+      this.satellite.hidden = true;
+      this.moonLink.hidden = true;
+      return;
+    }
     this.orbitTime = time;
     const orbitClock = Math.max(time, this.orbitResumeAt ?? time);
     const phase = this.reducedMotion.matches ? 0 : (orbitClock - this.orbitStarted) / 8300;
@@ -637,7 +663,7 @@ export class Globe {
     const distance = Math.hypot(cx - this.cx, cy - this.cy);
     renderSphere(this.moonRenderer, this.satellite, {
       cx, cy, ratio, radius: size, world: this.moon,
-      basis: lockedMoonBasis(radial), points: 0,
+      basis: lockedMoonBasis(radial),
       occluder: depth > 0 ? [this.cx * ratio, this.satellite.height - this.cy * ratio, radius * ratio] : [0, 0, 0],
     });
     const masked = depth > 0 && distance < radius + size * .32;
@@ -931,7 +957,6 @@ export class Globe {
     const canvas = this.canvas;
     const surface = canvas.parentElement;
     const fingers = new Map();
-    let pinch;
     const coordinates = (event) => {
       const box = canvas.getBoundingClientRect();
       return [event.clientX - box.left, event.clientY - box.top];
@@ -944,15 +969,29 @@ export class Globe {
       const onCanvas = event.target === canvas;
       if (event.pointerType === 'touch') {
         if (!onCanvas && !this.labels.contains(event.target)) return;
+        if (!this.world) return;
         if (fingers.size >= 2) return;
         fingers.set(event.pointerId, coordinates(event));
         if (fingers.size === 2) {
           const span = touchSpan();
-          pinch = {...span, zoom: this.zoomTarget};
+          // 从当前 zoom 起拍并冻结缩放动画；锚点取双指中点对应的地图角坐标。
+          this.zoomTarget = this.zoom;
+          const x = (span.center[0] - this.cx) / (this.radius * this.zoom);
+          const y = (this.cy - span.center[1]) / (this.radius * this.zoom);
+          this.pinch = {
+            distance: span.distance || 1,
+            zoom: this.zoom,
+            anchored: x * x + y * y < .9
+              ? viewportAngles(this.world, cameraBasis(this.lon, this.lat), this.zoom, x, y)
+              : null,
+            world: this.world,
+          };
+          this.pinchLatest = null;
           for (const id of fingers.keys()) canvas.setPointerCapture(id);
           this.pointer = null;
           this.flight = null;
           this.velocity = null;
+          this.requestFrame();
           return;
         }
       }
@@ -968,9 +1007,11 @@ export class Globe {
       const [x, y] = coordinates(event);
       if (fingers.has(event.pointerId)) {
         fingers.set(event.pointerId, [x, y]);
-        if (pinch && fingers.size === 2 && pinch.distance > 0) {
+        if (this.pinch && fingers.size === 2) {
+          // 只记录最新跨度/中点，实际相机更新在下一帧 applyPinch 里做一次。
           const span = touchSpan();
-          this.zoomBy((pinch.zoom * span.distance / pinch.distance) / this.zoomTarget, span.center);
+          if (span.distance > 0) this.pinchLatest = span;
+          this.requestFrame();
           return;
         }
       }
@@ -994,9 +1035,20 @@ export class Globe {
       this.requestFrame();
     });
     surface.addEventListener('pointerup', (event) => {
-      fingers.delete(event.pointerId);
-      if (pinch && fingers.size < 2) {
-        pinch = null;
+      const trackedTouch = fingers.delete(event.pointerId);
+      if (this.pinch && trackedTouch) {
+        // 先消费最后一帧未应用的跨度，再收尾捏合。
+        this.applyPinch();
+        this.pinch = null;
+        this.pinchLatest = null;
+        if (fingers.size === 1) {
+          // 放开一指：剩余手指直接接续拖动，且已视为移动，不会再触发点选。
+          const [id] = fingers.keys();
+          const [x, y] = fingers.get(id);
+          this.pointer = {id, start: [x, y], last: [x, y], time: performance.now(), moved: true};
+          this.spinAfter = performance.now() + 2150;
+        }
+        this.requestFrame();
         return;
       }
       const p = this.pointer;
@@ -1011,7 +1063,12 @@ export class Globe {
       this.requestFrame();
     });
     surface.addEventListener('pointercancel', (event) => {
-      if (fingers.delete(event.pointerId)) pinch = null;
+      const trackedTouch = fingers.delete(event.pointerId);
+      if (this.pinch && trackedTouch) {
+        this.pinch = null;
+        this.pinchLatest = null;
+        this.requestFrame();
+      }
       if (this.pointer?.id === event.pointerId) {
         this.pointer = null;
         this.requestFrame();
