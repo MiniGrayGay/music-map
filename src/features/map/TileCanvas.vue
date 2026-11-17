@@ -11,7 +11,7 @@ const props = defineProps({
   seaColor: {type: String, required: true},
 });
 
-const emit = defineEmits(['canvas-frame']);
+const emit = defineEmits(['canvas-frame', 'raster-ready']);
 const surface = ref(null);
 const bitmaps = new Map();
 const requested = new Map();
@@ -29,6 +29,7 @@ let nativeKeys;
 let patchImage;
 let fontaineImage;
 let active = true;
+let rasterReady = false;
 
 const keyFor = (z, x, y) => `${z}/${x}/${y}`;
 
@@ -232,6 +233,12 @@ function draw() {
   element.dataset.ready = ready;
   element.dataset.nativeVisible = nativeVisible.length;
   element.dataset.nativeReady = nativeReady;
+  const root = keyFor(0, 0, 0);
+  if (!rasterReady && (bitmaps.has(root) || (failures.has(root)
+    && visible.every(tile => bitmaps.has(tile.key) || failures.has(tile.key))))) {
+    rasterReady = true;
+    emit('raster-ready');
+  }
   emitBackdrop(element);
   schedule();
 }

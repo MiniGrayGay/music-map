@@ -20,11 +20,12 @@ const props = defineProps({
   searchHost: {type: HTMLElement, default: null},
   reliefTarget: {type: HTMLElement, default: null},
   reliefAspect: {type: Number, default: null},
+  initialViewport: {type: Object, default: null},
   mobileDevice: {type: Boolean, default: false},
   smoothBoundaries: {type: Boolean, default: true},
 });
 const emit = defineEmits([
-  'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame', 'relief-reveal',
+  'handoff-ready', 'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame', 'relief-reveal',
 ]);
 const atlas = import.meta.glob('./globe/atlas/*', {eager: true, query: '?url', import: 'default'});
 const chart = {
@@ -294,6 +295,10 @@ async function showWorld() {
       }) : [];
       installedMap = id;
       globe.setWorld(world, image, items);
+      if (props.initialViewport) {
+        const ready = () => emit('handoff-ready');
+        if (!globe.alignViewport(props.initialViewport, props.mapData.canvas, false, ready)) ready();
+      }
     }
     status.value = '';
     if (pendingSelection && items.some(({zone}) => zone.key === pendingSelection.key)) {
@@ -303,7 +308,10 @@ async function showWorld() {
       globe.select(items.find(({zone}) => zone.key === props.activeZone.key) ?? null);
     }
   } catch (error) {
-    if (revision === request) status.value = error.message;
+    if (revision === request) {
+      status.value = error.message;
+      if (props.initialViewport) emit('unavailable', error.message);
+    }
   }
 }
 
@@ -369,6 +377,8 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   resetView, clearSelection,
   refreshRelief: () => globe?.requestFrame(),
   viewportRect: () => globe?.viewportRect(props.mapData.canvas),
+  alignViewport: (rect, done) => globe?.alignViewport(rect, props.mapData.canvas, true, done),
+  cancelViewportAlignment: () => globe?.cancelViewportAlignment(),
   focusZone: () => canvas.value?.focus({preventScroll: true}), jumpToZone,
 });
 </script>

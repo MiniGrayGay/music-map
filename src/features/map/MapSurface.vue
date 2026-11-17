@@ -4,7 +4,7 @@
 // 交互走 .world 内透明命中 path（fill:none + pointer-events:fill）；tooltip
 // 只用 RegionTooltip。单击、右键或回车激活分区交给播放器，空白点击收起
 // 播放器。基础交互保持：鼠标/触屏拖动、指轮锚点缩放、双指捏合、键盘平移缩放。
-import {computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} from 'vue';
+import {computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch, watchEffect} from 'vue';
 
 import RegionTooltip from '../../components/RegionTooltip.vue';
 import {musicView} from '../bgm/bgmStatus.js';
@@ -38,9 +38,10 @@ const props = defineProps({
   mapName: {type: String, required: true},
   bgm: {type: Object, required: true}, // {status, reason, zones, …}（bgmStatus 结果）
   smoothBoundaries: {type: Boolean, default: true},
+  retainLayers: {type: Boolean, default: false},
 });
 
-const emit = defineEmits(['view', 'zone-activate', 'blank-tap', 'canvas-frame']);
+const emit = defineEmits(['view', 'zone-activate', 'blank-tap', 'canvas-frame', 'surface-ready']);
 
 const containerRef = ref(null);
 const moonOverlay = ref(null);
@@ -52,6 +53,20 @@ const deviceScale = ref(window.devicePixelRatio || 1);
 const transform = reactive({scale: 1, tx: 0, ty: 0});
 const tooltipPoint = reactive({x: 0, y: 0});
 const loadedLayerIds = reactive(new Set());
+const failedLayerIds = reactive(new Set());
+const rasterReady = ref(false);
+const savedLayers = shallowRef(null);
+watchEffect(() => {
+  if (layerModeActive.value) {
+    savedLayers.value = {
+      pieces: activeLayerPieces.value,
+      context: contextLayerPieces.value,
+      focus: activeFocusRect.value,
+    };
+  }
+});
+const layers = computed(() => layerModeActive.value || props.retainLayers ? savedLayers.value : null);
+const focusRect = computed(() => layers.value?.focus ?? null);
 
 // 音乐分区交互状态：hover / 键盘焦点 / 激活选中，任一即为“当前分区”。
 const hoveredZoneKey = ref(null);
@@ -60,6 +75,7 @@ const selectedZoneKey = ref(null);
 
 let fitMinScale = 0.01;
 let resizeObserver = null;
+let cameraFrame = 0;
 
 const worldStyle = computed(() => ({
   width: `${props.mapData.canvas.width}px`,
@@ -68,17 +84,21 @@ const worldStyle = computed(() => ({
   transformOrigin: '0 0',
 }));
 
-const currentLayerIds = computed(() => activeLayerPieces.value.map((entry) => entry.layerId));
+const currentLayerIds = computed(() => layers.value?.pieces.map((entry) => entry.layerId) ?? []);
 const layerArtworkReady = computed(() => currentLayerIds.value.length > 0
   && currentLayerIds.value.every((id) => loadedLayerIds.has(id)));
-const zoomCeiling = computed(() => Math.min(MAX_SCALE, ...activeLayerPieces.value.map(
+const layerArtworkFailed = computed(() => currentLayerIds.value.some(id => failedLayerIds.has(id)));
+watch([rasterReady, layerArtworkReady, layerArtworkFailed], ([ground, floor, failed]) => {
+  if (ground && (!layers.value || floor || failed)) emit('surface-ready');
+}, {flush: 'post'});
+const zoomCeiling = computed(() => Math.min(MAX_SCALE, ...(layers.value?.pieces ?? []).map(
   (entry) => entry.pixelDensity / deviceScale.value,
 )));
 const mapZones = computed(() => {
-  if (layerModeActive.value && !layerArtworkReady.value) {
+  if (layers.value && !layerArtworkReady.value) {
     return [];
   }
-  return musicView(props.bgm, props.mapName, currentLayerIds.value, layerModeActive.value);
+  return musicView(props.bgm, props.mapName, currentLayerIds.value, Boolean(layers.value), layers.value?.pieces);
 });
 const moonZoneAnchors = computed(() => {
   const anchors = new Map();
@@ -148,7 +168,8 @@ function emitView() {
   });
 }
 
-function applyTransform(next) {
+function applyTransform(next, animating = false) {
+  if (!animating) cancelAnimationFrame(cameraFrame);
   const clamped = clampTransform(next, viewport, props.mapData.canvas, fitMinScale,
     Math.max(fitMinScale, zoomCeiling.value));
   transform.scale = clamped.scale;
@@ -157,19 +178,36 @@ function applyTransform(next) {
   emitView();
 }
 
-function resetView() {
-  if (activeFocusRect.value) {
-    applyTransform(layerFocusTransform(viewport, activeFocusRect.value, fitMinScale,
-      zoomCeiling.value));
+function resetView(animate = false) {
+  if (focusRect.value) {
+    const next = layerFocusTransform(viewport, focusRect.value, fitMinScale, zoomCeiling.value);
+    if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      applyTransform(next);
+      return;
+    }
+    const from = {...transform};
+    const start = performance.now();
+    cancelAnimationFrame(cameraFrame);
+    const advance = (time) => {
+      const t = Math.min(1, (time - start) / 380);
+      const ease = t * t * (3 - 2 * t);
+      applyTransform({
+        scale: from.scale + (next.scale - from.scale) * ease,
+        tx: from.tx + (next.tx - from.tx) * ease,
+        ty: from.ty + (next.ty - from.ty) * ease,
+      }, true);
+      if (t < 1) cameraFrame = requestAnimationFrame(advance);
+    };
+    cameraFrame = requestAnimationFrame(advance);
     return;
   }
   const fit = fitTransform(viewport, props.mapData.canvas, 24);
   applyTransform(fit);
 }
 
-watch(activeFocusRect, (rect) => {
+watch(focusRect, (rect) => {
   if (!viewport.width || !viewport.height) return;
-  if (rect) resetView();
+  if (rect) resetView(true);
   else applyTransform(transform);
 });
 
@@ -194,6 +232,7 @@ function pinchInfo() {
 
 function onPointerDown(event) {
   if (event.button !== 0) return;
+  cancelAnimationFrame(cameraFrame);
   containerRef.value.focus({preventScroll: true});
   const point = pointFromEvent(event);
   pointers.set(event.pointerId, point);
@@ -430,6 +469,7 @@ function focusZone(key) {
 defineExpose({
   zoomIn: () => zoomCenter(1.5), zoomOut: () => zoomCenter(1 / 1.5),
   resetView, clearSelection, focusZone,
+  viewportRect: () => viewportWorldRect(transform, viewport),
 });
 
 onMounted(() => {
@@ -447,7 +487,7 @@ onMounted(() => {
     viewport.height = element.clientHeight;
     deviceScale.value = window.devicePixelRatio || 1;
     fitMinScale = minScale(viewport, props.mapData.canvas, 24);
-    if (wasFit && !activeFocusRect.value) {
+    if (wasFit && !focusRect.value) {
       resetView();
     } else {
       const scale = Math.min(Math.max(transform.scale, fitMinScale), zoomCeiling.value);
@@ -458,6 +498,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cancelAnimationFrame(cameraFrame);
   resizeObserver?.disconnect();
 });
 </script>
@@ -466,7 +507,7 @@ onBeforeUnmount(() => {
   <div
     ref="containerRef"
     class="map-surface"
-    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon, 'layer-mode': layerModeActive}"
+    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon, 'layer-mode': layers}"
     tabindex="0"
     role="application"
     aria-roledescription="提瓦特区域地图"
@@ -478,18 +519,19 @@ onBeforeUnmount(() => {
     @keydown="onKeydown"
     @contextmenu="onContextMenu"
   >
-    <TileCanvas :class="{ 'floor-context': layerModeActive }" :map-name="mapName"
+    <TileCanvas :class="{ 'floor-context': layers }" :map-name="mapName"
                 :pyramid="mapData.pyramid" :canvas="mapData.canvas" :sea-color="mapData.seaColor"
-                :viewport="viewport" :transform="transform" @canvas-frame="emit('canvas-frame', $event)" />
+                :viewport="viewport" :transform="transform" @canvas-frame="emit('canvas-frame', $event)"
+                @raster-ready="rasterReady = true" />
     <img v-if="isMoonCanon" :src="moonCanonPatch.url" class="moon-editor-patch"
-         :class="{'floor-context': layerModeActive}"
+         :class="{'floor-context': layers}"
          :style="rasterPosition(transform, moonCanonPatch.left, moonCanonPatch.top,
            moonCanonPatch.width, moonCanonPatch.height)"
          alt="" draggable="false" />
     <canvas v-if="isMoonCanon && moonSafety" ref="moonOverlay" class="moon-safety-overlay"
-            :class="{'floor-context': layerModeActive}" :style="worldStyle" aria-hidden="true" />
-    <LayerOverlay :pieces="activeLayerPieces" :context-pieces="contextLayerPieces" :transform="transform"
-                  @loaded="loadedLayerIds.add($event)" />
+            :class="{'floor-context': layers}" :style="worldStyle" aria-hidden="true" />
+    <LayerOverlay :pieces="layers?.pieces ?? []" :context-pieces="layers?.context ?? []" :transform="transform"
+                  @loaded="loadedLayerIds.add($event)" @failed="failedLayerIds.add($event)" />
     <div class="world" :style="worldStyle">
       <!-- 分区透明命中层：不可见；hover/单击/右键/键盘都发生在这层。 -->
       <svg
@@ -528,7 +570,7 @@ onBeforeUnmount(() => {
       :active-region="activeZoneRegion"
       :transform="transform"
       :smooth="smoothBoundaries"
-      :highlight-footprint="layerModeActive"
+      :highlight-footprint="Boolean(layers)"
     />
     <RegionTooltip
       v-if="!dragState.active && activeZone && activeZone.key !== selectedZoneKey &&
@@ -542,6 +584,7 @@ onBeforeUnmount(() => {
       :viewport="viewport"
     />
     <p v-if="moonSafetyError" class="floor-status" role="status">霜月遮罩无法加载</p>
+    <p v-else-if="layerArtworkFailed" class="floor-status" role="status">当前楼层底图加载失败</p>
     <p v-else-if="layerArtworkReady && bgm.status === 'ready' && !zones.length
       && (!isMoonCanon || moonSafety)" class="floor-status" role="status">
       本层音乐分区待核实
@@ -597,6 +640,14 @@ onBeforeUnmount(() => {
 
 .moon-surface .zone-hit:not([data-hovered]) {
   cursor: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile-layer,
+  .moon-editor-patch,
+  .moon-safety-overlay {
+    transition: filter 180ms ease;
+  }
 }
 
 .tile-layer.floor-context,

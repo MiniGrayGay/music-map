@@ -5,7 +5,7 @@ import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
 import {retireReliefDock} from '../reliefDockMotion.js';
 import {
-  cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, direction, dot, fullSpan,
+  atlasAngles, cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, direction, dot, fullSpan,
   projectAtlas, projectVisibleOutline, surfaceRay, viewAtlasPoints, viewportAngles, wrap,
 } from './projection.js';
 
@@ -516,6 +516,37 @@ export class Globe {
     };
   }
 
+  alignViewport(rect, canvas, animate, onSettled) {
+    if (!this.world || !this.radius || !rect?.width) return false;
+    const [lon, lat] = atlasAngles(this.world,
+      (rect.x + rect.width / 2) / canvas.width,
+      (rect.y + rect.height / 2) / canvas.height);
+    const zoom = Math.max(3.8, this.width * canvas.width * chartScale(this.world)[0]
+      / (rect.width * this.radius));
+    if (animate) this.flyTo(lon, lat, zoom, [.5, .5]);
+    else {
+      this.lon = lon;
+      this.lat = lat;
+      this.zoom = this.zoomTarget = zoom;
+      this.center = [.5, .5];
+      this.velocity = this.flight = null;
+      this.spinAfter = performance.now() + 3100;
+      this.requestFrame();
+    }
+    this.viewportAligned = onSettled;
+    this.handoffDeadline = !animate && onSettled ? performance.now() + 650 : 0;
+    return true;
+  }
+
+  cancelViewportAlignment() {
+    if (!this.viewportAligned) return;
+    this.viewportAligned = null;
+    if (this.flight) {
+      this.flight = null;
+      this.zoomTarget = this.zoom;
+    }
+  }
+
   flyTo(lon, lat, zoom, center = null, revealSelection = false) {
     this.hideReliefCard();
     this.reliefLeadStarted = null;
@@ -557,7 +588,7 @@ export class Globe {
     if (this.flight) this.zoomTarget = this.zoom;
     this.flight = null;
     this.spinAfter = performance.now() + 1700;
-    const next = clamp(this.zoomTarget * factor, MIN_ZOOM, MAX_ZOOM);
+    const next = clamp(this.zoomTarget * factor, MIN_ZOOM, Math.max(MAX_ZOOM, this.zoomTarget));
     if (anchor && factor > 1 && next > this.zoomTarget) {
       const x = (anchor[0] - this.cx) / (this.radius * this.zoom);
       const y = (this.cy - anchor[1]) / (this.radius * this.zoom);
@@ -721,6 +752,15 @@ export class Globe {
     this.drawSatellite(time, radius, orbit);
     const lockVisible = this.drawSignals(time, radius, basis, orbit);
     this.onView?.(this.zoomTarget < MAX_ZOOM, this.zoomTarget > MIN_ZOOM, this.magnified);
+    if (!this.flight && this.viewportAligned) {
+      const pending = this.handoffDeadline > time && !this.tiles.visibleSettled;
+      if (pending) this.requestFrame();
+      else {
+        const ready = this.viewportAligned;
+        this.viewportAligned = null;
+        ready();
+      }
+    }
     // 紧凑设备上播放中的锁定光环不再常驻脉冲（那会让静止画面持续整帧
     // 重绘）；选中后的入场脉冲与移动、标签动画保留。
     const pulse = lockVisible
@@ -738,7 +778,8 @@ export class Globe {
     const latest = this.pinchLatest;
     if (!this.pinch || !latest) return;
     this.pinchLatest = null;
-    const zoom = clamp(this.pinch.zoom * latest.distance / this.pinch.distance, MIN_ZOOM, MAX_ZOOM);
+    const zoom = clamp(this.pinch.zoom * latest.distance / this.pinch.distance,
+      MIN_ZOOM, Math.max(MAX_ZOOM, this.pinch.zoom));
     this.zoom = this.zoomTarget = zoom;
     if (this.pinch.anchored && this.world === this.pinch.world) {
       const x = (latest.center[0] - this.cx) / (this.radius * zoom);

@@ -2,6 +2,7 @@ import {markRaw} from 'vue';
 import {audioUrl, normalizeAudioBase} from './audioUrl.js';
 import {projectRings, ringsBBox, ringsPathData} from './zoneGeometry.js';
 import {normalizeGameStates, withVerifiedTrack} from './musicGraph.js';
+import {displayRegionName, geographicName} from './regionNames.js';
 import {verifiedTrackFor} from './verifiedTracks.js';
 
 export const BGM_STATUS = {
@@ -39,11 +40,10 @@ export async function loadRegionBgm(expectedClientVersion) {
     }
     markRaw(payload.musicGraph);
   }
-  // 位置参数顺序固定为 (rows, music, graph, origin, areaNames, prefix)：主世界
-  // origin 是 undefined（用 zoneGeometry 默认投影），绝不把 areaNames 传进
-  // origin 槽——那会让全部投影变 NaN。
-  const {items: zones, skipped} = normalizeView(payload.zones, payload.music, payload.musicGraph,
-    undefined, areaNameIndex(payload));
+  const {items: zones, skipped} = normalizeView(payload.zones, payload, {
+    sceneId: payload.sceneId,
+    areaNames: areaNameIndex(payload),
+  });
   if (zones.length === 0) return verifying(`清单无有效音乐分区（${skipped.length} 条被忽略）`);
   return {
     status: BGM_STATUS.READY,
@@ -62,12 +62,14 @@ function areaNameIndex(payload) {
   for (const row of payload.zones ?? []) {
     if (!row || typeof row.name !== 'string') continue;
     const areaId = typeof row.id === 'string' ? row.id.split(':')[0] : row.id;
-    if (areaId !== undefined && !names.has(String(areaId))) names.set(String(areaId), row.name);
+    const name = geographicName(displayRegionName(row, payload.clientVersion, payload.sceneId));
+    if (name && areaId !== undefined && !names.has(String(areaId))) names.set(String(areaId), name);
   }
   return names;
 }
 
-function normalizeView(rows, music, graph, origin, areaNames, prefix = '') {
+function normalizeView(rows, {music, musicGraph, clientVersion}, options) {
+  const {origin, prefix = ''} = options;
   // fail-closed：origin 只允许 undefined（默认投影）或二元数值数组，其他
   // 类型立即报错，防止参数错位静默产出 NaN 路径。
   if (origin !== undefined
@@ -79,40 +81,48 @@ function normalizeView(rows, music, graph, origin, areaNames, prefix = '') {
   const skipped = [];
   const keys = new Set();
   for (const [index, raw] of rows.entries()) {
-    const zone = normalizeZone(raw, index, keys, skipped, music, graph, origin, areaNames);
+    const zone = normalizeZone(raw, index, keys, skipped, music, musicGraph, clientVersion, options);
     if (zone) items.push({...zone, key: prefix + zone.key});
   }
   return {items, skipped};
 }
 
-export function musicView(bgm, mapName, layerIds, floorSelected) {
+export function musicView(bgm, mapName, layerIds, floorSelected, layerPieces = []) {
   if (bgm.status !== BGM_STATUS.READY) return [];
   const payload = bgm.payload;
   if (!payload) return mapName === 'Teyvat' ? bgm.zones : [];
   const map = payload.maps?.[mapName];
   if (!map && mapName !== 'Teyvat') return [];
   const origin = map?.origin;
+  const sceneId = map?.sceneId ?? payload.sceneId;
   const areaNames = areaNameIndex(payload);
   if (floorSelected) {
     const floorKeys = [...new Set(layerIds.map((id) => payload.layerFloor?.[id]).filter(Boolean))];
-    return floorKeys.flatMap((id) => normalizeView(payload.floorViews?.[id] ?? [],
-      payload.music, payload.musicGraph, origin, areaNames, `layer-${id}-`).items.map((zone) => {
-      // 仅在楼层 key 与区域 id 同时匹配核实关联行时，为该 zone 换上带核实
-      // 备用曲的 graph 包装；其余 zone 与非楼层视图保持原 graph。
-      const verified = verifiedTrackFor(id, typeof zone.id === 'number' ? zone.id : null);
-      return verified ? {...zone, graph: markRaw(withVerifiedTrack(zone.graph, verified))} : zone;
-    }));
+    return floorKeys.flatMap((id) => {
+      const names = new Set(layerPieces
+        .filter(({layerId}) => payload.layerFloor[layerId] === id)
+        .map(({name}) => geographicName(name)).filter(Boolean));
+      const floorName = names.size === 1 ? [...names][0] : null;
+      const {items} = normalizeView(payload.floorViews?.[id] ?? [], payload, {
+        origin, areaNames, sceneId, floorName, prefix: `layer-${id}-`,
+      });
+      return items.map((zone) => {
+        // 核实备用曲同时匹配楼层和区域 id。
+        const verified = verifiedTrackFor(id, typeof zone.id === 'number' ? zone.id : null);
+        return verified ? {...zone, graph: markRaw(withVerifiedTrack(zone.graph, verified))} : zone;
+      });
+    });
   }
   if (mapName === 'Teyvat') return bgm.zones;
-  return normalizeView(payload.scenes?.[map.sceneId] ?? [], payload.music, payload.musicGraph,
-    origin, areaNames).items;
+  return normalizeView(payload.scenes?.[sceneId] ?? [], payload, {origin, areaNames, sceneId}).items;
 }
 
 function verifying(reason) {
   return {status: BGM_STATUS.UNAVAILABLE, reason, zones: [], skipped: 0, clientVersion: null};
 }
 
-function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaNames) {
+function normalizeZone(raw, index, keys, skipped, music, graph, clientVersion,
+  {origin, areaNames, sceneId, floorName}) {
   const reject = (why) => {
     skipped.push(why);
     return null;
@@ -148,7 +158,7 @@ function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaName
   const zone = {
     key,
     id,
-    name: name.trim(),
+    name: displayRegionName(raw, clientVersion, sceneId, floorName),
     // 楼层分区可带 inheritedFrom（来源区域 areaId）；解析成来源分区名供 UI
     // 展示，缺失或对不上时为 null。
     inheritedFromName: raw.inheritedFrom !== undefined && raw.inheritedFrom !== null

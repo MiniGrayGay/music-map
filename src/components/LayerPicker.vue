@@ -1,26 +1,4 @@
 <script setup>
-// 分层选择器：工作室 LayeredMapControl 模型的移植——「分层/退出」模式开关
-// + 可搜索的分组选择 + 右侧楼层竖排按钮。选中组与楼层写入 layerSelection
-// 单例；每次定位目标变化 emit('focus', rect)，由集成方用
-// layerFocusTransform + MapSurface 平移缩放到贴片。清单未就绪时整体不渲染。
-//
-// 交互契约：
-//   - 搜索框为 combobox（aria-activedescendant）：输入即过滤全部目录
-//     （约 350 楼层量级必须可检索）；无输入时按视口近邻排序（需 viewportRect
-//     prop，缺省给全量），已选组恒置顶；
-//   - ↑/↓/Home/End 移动高亮，Enter 选中，Esc 关搜索面板并把焦点还给分组
-//     按钮；面板外点击 / Tab 离开同样关闭；
-//   - 楼层按钮显示 floorLabel（B1/1F），title 给楼层名；再点当前层不变化
-//     （回地面＝「退出」或 Esc 退出整个分层模式，保留上次组/层）；
-//   - 根节点阻断 pointerdown/wheel/按键冒泡，嵌在地图容器内不触发拖动、
-//     平移、缩放热路径；
-//   - 无标题装饰、无左侧色条；单楼层组同样显示（可进可出）。
-//
-// 集成（root）：放入全视口容器（如 .map-surface 或 .app 内），组件自定位
-// top:10px right:10px；楼层列 position:fixed 右缘垂直居中。
-//   <LayerPicker :app-canvas="mapData.canvas"
-//                :viewport-rect="viewportWorldRect(transform, viewport)"
-//                @focus="rect => surfaceRef.focusWorldRect(rect)" />
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import LiquidGlass from './LiquidGlass.vue';
 import {useAnchoredPanel} from './panelMotion.js';
@@ -37,6 +15,7 @@ const props = defineProps({
   viewportRect: {type: Object, default: null}, // {x,y,width,height} 世界像素
   readViewport: {type: Function, default: null},
   floorHost: {type: HTMLElement, default: null},
+  switching: {type: Boolean, default: false},
   expectedVersion: {type: String, default: DEFAULT_GAME_VERSION},
 });
 
@@ -51,19 +30,14 @@ const groupButtonRef = ref(null);
 const searchRef = ref(null);
 const listRef = ref(null);
 const floorButtonsRef = ref(null);
-const moreFloorsAbove = ref(false);
-const moreFloorsBelow = ref(false);
 const panelOpen = ref(false);
-let panelAnchor;
-const panelMotion = useAnchoredPanel(() => panelAnchor?.isConnected ? panelAnchor : modeButtonRef.value);
+const panelMotion = useAnchoredPanel(() => groupButtonRef.value ?? modeButtonRef.value);
 const query = ref('');
 const openedViewport = ref(null);
 const highlightIndex = ref(0);
 
 const ready = computed(() => state.status === 'ready' && state.groups.length > 0);
 const activeGroupId = computed(() => state.groups.length > 0 ? state.activeGroupId : null);
-const activeFloorSelector = '[aria-pressed="true"]';
-let keepFloorVisible = true;
 
 onMounted(() => {
   load({expectedGameVersion: props.expectedVersion, appCanvas: props.appCanvas});
@@ -126,7 +100,6 @@ function emitFocus() {
 function openPanel(focusSearch) {
   if (panelOpen.value) return;
   openedViewport.value = props.readViewport?.() ?? null;
-  panelAnchor = layerModeActive.value ? groupButtonRef.value : modeButtonRef.value;
   panelOpen.value = true;
   query.value = '';
   const chosen = visibleGroups.value.findIndex((group) => group.key === activeGroupId.value);
@@ -137,8 +110,7 @@ function openPanel(focusSearch) {
 function closePanel(restoreFocus) {
   if (!panelOpen.value) return;
   panelOpen.value = false;
-  const trigger = layerModeActive.value ? groupButtonRef.value : modeButtonRef.value;
-  if (restoreFocus) trigger?.focus({preventScroll: true});
+  if (restoreFocus) (groupButtonRef.value ?? modeButtonRef.value)?.focus({preventScroll: true});
 }
 
 function togglePanel(event) {
@@ -149,82 +121,52 @@ function togglePanel(event) {
 // ---- 选择 ----
 function revealActiveFloor() {
   const list = floorButtonsRef.value;
-  const viewport = list?.parentElement;
-  const selected = list?.querySelector(activeFloorSelector);
-  if (!viewport || !selected) return;
-
-  keepFloorVisible = true;
-  // 只调整楼层列表自身，避免 scrollIntoView 连带移动外层地图。
-  const {top: visibleTop, bottom: visibleBottom} = viewport.getBoundingClientRect();
-  const {top, bottom} = selected.getBoundingClientRect();
-  if (top < visibleTop) viewport.scrollTop += Math.floor(top - visibleTop);
-  else if (bottom > visibleBottom) viewport.scrollTop += Math.ceil(bottom - visibleBottom);
+  const selected = list?.querySelector('[aria-pressed="true"]');
+  if (!selected) return;
+  const bounds = list.getBoundingClientRect();
+  const {left, right} = selected.getBoundingClientRect();
+  if (left < bounds.left) list.scrollLeft += Math.floor(left - bounds.left);
+  else if (right > bounds.right) list.scrollLeft += Math.ceil(right - bounds.right);
 }
 
-watch(floorButtonsRef, (list, _, onCleanup) => {
-  const viewport = list?.parentElement;
-  if (!viewport) return;
-  let height = viewport.clientHeight;
-  const updateEdges = () => {
-    moreFloorsAbove.value = viewport.scrollTop > 1;
-    moreFloorsBelow.value = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop > 1;
-  };
-  const rememberVisibility = () => {
-    updateEdges();
-    if (viewport.clientHeight !== height || height === 0) return;
-    const floor = list.querySelector(activeFloorSelector)?.getBoundingClientRect();
-    const bounds = viewport.getBoundingClientRect();
-    if (floor) keepFloorVisible = floor.top >= bounds.top && floor.bottom <= bounds.bottom;
-  };
-  // 只在尺寸变化时维持本来可见的选中层，用户自由滚走的视图不改。
-  const observer = new ResizeObserver(() => {
-    const nextHeight = viewport.clientHeight;
-    if (nextHeight === 0) return;
-    updateEdges();
-    if (nextHeight === height) return;
-    height = nextHeight;
-    if (keepFloorVisible) revealActiveFloor();
-  });
-  observer.observe(viewport);
-  observer.observe(list);
-  updateEdges();
-  viewport.addEventListener('scroll', rememberVisibility, {passive: true});
-  onCleanup(() => {
-    observer.disconnect();
-    viewport.removeEventListener('scroll', rememberVisibility);
-  });
-}, {flush: 'post'});
-
 function chooseGroup(group) {
-  selectGroup(group.key);
+  if (props.switching) return;
   closePanel(true);
+  if (group.key === activeGroupId.value) return;
+  if (!layerModeActive.value && group.key === state.lastGroupKey) enterLayers();
+  else selectGroup(group.key);
   emitFocus();
   void nextTick(revealActiveFloor);
 }
 
 function chooseFloor(level) {
-  const changed = level !== state.activeFloorLevel;
+  if (props.switching || level === state.activeFloorLevel) return;
   selectFloor(level);
-  if (changed) emitFocus();
+  emitFocus();
   void nextTick(revealActiveFloor);
+}
+
+function returnToSurface() {
+  closePanel(false);
+  exitLayers();
+  void nextTick(() => modeButtonRef.value?.focus({preventScroll: true}));
 }
 
 function toggleMode(event) {
   if (layerModeActive.value) {
-    closePanel(false);
-    exitLayers();
+    returnToSurface();
     return;
   }
-  if (panelOpen.value) {
-    closePanel(true);
-    return;
+  if (props.switching) return;
+  if (!panelOpen.value) {
+    enterLayers();
+    if (activeGroup.value) {
+      emitFocus();
+      void nextTick(revealActiveFloor);
+      return;
+    }
   }
-  enterLayers();
-  if (!activeGroup.value) openPanel(event.pointerType !== 'touch');
-  else {
-    emitFocus();
-    void nextTick(revealActiveFloor);
-  }
+  togglePanel(event);
 }
 
 // ---- 键盘 ----
@@ -260,9 +202,9 @@ function onSearchKeydown(event) {
 
 function onRootKeydown(event) {
   event.stopPropagation(); // 组件内按键不外泄给地图（平移/缩放热路径）
-  if (event.key === 'Escape' && !panelOpen.value) {
+  if (event.key === 'Escape' && !panelOpen.value && layerModeActive.value) {
     event.preventDefault();
-    exitLayers(); // 回地面；再进分层恢复上次组/层
+    returnToSurface();
   }
 }
 
@@ -319,12 +261,10 @@ onBeforeUnmount(() => {
         ref="modeButtonRef"
         type="button"
         class="mode"
-        :class="{on: layerModeActive}"
-        :aria-haspopup="layerModeActive ? undefined : 'listbox'"
         :aria-expanded="layerModeActive ? undefined : panelOpen"
-        :aria-controls="!layerModeActive && panelOpen ? 'layer-group-panel' : undefined"
-        aria-label="切换分层地图"
-        :title="layerModeActive ? '退出分层地图（回地面）' : '进入分层地图'"
+        :aria-controls="layerModeActive ? undefined : 'layer-group-panel'"
+        :aria-label="layerModeActive ? '退出分层' : '切换分层地图'"
+        :aria-disabled="!layerModeActive && switching || undefined"
         @click="toggleMode"
       >
         <svg v-if="!layerModeActive" viewBox="0 0 24 24" class="layer-icon" aria-hidden="true">
@@ -333,21 +273,25 @@ onBeforeUnmount(() => {
                 stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         {{ layerModeActive ? '退出' : '分层' }}
+        <svg v-if="!layerModeActive" :class="{rotated: panelOpen}" viewBox="0 0 16 16" class="caret" aria-hidden="true">
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
       </button>
       <button
         v-if="layerModeActive"
         ref="groupButtonRef"
         type="button"
         class="group"
-        aria-haspopup="listbox"
-        :aria-expanded="panelOpen ? 'true' : 'false'"
-        :aria-controls="panelOpen ? 'layer-group-panel' : undefined"
         aria-label="分层区域"
-        :title="activeGroup?.label ?? '选择区域'"
-        @click="togglePanel"
+        :title="activeGroup?.label"
+        :aria-disabled="switching || undefined"
+        :aria-expanded="panelOpen"
+        aria-controls="layer-group-panel"
+        @click="!switching && togglePanel($event)"
       >
-        <span class="group-label">{{ activeGroup?.label ?? '选择区域' }}</span>
-        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+        <span class="group-label">{{ activeGroup?.label }}</span>
+        <svg :class="{rotated: panelOpen}" viewBox="0 0 16 16" class="caret" aria-hidden="true">
           <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"
                 stroke-linecap="round" stroke-linejoin="round" />
         </svg>
@@ -397,29 +341,32 @@ onBeforeUnmount(() => {
     </Transition>
 
     <Teleport :to="floorHost ?? 'body'" :disabled="!floorHost">
-      <div
-        v-if="layerModeActive && floorOptions.length > 0"
-        v-show="!panelOpen"
-        class="floors map-glass"
-        :class="{'more-floors-above': moreFloorsAbove, 'more-floors-below': moreFloorsBelow}"
-      >
-        <LiquidGlass />
-        <p v-if="floorOptions.length > 1" class="floor-count">共 {{ floorOptions.length }} 层</p>
-        <ScrollPane label="楼层列表滚动">
-          <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="分层楼层">
+      <Transition name="floor-tools">
+        <div
+          v-if="layerModeActive && floorOptions.length > 0"
+          v-show="!panelOpen"
+          class="floors map-glass"
+          :inert="panelOpen || !layerModeActive"
+          @pointerdown.stop
+          @wheel.stop
+          @keydown="onRootKeydown"
+        >
+          <LiquidGlass />
+          <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="地图楼层">
             <button
               v-for="floor in floorOptions"
               :key="floor.level"
               type="button"
               class="floor"
-              :class="{active: floor.level === state.activeFloorLevel}"
-              :aria-pressed="floor.level === state.activeFloorLevel ? 'true' : 'false'"
+              :aria-pressed="floor.level === state.activeFloorLevel"
+              :aria-disabled="switching || undefined"
               :title="activeGroup?.unnamed ? floor.label : floor.name ?? floor.label"
               @click="chooseFloor(floor.level)"
             >{{ floor.label }}</button>
           </div>
-        </ScrollPane>
-      </div>
+          <span v-if="floorOptions.length > 1" class="floor-count">共 {{ floorOptions.length }} 层</span>
+        </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -432,13 +379,13 @@ onBeforeUnmount(() => {
 .bar {
   display: flex;
   align-items: stretch;
-  gap: var(--space-1);
+  gap: 4px;
   padding: 5px;
   border-radius: 19px;
 }
 
-.mode {
-  flex: none;
+.mode,
+.group {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,9 +406,10 @@ onBeforeUnmount(() => {
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.mode:not(.on) {
-  min-width: 94px;
-  padding-inline: 14px;
+.mode {
+  flex: none;
+  min-width: 66px;
+  padding-inline: 12px;
   font-size: 16px;
   font-weight: 500;
 }
@@ -477,18 +425,11 @@ onBeforeUnmount(() => {
     border-radius: var(--radius-card);
   }
 
-  /* 窄窗隐藏图标后，两字标签（分层/退出）在 48px 宽里被 16px 内边距挤出：
-     收窄内边距并放宽最小宽度，保持 ≥48px 触控目标且文字完整居中。 */
-  .mode:not(.on) {
-    min-width: 56px;
-    padding-inline: 8px;
+  .mode,
+  .group {
+    padding-inline: 9px;
+    gap: 5px;
     font-size: 14px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .mode {
-    border-radius: inherit;
   }
 
   .layer-icon {
@@ -496,60 +437,47 @@ onBeforeUnmount(() => {
   }
 }
 
-.mode:hover {
+.mode:hover:not([aria-disabled="true"]),
+.group:hover:not([aria-disabled="true"]) {
   background: var(--control-hover);
 }
 
-.mode:active {
+.mode:active,
+.group:active {
   background-color: var(--control-active);
 }
 
-.mode.on {
-  background-image: var(--control-selected);
-  color: var(--text-primary);
-}
-
-.group {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-inline-size: 0;
-  max-width: min(250px, 42vw);
-  height: 44px;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background-color 120ms ease;
-}
-
-.group:hover {
-  background: var(--control-hover);
-}
-
-.group:active {
-  background: var(--control-active);
-}
-
-.group:focus-visible,
-.mode:focus-visible {
+.mode:focus-visible,
+.group:focus-visible {
   background-color: var(--control-focus);
 }
 
-.group-label {
+.group {
   min-width: 0;
-  max-width: 34vw;
+  max-width: min(180px, 36vw);
+  gap: 6px;
+  font-weight: 500;
+}
+
+.group-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.group svg {
+.caret {
   flex: none;
+  width: 14px;
+  height: 14px;
+  transition: transform 200ms ease;
+}
+
+.caret.rotated {
+  transform: rotate(180deg);
+}
+
+[aria-disabled="true"] {
+  cursor: default;
 }
 
 .panel {
@@ -635,76 +563,72 @@ onBeforeUnmount(() => {
 
 .floors {
   position: absolute;
-  top: 50%;
-  right: 10px;
-  transform: translateY(-50%);
-  --pane-limit: min(58vh, 466px);
+  top: var(--floor-tools-top, 83px);
+  inset-inline-start: var(--floor-tools-left, var(--map-inline-inset));
+  max-inline-size: min(360px, calc(100% - var(--floor-tools-left, var(--map-inline-inset)) - var(--floor-tools-right, 20px)));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  padding: 5px;
   border-radius: var(--radius-card);
-  overflow: hidden;
 }
 
-.floors > :not(.liquid-glass) {
-  animation: ui-fade-in 200ms ease-out;
+.floor-tools-enter-active,
+.floor-tools-leave-active {
+  transition: opacity 180ms ease, translate 180ms ease;
 }
 
-.floors .scroll-pane {
-  margin-inline: 3px;
-  padding-block-end: 8px;
+.floor-tools-enter-from,
+.floor-tools-leave-to {
+  opacity: 0;
+  translate: 0 -4px;
+}
+
+.floor-tools-leave-active {
+  pointer-events: none;
+}
+
+.floor-count {
+  flex: none;
+  padding-inline: 3px 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 20px;
 }
 
 .floor-buttons {
   display: flex;
-  flex-direction: column;
-  padding: var(--space-1);
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-focus) transparent;
 }
 
-.floor-count {
-  display: none;
+@media (pointer: coarse) {
+  .floor-buttons { scrollbar-width: none; }
 }
 
-@media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
-  .floors {
-    --floor-rail-limit: min(22dvh, 148px);
-    --pane-limit: var(--floor-rail-limit);
-    --floor-mask-start: #000;
-    --floor-mask-end: #000;
-  }
-
-  .floor-count {
-    display: block;
-    margin: 0;
-    line-height: 24px;
-    text-align: center;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-
-  .floors:has(.floor-count) .scroll-pane {
-    --pane-limit: max(44px, calc(var(--floor-rail-limit) - 24px));
-  }
-
-  .floors.more-floors-above {
-    --floor-mask-start: transparent;
-  }
-
-  .floors.more-floors-below {
-    --floor-mask-end: transparent;
-  }
-
-  .floors .scroll-pane {
-    mask-image: linear-gradient(to bottom, var(--floor-mask-start), #000 10px,
-      #000 calc(100% - 10px), var(--floor-mask-end));
+@media (prefers-reduced-motion: reduce) {
+  .floor-tools-enter-active,
+  .floor-tools-leave-active,
+  .caret {
+    transition: none;
   }
 }
 
 .floor {
   box-sizing: border-box;
-  width: 48px;
+  flex: none;
+  min-width: 44px;
   min-height: 44px;
   padding: 0 var(--space-1);
   border: 0;
   border-radius: var(--radius-control);
-  background: transparent;
+  background: var(--control-hover);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 550;
@@ -716,8 +640,8 @@ onBeforeUnmount(() => {
   transition: background-color 120ms ease, color 120ms ease;
 }
 
-.floor:hover {
-  background: var(--control-hover);
+.floor:hover:not([aria-disabled="true"]) {
+  background: var(--control-focus);
   color: var(--text-primary);
 }
 
@@ -729,13 +653,13 @@ onBeforeUnmount(() => {
   background: var(--control-focus);
 }
 
-.floor.active {
+.floor[aria-pressed="true"] {
   background-image: var(--control-selected);
   color: var(--text-primary);
   font-weight: 600;
 }
 
-.floor.active:focus-visible {
+.floor[aria-pressed="true"]:focus-visible {
   background-color: var(--control-focus);
 }
 </style>

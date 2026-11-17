@@ -94,13 +94,21 @@ function expectedZoneTracks(manifest, stateName, mode) {
 }
 
 async function openFloorGroup(page, name) {
-  await page.click('button[aria-label="切换分层地图"]');
+  const groupSelector = 'button[aria-label="分层区域"]';
   const searchSelector = '#layer-group-panel[data-panel-open] input[aria-label="搜索分层区域"]';
-  await page.waitForFunction((selector) => document.querySelector(selector)
-    || document.querySelector('.layer-piece'), {}, searchSelector);
-  if (await page.evaluate((name) => document.querySelector('button[aria-label="分层区域"]')
-    ?.title.includes(name), name)) return;
-  if (!await page.$(searchSelector)) await page.click('button[aria-label="分层区域"]');
+  if (!await page.$(groupSelector)) {
+    const entry = 'button[aria-label="切换分层地图"]:not([aria-disabled="true"])';
+    await page.waitForSelector(entry, {visible: true});
+    await page.click(entry);
+    await page.waitForFunction((search, group) => document.querySelector(search)
+      || document.querySelector(group), {}, searchSelector, groupSelector);
+  }
+  if (await page.$(groupSelector)) {
+    if (await page.$eval(groupSelector, (node, label) => node.title.includes(label), name)) return;
+    await page.waitForSelector(groupSelector + ':not([aria-disabled="true"])');
+    await page.click(groupSelector);
+  }
+  await page.waitForSelector(searchSelector, {visible: true});
   await page.type(searchSelector, name);
   // 键盘流验证：回车必须选中可见的匹配项，而不是置顶的旧已选组。
   await page.waitForFunction((name) => document.querySelector('#layer-group-panel[data-panel-open] [role="option"]')
@@ -484,7 +492,8 @@ async function main() {
     await globe.waitForSelector('#layer-group-list [role="option"]', {visible: true});
     await globe.click('#layer-group-list [role="option"]');
     await globe.waitForSelector('.layer-piece');
-    await globe.click(layerButton);
+    await globe.click('button[aria-label="退出分层"]');
+    await globe.waitForSelector('.map-surface', {hidden: true});
     await globe.waitForSelector('.globe-labels .place');
     check(await globe.$('.layer-piece') === null, '退出分层回到球面');
   } finally {
@@ -1136,7 +1145,7 @@ async function main() {
   await page.screenshot({path: path.join(shotDir, '13-cave-independent.png')});
   check(await page.$eval('button.reset', (b) => b.getAttribute('aria-label')) === '复位到当前楼层',
     '分层模式复位按钮名称与真实行为一致（当前楼层）');
-  await page.click('button[aria-label="切换分层地图"]');
+  await page.click('button[aria-label="退出分层"]');
   await page.waitForSelector('.music-player', {hidden: true});
   check(await panelClosed(page, '.music-player'), '回到地表清理楼层播放选择');
   check(await page.$eval('button.reset', (b) => b.getAttribute('aria-label')) === '复位到全图',
@@ -1160,7 +1169,7 @@ async function main() {
   check(await panelClosed(page, '#layer-group-panel'), 'Escape 关闭分组搜索面板');
   check(await page.$eval('button[aria-label="分层区域"]', (b) => document.activeElement === b),
     '分组面板关闭后焦点回到分组按钮');
-  await page.click('button[aria-label="切换分层地图"]');
+  await page.click('button[aria-label="退出分层"]');
 
   await openMeropide(page);
   // 目标分区与期望曲单同源（graph 解析含昼夜补偿）：保证右键命中的分区
@@ -1226,7 +1235,7 @@ async function main() {
     check(true, '切到战斗时播放对应的战斗音轨');
     check(await collapsePlayerDetails(page), 'Escape 收起楼层试听选项并恢复入口焦点');
   }
-  await page.click('button[aria-label="切换分层地图"]');
+  await page.click('button[aria-label="退出分层"]');
   await page.waitForFunction(() => !document.querySelector('.layer-piece, path[data-zone-key^="layer-"], .music-player'));
   check(await page.$('path[aria-label*="梅洛彼得堡"]') === null, '返回地表后无梅洛彼得堡楼层区边线或命中');
   await page.click('button[aria-label="复位到全图"]');
@@ -1318,7 +1327,7 @@ async function main() {
   // 390px：播放器与条件抽屉、下拉弹层完整落在视口内，Escape 分层关闭。
   const narrowPlayerBox = await page.$eval('.music-player', (node) => {
     const rect = node.getBoundingClientRect();
-    const mapControls = document.querySelectorAll('.zoom-controls, .layer-picker .floors');
+    const mapControls = document.querySelectorAll('.zoom-controls, .floors');
     const overlapsControls = [...mapControls].some((control) => {
       const bounds = control.getBoundingClientRect();
       return rect.left < bounds.right && rect.right > bounds.left

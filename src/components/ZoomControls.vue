@@ -1,5 +1,5 @@
 <script setup>
-// 地图控制：放大 / 缩小 / 复位 / 平滑边线。+/− 成对一格，复位
+// 地图控制：放大 / 缩小 / 复位。+/− 成对一格，复位
 // 独立一格；命中区 44×44 满足触屏最低标准。复位按钮的名称跟随真实行为：
 // 地表模式复位到全图，分层模式复位到当前楼层的贴片范围。
 import {computed, ref} from 'vue';
@@ -12,7 +12,6 @@ const props = defineProps({
   globeMode: {type: Boolean, default: false},
   resetLabel: {type: String, default: ''},
 });
-const smoothBoundaries = defineModel('smoothBoundaries', {type: Boolean, required: true});
 const emit = defineEmits(['zoom-in', 'zoom-out', 'reset']);
 const resetLabel = computed(() => props.resetLabel
   || (props.globeMode ? '复位星球' : props.layerMode ? '复位到当前楼层' : '复位到全图'));
@@ -45,21 +44,6 @@ function reactToControl(event) {
         <path d="M2.5 5.5v-3h3M13.5 5.5v-3h-3M2.5 10.5v3h3M13.5 10.5v3h-3"
               fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
               stroke-linejoin="round" />
-      </svg>
-    </button>
-    <button
-      v-if="!globeMode"
-      type="button"
-      class="smoothing"
-      aria-label="平滑边线"
-      :aria-pressed="smoothBoundaries"
-      :title="smoothBoundaries ? '关闭边线平滑' : '开启边线平滑'"
-      @click="smoothBoundaries = !smoothBoundaries"
-    >
-      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-        <path :d="smoothBoundaries ? 'M2 12h2a4 4 0 0 0 4-4 4 4 0 0 1 4-4h2' : 'M2 12h6V4h6'"
-              fill="none" stroke="currentColor" stroke-width="1.6"
-              stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </button>
   </div>
@@ -137,14 +121,6 @@ button:active:not(:disabled) {
 }
 
 button:focus-visible {
-  background: var(--control-focus);
-}
-
-.smoothing[aria-pressed='true'] {
-  background-image: var(--control-selected);
-}
-
-.smoothing:focus-visible {
   background: var(--control-focus);
 }
 

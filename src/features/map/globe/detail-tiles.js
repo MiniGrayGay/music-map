@@ -202,6 +202,10 @@ export class DetailTiles {
     if (gl.getError() !== gl.NO_ERROR) throw new Error('Cannot upload complete tile mip chain');
   }
 
+  get visibleSettled() {
+    return [...this.visible.keys()].every(key => this.slots.has(key) || this.failed.has(key));
+  }
+
   get drawSize() {
     return this.lookupReady ? this.size : EMPTY_SIZE;
   }

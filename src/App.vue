@@ -2,7 +2,7 @@
 // 应用组合层：装载地图数据与音乐分区清单，组织地图主画面、缩放控件与分区
 // 音乐播放器。清单缺失/契约不符时保持空态（只有地图本身）；播放器只绑定
 // 真实清单里的分区，页面不展示任何假设的音乐层。
-import {computed, defineAsyncComponent, onBeforeUnmount, onMounted, reactive, ref, watch} from 'vue';
+import {computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} from 'vue';
 import LayerPicker from './components/LayerPicker.vue';
 import LiquidGlass from './components/LiquidGlass.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
@@ -42,7 +42,9 @@ const bgm = reactive({
 const activeZone = ref(null); // 播放器当前绑定的音乐分区（真实清单条目）
 const presentedZone = ref(null);
 const view = reactive({canZoomIn: true, canZoomOut: true});
-const surfaceRef = ref(null);
+const globeSurface = ref(null);
+const planeSurface = ref(null);
+const planeStage = ref(null);
 const mapToolbar = ref(null);
 const playerRef = ref(null);
 const playerMotion = useAnchoredPanel(
@@ -52,6 +54,92 @@ const playerMotion = useAnchoredPanel(
 const globeError = ref('');
 const mobileDevice = isMobileDevice();
 const showGlobe = computed(() => !layerModeActive.value && !globeError.value);
+const presentedGlobe = ref(true);
+const mapHandoff = shallowRef(null);
+const surfaceRef = computed(() => showGlobe.value ? globeSurface.value : planeSurface.value);
+const keepGlobe = computed(() => !globeError.value && (showGlobe.value || presentedGlobe.value || !!mapHandoff.value));
+const keepPlane = computed(() => !showGlobe.value || !presentedGlobe.value || !!mapHandoff.value);
+let surfaceFade;
+
+function finishHandoff(plan) {
+  if (mapHandoff.value !== plan) return;
+  presentedGlobe.value = plan.toGlobe;
+  mapHandoff.value = null;
+  surfaceFade = null;
+}
+
+function blendSurfaces(plan, from = presentedGlobe.value ? 0 : 1) {
+  if (mapHandoff.value !== plan || plan.blending) return;
+  if (!planeStage.value || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    finishHandoff(plan);
+    return;
+  }
+  plan.blending = true;
+  const to = plan.toGlobe ? 0 : 1;
+  const fade = surfaceFade = {element: planeStage.value, opacity: from, frame: 0};
+  fade.element.style.opacity = from;
+  let elapsed = 0;
+  let last = performance.now();
+  const advance = (now) => {
+    if (surfaceFade !== fade) return;
+    // A slow tile upload must not skip directly from one map to the other.
+    elapsed += Math.min(48, Math.max(0, now - last));
+    last = now;
+    const progress = Math.min(1, elapsed / 280);
+    const eased = progress * progress * (3 - 2 * progress);
+    fade.opacity = from + (to - from) * eased;
+    fade.element.style.opacity = fade.opacity;
+    if (progress < 1) fade.frame = requestAnimationFrame(advance);
+    else finishHandoff(plan);
+  };
+  fade.frame = requestAnimationFrame(advance);
+}
+
+watch(showGlobe, (toGlobe) => {
+  const opacity = surfaceFade?.opacity ?? null;
+  if (surfaceFade) cancelAnimationFrame(surfaceFade.frame);
+  surfaceFade = null;
+  if (globeError.value || (toGlobe === presentedGlobe.value && opacity === null)) {
+    globeSurface.value?.cancelViewportAlignment();
+    presentedGlobe.value = toGlobe;
+    mapHandoff.value = null;
+    return;
+  }
+  const sameMap = planeSurface.value?.$props.mapName === mapName.value;
+  const plan = {toGlobe, viewport: toGlobe && sameMap ? planeSurface.value.viewportRect() : null};
+  mapHandoff.value = plan;
+  if (opacity !== null) blendSurfaces(plan, opacity);
+}, {flush: 'sync'});
+onBeforeUnmount(() => { if (surfaceFade) cancelAnimationFrame(surfaceFade.frame); });
+
+function maybeEnterLayer(plan) {
+  if (plan.cameraReady && plan.rasterReady) blendSurfaces(plan);
+}
+
+function onPlaneView(state) {
+  if (!showGlobe.value) Object.assign(view, state);
+  const plan = mapHandoff.value;
+  if (!plan || plan.toGlobe || plan.cameraMoving || !state.viewportRect?.width) return;
+  plan.cameraMoving = true;
+  const aligned = () => {
+    plan.cameraReady = true;
+    maybeEnterLayer(plan);
+  };
+  if (!globeSurface.value?.alignViewport(state.viewportRect, aligned)) aligned();
+}
+
+function onPlaneReady() {
+  const plan = mapHandoff.value;
+  if (!plan || plan.toGlobe) return;
+  plan.rasterReady = true;
+  maybeEnterLayer(plan);
+}
+
+function onGlobeFrame(canvas) {
+  if (showGlobe.value) receiveBackdrop(canvas);
+  const plan = mapHandoff.value;
+  if (plan?.toGlobe && !plan.viewport) blendSurfaces(plan);
+}
 const lunarResetLabel = computed(() => {
   if (!showGlobe.value || mapName.value !== 'MoonCanon') return '';
   return view.globeMap === 'MoonCanon' && view.magnified ? '复位到霜月全览' : '返回全局预览';
@@ -134,20 +222,7 @@ onBeforeUnmount(() => {
   screen.orientation?.removeEventListener?.('change', updateReliefViewport);
   removeEventListener('resize', updateReliefViewport);
 });
-const smoothingKey = 'teyvat-region-map.smooth-boundaries';
-const smoothBoundaries = ref(true);
-try {
-  smoothBoundaries.value = localStorage.getItem(smoothingKey) !== 'off';
-} catch {
-  // The setting is still available for this page when storage is disabled.
-}
-watch(smoothBoundaries, (enabled) => {
-  try {
-    localStorage.setItem(smoothingKey, enabled ? 'on' : 'off');
-  } catch {
-    // Keep the setting for this page even when it cannot be persisted.
-  }
-});
+const smoothBoundaries = true;
 let currentBackdrop;
 watch(layerModeActive, () => {
   activeZone.value = null;
@@ -250,53 +325,59 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 <template>
   <div ref="appRoot" class="app" :class="{'app--mobile': mobileDevice}">
     <template v-if="mapData">
-      <div class="app-controls" :class="{'app-controls--globe': showGlobe}">
+      <div v-if="!mobileDevice" class="app-controls" :inert="!!mapHandoff">
         <ZoomControls
           :can-zoom-in="view.canZoomIn"
           :can-zoom-out="view.canZoomOut"
           :layer-mode="layerModeActive"
           :globe-mode="showGlobe"
           :reset-label="lunarResetLabel"
-          v-model:smooth-boundaries="smoothBoundaries"
           @zoom-in="surfaceRef?.zoomIn()"
           @zoom-out="surfaceRef?.zoomOut()"
           @reset="surfaceRef?.resetView()"
         />
       </div>
-      <MapSurface
-        v-if="!showGlobe"
-        :key="mapName"
-        ref="surfaceRef"
-        :map-data="activeMap"
-        :map-name="mapName"
-        :bgm="bgm"
-        :smooth-boundaries="smoothBoundaries"
-        @canvas-frame="receiveBackdrop"
-        @view="(state) => Object.assign(view, state)"
-        @zone-activate="activeZone = $event"
-        @blank-tap="activeZone = null"
-      />
-      <GlobeSurface
-        v-else
-        ref="surfaceRef"
-        :map-data="activeMap"
-        :map-name="mapName"
-        :bgm="bgm"
-        :active-zone="activeZone"
-        :available-maps="mapOptions"
-        :search-host="mapToolbar"
-        :relief-target="reliefDock"
-        :relief-aspect="reliefAspect"
-        :mobile-device="mobileDevice"
-        :smooth-boundaries="smoothBoundaries"
-        @canvas-frame="receiveBackdrop"
-        @view="(state) => Object.assign(view, state)"
-        @zone-activate="activeZone = $event"
-        @zone-focus="focusRelief"
-        @relief-reveal="revealRelief"
-        @select-map="selectMap"
-        @unavailable="globeError = $event"
-      />
+      <div v-if="keepGlobe" class="map-stage" :inert="!!mapHandoff || !showGlobe">
+        <GlobeSurface
+          ref="globeSurface"
+          :map-data="activeMap"
+          :map-name="mapName"
+          :bgm="bgm"
+          :active-zone="activeZone"
+          :available-maps="mapOptions"
+          :search-host="showGlobe ? mapToolbar : null"
+          :initial-viewport="mapHandoff?.toGlobe ? mapHandoff.viewport : null"
+          :relief-target="reliefDock"
+          :relief-aspect="reliefAspect"
+          :mobile-device="mobileDevice"
+          :smooth-boundaries="smoothBoundaries"
+          @canvas-frame="onGlobeFrame"
+          @handoff-ready="mapHandoff?.toGlobe && blendSurfaces(mapHandoff)"
+          @view="(state) => { if (showGlobe) Object.assign(view, state) }"
+          @zone-activate="activeZone = $event"
+          @zone-focus="focusRelief"
+          @relief-reveal="revealRelief"
+          @select-map="selectMap"
+          @unavailable="globeError = $event"
+        />
+      </div>
+      <div v-if="keepPlane" ref="planeStage" class="map-stage" :style="{opacity: presentedGlobe ? 0 : 1}"
+           :inert="!!mapHandoff || showGlobe">
+        <MapSurface
+          :key="mapName"
+          ref="planeSurface"
+          :map-data="activeMap"
+          :map-name="mapName"
+          :bgm="bgm"
+          :retain-layers="!!mapHandoff?.toGlobe"
+          :smooth-boundaries="smoothBoundaries"
+          @canvas-frame="(canvas) => { if (!showGlobe) receiveBackdrop(canvas) }"
+          @surface-ready="onPlaneReady"
+          @view="onPlaneView"
+          @zone-activate="activeZone = $event"
+          @blank-tap="activeZone = null"
+        />
+      </div>
       <div v-if="globeError" class="music-unavailable" role="status">{{ globeError }}</div>
       <div v-if="showRelief && reliefPackStatus" class="music-unavailable relief-loading">
         <span role="status">{{ reliefPackLabels[reliefPackStatus.stage] }}</span>
@@ -342,7 +423,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           <LayerPicker :app-canvas="activeMap.canvas"
                        :viewport-rect="showGlobe ? null : view.viewportRect"
                        :read-viewport="showGlobe ? surfaceRef?.viewportRect : null"
-                       :floor-host="appRoot" />
+                       :floor-host="appRoot"
+                       :switching="!!mapHandoff" />
         </div>
       </div>
       <ToyFollowPrompt v-if="followCardPreview" :author="followCardPreview"
@@ -449,6 +531,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   height: 100%;
 }
 
+.map-stage { position: absolute; inset: 0; }
+
 .app-controls {
   position: absolute;
   left: 24px;
@@ -465,16 +549,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   visibility: hidden;
 }
 
-@media (min-width: 701px) and (pointer: fine), (min-width: 701px) and (min-height: 501px) {
-  .app :deep(.floors) {
-    top: 92px;
-    right: auto;
-    left: 18px;
-    transform: none;
-    --pane-limit: min(440px, calc(100dvh - 270px));
-  }
-}
-
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
   .app {
     /* 移动端控件共享外边距、命中尺寸与行距。 */
@@ -486,7 +560,9 @@ onBeforeUnmount(() => releasePlayerEscape?.());
     --mobile-row-gap: var(--space-1);
     --mobile-tools-top: calc(var(--mobile-top) + var(--mobile-control-size)
       + var(--mobile-row-gap));
-    --mobile-floor-limit: min(22dvh, 148px);
+    --floor-tools-top: var(--mobile-tools-top);
+    --floor-tools-left: var(--mobile-left);
+    --floor-tools-right: var(--mobile-right);
     --player-top-clearance: calc(var(--mobile-tools-top) + var(--mobile-control-size)
       + var(--mobile-row-gap));
   }
@@ -523,11 +599,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
     padding: 0;
   }
 
-  .app :deep(.layer-picker .mode),
-  .app :deep(.layer-picker .group) {
-    padding-inline: 8px;
-  }
-
   /* 左侧模式控件与搜索框共用同源 44px 命中区。 */
   .app :deep(.layer-picker .mode) {
     height: var(--mobile-control-size);
@@ -539,15 +610,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   }
 
   .app:has(.floor-buttons) {
-    --player-top-clearance: calc(var(--mobile-tools-top) + var(--mobile-floor-limit) + 8px);
-  }
-
-  .app :deep(.floors) {
-    top: var(--mobile-tools-top);
-    right: var(--mobile-right);
-    left: auto;
-    transform: none;
-    --floor-rail-limit: var(--mobile-floor-limit);
+    --player-top-clearance: calc(var(--mobile-tools-top) + var(--mobile-control-size) + 16px);
   }
 
   .music-unavailable {
@@ -558,29 +621,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 }
 
 @media (min-width: 701px) and (max-height: 490px) and (pointer: fine) {
-  .app :deep(.floors) {
-    top: 84px;
-    transform: none;
-    --pane-limit: max(44px, calc(100dvh - 272px));
-  }
-
   .app :deep(.layer-picker .group-scroll) {
     --pane-limit: max(44px, calc(100dvh - 310px));
-  }
-}
-
-@media (min-width: 520px) and (orientation: landscape) and (pointer: coarse) and (max-height: 500px) {
-  .app,
-  .app:has(.floor-buttons) {
-    --player-top-clearance: var(--mobile-tools-top);
-  }
-
-  .app :deep(.floors) {
-    top: calc(var(--mobile-tools-top) + 52px);
-    right: auto;
-    left: var(--mobile-left);
-    --floor-rail-limit: max(68px, calc(100dvh - var(--mobile-tools-top) - 68px
-      - env(safe-area-inset-bottom)));
   }
 }
 
@@ -645,10 +687,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
     min-height: var(--mobile-control-size);
     font-size: 14px;
   }
-}
-
-.app--mobile .app-controls--globe {
-  display: none;
 }
 
 .app-message {
