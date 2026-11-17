@@ -8,6 +8,7 @@ import {computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} 
 
 import RegionTooltip from '../../components/RegionTooltip.vue';
 import {musicView} from '../bgm/bgmStatus.js';
+import {dayNightChoices, resolveRegionalPlaylist} from '../bgm/regionalPlaylist.js';
 import LayerOverlay from '../layers/LayerOverlay.vue';
 import {
   activeFocusRect,
@@ -130,8 +131,12 @@ const activeZoneRegion = computed(() => {
   return {id1: zone.key, rings: zone.pixelRings, lines: zone.pixelLines, path: zone.pathData};
 });
 
+const playableZones = new WeakMap();
 function zonePlayable(zone) {
-  return Object.values(zone.playlists).some((branches) => branches.some((branch) => branch.tracks.length));
+  if (!playableZones.has(zone)) {
+    playableZones.set(zone, dayNightChoices.some(({key}) => resolveRegionalPlaylist(zone, key).tracks.length > 0));
+  }
+  return playableZones.get(zone);
 }
 
 function emitView() {
@@ -506,7 +511,7 @@ onBeforeUnmount(() => {
           role="button"
           :aria-label="zonePlayable(zone)
             ? `音乐分区 ${zone.name}，单击或回车试听`
-            : `音乐分区 ${zone.name}，音轨核对中`"
+            : `音乐分区 ${zone.name}，暂无曲目`"
           @pointerenter="onZoneEnter(zone, $event)"
           @pointerleave="onZoneLeave"
           @focus="onZoneFocus(zone, $event)"
@@ -530,7 +535,7 @@ onBeforeUnmount(() => {
       :key="activeZone.key"
       :label="activeZone.name"
       :id1="activeZone.key"
-      :bgm-state="zonePlayable(activeZone) ? null : '音轨核对中'"
+      :bgm-state="zonePlayable(activeZone) ? null : '暂无曲目'"
       :x="tooltipPoint.x"
       :y="tooltipPoint.y"
       :viewport="viewport"

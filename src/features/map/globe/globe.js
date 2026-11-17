@@ -188,10 +188,10 @@ export class Globe {
       this.requestFrame();
     };
     this.tiles = new DetailTiles(this.gl, this.detail, invalidate, {
-      compact: this.compact, capacity: this.compact ? 14 : 30, concurrency: this.compact ? 3 : 5,
+      compact: this.compact, capacity: this.compact ? 20 : 30, concurrency: this.compact ? 3 : 5,
     });
     this.nativeTiles = new DetailTiles(this.gl, this.nativeDetail, invalidate, {
-      compact: this.compact, capacity: this.compact ? 8 : 16, concurrency: this.compact ? 2 : 4, native: true,
+      compact: this.compact, capacity: this.compact ? 12 : 16, concurrency: this.compact ? 2 : 4, native: true,
     });
     this.orbitStarted = performance.now();
     try {
@@ -370,7 +370,7 @@ export class Globe {
 
   resize() {
     const {width, height} = this.canvas.getBoundingClientRect();
-    const ratio = Math.min(devicePixelRatio, this.compact ? 1.15 : 1.45);
+    const ratio = Math.min(devicePixelRatio, this.compact ? 1.3 : 1.45);
     this.width = width;
     this.height = height;
     this.ratio = ratio;
@@ -545,10 +545,13 @@ export class Globe {
     const detailFocusChanged = this.lastTileFocus !== focused;
     this.cameraMoving = moving;
     // Only the moving WebGL raster is sampled at a lower resolution.
+    // 紧凑设备拖动期保持更低的采样率换帧率；静止后回到完整 ratio。
     const rasterRatio = moving ? ratio * (this.compact ? .62 : .72) : ratio;
     const pose = [this.lon, this.lat, radius, cx, cy, this.points, rasterRatio];
     const changed = !this.sphereState || pose.some((value, index) => value !== this.sphereState[index]);
-    const tileInterval = this.flight ? 200 : 110;
+    // 拖动中密集重算可见瓦片会不断中止在途请求（弱网浪费且打断解码），
+    // 紧凑设备在移动期间放宽到飞行航拍的同一节奏，静止后照常补齐。
+    const tileInterval = this.flight || (this.compact && moving) ? 200 : 110;
     if (worldChanged || settled || detailFocusChanged || (changed && time - (this.tileUpdateAt ?? -Infinity) >= tileInterval)) {
       const detailView = {cx, cy, width, height, radius, ratio, basis, focused, zoom: this.zoom, lon: this.lon, lat: this.lat};
       this.tiles.update(this.world, detailView);
@@ -579,8 +582,11 @@ export class Globe {
     this.drawSatellite(time, radius, orbit);
     const lockVisible = this.drawSignals(time, radius, basis, orbit);
     this.onView?.(this.zoomTarget < MAX_ZOOM, this.zoomTarget > MIN_ZOOM, this.magnified);
+    // 紧凑设备上播放中的锁定光环不再常驻脉冲（那会让静止画面持续整帧
+    // 重绘）；选中后的入场脉冲与移动、标签动画保留。
     const pulse = lockVisible
-      && (this.playing || time - this.lockTime < 1750) && !this.reducedMotion.matches;
+      && (this.compact ? time - this.lockTime < 1750 : (this.playing || time - this.lockTime < 1750))
+      && !this.reducedMotion.matches;
     if (this.flight || this.velocity || this.zoom !== this.zoomTarget || this.points !== this.styleTarget || pulse
       || (this.selected && this.raiseStarted != null && this.raise < 1)
       || autoSpin || (orbit && !this.reducedMotion.matches)) {

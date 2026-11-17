@@ -25,7 +25,7 @@
 //   - noImageLayers（当前客户端无贴图的层）保留计数，不进可选楼层；
 //   - 单一地下层的组同样有效（可回地面＝退出分层），不做过滤。
 
-export const LAYER_MANIFEST_URL = '/layers/manifest.json';
+export const LAYER_MANIFEST_URL = './layers/manifest.json';
 export const LAYER_CATALOG_STATUS = {
   ABSENT: 'absent', // 清单未就绪：不渲染选择器与叠绘
   READY: 'ready',

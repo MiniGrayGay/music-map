@@ -9,7 +9,7 @@ export const mapLabels = {
 export async function loadLayerBases(mainMap) {
   let response;
   try {
-    response = await fetch('/layers/basemaps.json');
+    response = await fetch('./layers/basemaps.json');
     if (!response.ok) return {};
     const {format, version, maps} = await response.json();
     if (format !== 'teyvat-layer-bases-v2' || version !== mainMap.dataVersion) return {};

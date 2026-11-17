@@ -50,7 +50,7 @@ async function fetchTile(key) {
     const native = props.pyramid.native;
     const version = (native && key.startsWith(`${native.level}/`)
       ? native.sourceIdentity : props.pyramid.sourceIdentity).slice(0, 12);
-    const response = await fetch(`/tiles/${props.mapName}/${key}.webp?v=${version}`, {
+    const response = await fetch(`./tiles/${props.mapName}/${key}.webp?v=${version}`, {
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

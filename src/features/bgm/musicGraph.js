@@ -149,7 +149,7 @@ function evaluate(graph, location, mode, overrides, discover) {
           id: preview.id,
           name: preview.name,
           duration: preview.duration,
-          url: audioUrl(preview.id, ''),
+          url: audioUrl(preview.id, graph.supplementAudioBaseUrl ?? ''),
           scope: local ? 'zone' : 'fallback',
           arrangement,
         });
@@ -266,7 +266,7 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
           name: verified.name,
           duration: verified.duration,
           // 已核实兜底曲随静态站点整组导出，必须用同站绝对路径而非外部音频基址。
-          url: audioUrl(verified.id, ''),
+          url: audioUrl(verified.id, graph.supplementAudioBaseUrl ?? ''),
           scope: 'zone',
         }],
         // 通配 fallback 的条件（如昼夜）对核实曲目无效，不展示。

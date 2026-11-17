@@ -14,5 +14,5 @@ const configuredBase = normalizeAudioBase(import.meta.env?.VITE_AUDIO_BASE_URL?.
 
 export function audioUrl(id, audioBase = configuredBase) {
   const file = `${id}.opus`;
-  return audioBase ? new URL(file, audioBase).href : `/region-bgm-audio/${file}`;
+  return audioBase ? new URL(file, audioBase).href : `./region-bgm-audio/${file}`;
 }

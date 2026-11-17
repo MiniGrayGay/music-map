@@ -471,10 +471,14 @@ onBeforeUnmount(() => {
     border-radius: var(--radius-card);
   }
 
+  /* 窄窗隐藏图标后，两字标签（分层/退出）在 48px 宽里被 16px 内边距挤出：
+     收窄内边距并放宽最小宽度，保持 ≥48px 触控目标且文字完整居中。 */
   .mode:not(.on) {
-    min-width: 48px;
+    min-width: 56px;
+    padding-inline: 8px;
     font-size: 14px;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .mode {

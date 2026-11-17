@@ -59,6 +59,9 @@ let sample;
 let lastSource;
 let lastSize;
 let backdropFilter = 'none';
+// 与播放器的移动判定一致；配合 aria-label 只对关闭键做对比防护。
+const mobileLayout = matchMedia('(max-width: 700px), (pointer: coarse)');
+let contrastGuard = false;
 
 function refresh() {
   if (!frame) frame = requestAnimationFrame(render);
@@ -71,6 +74,8 @@ function render() {
   const size = Math.round(bounds.width * (props.shape === 'pill' ? 1 : .94));
   const extent = Math.ceil(size / .72 + 6);
   stage.value.style.width = stage.value.style.height = `${extent}px`;
+  contrastGuard = mobileLayout.matches
+    && control?.getAttribute('aria-label') === '关闭播放器';
 
   const source = backdrop?.value?.canvas;
   let src;
@@ -91,6 +96,13 @@ function render() {
       // Include the blur's surroundings without filtering the entire map for each button.
       context.drawImage(source, (left - margin - scene.left) * scaleX, (top - margin - scene.top) * scaleY,
         span * scaleX, span * scaleY, -margin, -margin, span, span);
+      // 亮背景（海面/白底）经折射会聚后可把镜头洗成纯白，浅色图标失去对比。
+      // 仅移动/窄窗的播放器关闭键叠这层半透明深色；其余按钮与桌面保持原玻璃观感。
+      if (contrastGuard) {
+        context.filter = 'none';
+        context.fillStyle = 'rgba(9, 23, 38, 0.5)';
+        context.fillRect(-margin, -margin, span, span);
+      }
       src = sample.toDataURL();
     }
   }

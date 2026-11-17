@@ -10,12 +10,10 @@ export const BGM_STATUS = {
   READY: 'ready',
 };
 
-export const BGM_MODES = ['exploration', 'combat'];
-
 export async function loadRegionBgm(expectedClientVersion) {
   let response;
   try {
-    response = await fetch('/data/genshin-region-bgm.json');
+    response = await fetch('./data/genshin-region-bgm.json');
   } catch {
     return verifying('清单请求失败');
   }
@@ -35,6 +33,7 @@ export async function loadRegionBgm(expectedClientVersion) {
   if (payload.musicGraph) {
     try {
       payload.musicGraph.audioBaseUrl = normalizeAudioBase(payload.musicGraph.audioBaseUrl);
+      payload.musicGraph.supplementAudioBaseUrl = normalizeAudioBase(payload.musicGraph.supplementAudioBaseUrl);
     } catch {
       return verifying('清单音频地址不受支持');
     }
@@ -141,8 +140,7 @@ function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaName
     }
     cleanRings.push(points);
   }
-  const playlists = Object.fromEntries(BGM_MODES.map((mode) =>
-    [mode, normalizePlaylist(music?.[raw.state]?.playlists?.[mode], graph?.audioBaseUrl)]));
+  const exploration = normalizePlaylist(music?.[raw.state]?.playlists?.exploration, graph?.audioBaseUrl);
   return {
     key,
     id,
@@ -158,7 +156,7 @@ function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaName
     bbox: ringsBBox(cleanRings, origin),
     musicState: music?.[raw.state]?.wwiseId,
     graph,
-    playlists,
+    playlists: {exploration},
   };
 }
 

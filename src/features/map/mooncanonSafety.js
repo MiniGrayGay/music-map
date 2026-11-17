@@ -1,10 +1,12 @@
+import patchUrl from './mooncanon-editor-patch.webp?url';
+
 const stencilUrl = new URL('./globe/atlas/MoonCanonStencil.png', import.meta.url).href;
 
 export const moonCanonChart = {width: 4352, height: 2304};
 // The editor's full-size MoonCanon_1024.jpg uses the same 1:4 chart coordinate system.
 export const moonCanonPatch = {
   map: 'MoonCanon', left: 3056, top: 1032, width: 288, height: 272,
-  url: new URL('./mooncanon-editor-patch.webp', import.meta.url).href,
+  url: patchUrl,
 };
 
 let loading;

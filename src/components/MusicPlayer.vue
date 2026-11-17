@@ -1,6 +1,7 @@
 <script setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useId, watch} from 'vue';
-import {resolveMusic} from '../features/bgm/musicGraph.js';
+import {dayNightChoices, resolveRegionalPlaylist} from '../features/bgm/regionalPlaylist.js';
+import {albumForTrack} from '../features/bgm/albumCovers.js';
 import {useMusicPlayback} from '../features/bgm/useMusicPlayback.js';
 import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
 import LiquidGlass from './LiquidGlass.vue';
@@ -10,15 +11,10 @@ import {pushEscapeHandler} from './escapeStack.js';
 
 const props = defineProps({
   zone: {type: Object, required: true},
-  mode: {type: String, default: 'exploration'},
   preview: {type: Boolean, default: false},
 });
-const emit = defineEmits(['close', 'update:mode']);
+const emit = defineEmits(['close']);
 
-const musicModes = [
-  {key: 'exploration', label: '探索'},
-  {key: 'combat', label: '战斗'},
-];
 const uid = useId();
 const glass = ref(null);
 const fluidBackdrop = shallowRef(null);
@@ -40,62 +36,34 @@ const volumeOpen = ref(false);
 const mobileVolume = matchMedia('(max-width: 700px), (pointer: coarse)');
 const systemVolume = ref(mobileVolume.matches);
 const selectedId = ref(null);
+const phase = ref('day');
 const overrides = shallowRef({});
-const browse = shallowRef({mode: props.mode, overrides: overrides.value});
+const browse = shallowRef(overrides.value);
 const zone = computed(() => props.zone);
-const phaseGroup = computed(() => zone.value.graph?.clock?.group);
-
-function resolveSelection(mode, conditions) {
-  const {graph, musicState, playlists} = zone.value;
-  if (graph) {
-    const resolved = resolveMusic(graph, musicState, mode, conditions);
-    // 窄规则：图沿未知条件的默认分支解析出零曲且无失败项时，回退到清单里
-    // 生成器已证的非默认变体（如蓝珀湖的隐藏分支），曲名用分支名，不猜条件。
-    if (!resolved.tracks.length && !resolved.incomplete) {
-      const variants = (playlists?.[mode] ?? []).flatMap((branch) => branch.tracks.map((item) => ({
-        ...item, name: item.name || branch.label.replace(/^曲单 /, ''),
-      })));
-      if (variants.length) return {tracks: variants, conditions: [], incomplete: false};
-    }
-    return resolved;
-  }
-  const branch = playlists?.[mode]?.[0];
-  return {tracks: branch?.tracks ?? [], conditions: [], incomplete: branch?.incomplete ?? true};
-}
-
-function playableTracks(selection) {
-  return selection.tracks.filter(({url}) => url).map((item) => ({
-    ...item,
-    displayName: item.name || '未核对曲名',
-  }));
-}
-
-const music = computed(() => resolveSelection(props.mode, overrides.value));
-const tracks = computed(() => playableTracks(music.value));
-const browseMusic = computed(() => browse.value.mode === props.mode && browse.value.overrides === overrides.value
-  ? music.value : resolveSelection(browse.value.mode, browse.value.overrides));
-const browseTracks = computed(() => browseMusic.value === music.value
-  ? tracks.value : playableTracks(browseMusic.value));
-const queueKey = computed(() => `${zone.value.key}:${browseTracks.value.map(({id}) => id).join(',')
-  || `empty-${browseMusic.value.incomplete}`}`);
+const music = computed(() => resolveRegionalPlaylist(zone.value, phase.value, overrides.value));
+const tracks = computed(() => music.value.tracks);
+const browseMusic = computed(() => browse.value === overrides.value
+  ? music.value : resolveRegionalPlaylist(zone.value, phase.value, browse.value));
+const browseTracks = computed(() => browseMusic.value.tracks);
+const queueKey = computed(() => `${zone.value.key}:${browseTracks.value.map(({id}) => id).join(',')}`);
 let queueHeightMotion;
 const activeIndex = computed(() => Math.max(
   0,
   tracks.value.findIndex(({id}) => id === selectedId.value),
 ));
 const track = computed(() => tracks.value[activeIndex.value] ?? null);
-const emptyLabel = computed(() => music.value.incomplete ? '暂无可试听曲目' : '此分区没有对应曲目');
-const title = computed(() => track.value?.displayName ?? emptyLabel.value);
+const title = computed(() => track.value?.displayName ?? '暂无曲目');
+const cover = computed(() => track.value ? albumForTrack(track.value.id) : null);
+// 图片加载失败时回退音符占位；封面地址一变就重置，切歌不误报别的封面。
+const coverFailed = ref(false);
+watch(() => cover.value?.url, () => {
+  coverFailed.value = false;
+});
 let trackNavigation;
 let titleMotion;
 let departureMotion;
 let countMotion;
-const namedConditions = computed(() => browseMusic.value.conditions.filter(({named}) => named));
-const phaseCondition = computed(() => namedConditions.value.find(({id}) => id === phaseGroup.value));
-const phaseChoices = computed((previous = []) => phaseCondition.value?.entries ?? previous);
-const otherConditions = computed(() => namedConditions.value.filter(({id}) => id !== phaseGroup.value));
-const browseMatchesPlayback = computed(() => browse.value.mode === props.mode
-  && browseMusic.value.conditions.length === music.value.conditions.length
+const browseMatchesPlayback = computed(() => browseMusic.value.conditions.length === music.value.conditions.length
   && browseMusic.value.conditions.every(({id, value}) =>
     music.value.conditions.some((condition) => condition.id === id && condition.value === value)));
 
@@ -114,7 +82,7 @@ const volumeStyle = computed(() => ({'--range-fill': `${volume.value * 100}%`}))
 watch(() => zone.value.key, () => {
   selectedId.value = null;
   overrides.value = {};
-  browse.value = {mode: props.mode, overrides: overrides.value};
+  browse.value = overrides.value;
   volumeOpen.value = false;
 }, {flush: 'sync'});
 
@@ -188,7 +156,7 @@ function advance(delta, wrap = false) {
 }
 
 function toggleDetails() {
-  if (!detailsOpen.value) browse.value = {mode: props.mode, overrides: overrides.value};
+  if (!detailsOpen.value) browse.value = overrides.value;
   detailsOpen.value = !detailsOpen.value;
 }
 
@@ -198,7 +166,7 @@ function updateVolumeMode({matches}) {
 }
 
 function browseCondition(id, value) {
-  browse.value = {...browse.value, overrides: {...browse.value.overrides, [id]: value}};
+  browse.value = {...browse.value, [id]: value};
 }
 
 function queueScrollOwner() {
@@ -238,9 +206,8 @@ function revealQueue(incoming) {
 }
 
 async function playFromList(item) {
-  overrides.value = browse.value.overrides;
+  overrides.value = browse.value;
   selectedId.value = item.id;
-  emit('update:mode', browse.value.mode);
   await nextTick();
   if (track.value?.id === item.id && !canPause.value) play();
 }
@@ -346,6 +313,13 @@ onBeforeUnmount(() => {
     <LiquidGlass ref="glass" />
     <div class="player-body liquid-panel-body">
       <header class="player-heading">
+        <div class="cover-slot" aria-hidden="true">
+          <img v-if="cover && !coverFailed" class="album-cover" :src="cover.url" alt="" draggable="false"
+               @error="coverFailed = true">
+          <svg v-else class="cover-placeholder" viewBox="0 0 24 24">
+            <path d="M9 5v9.6a3 3 0 1 0 2 2.8V8.6l8-1.8v6.8a3 3 0 1 0 2 2.8V4L9 6.4V5Z" />
+          </svg>
+        </div>
         <div class="track-heading">
           <div class="track-title-row">
             <h2 ref="titleLine" class="track-name" :title="track?.displayName" :data-source="track?.id">
@@ -359,6 +333,10 @@ onBeforeUnmount(() => {
               {{ activeIndex + 1 }} / {{ tracks.length }}
             </span>
           </div>
+          <p v-if="track" class="album-row" :title="track.album">
+            {{ track.album }}
+          </p>
+          <p v-else class="album-row album-row--empty" aria-hidden="true"></p>
         </div>
         <button
           v-if="!preview"
@@ -521,6 +499,10 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
+      <div class="phase-control">
+        <SegmentedChoice label="昼夜" :choices="dayNightChoices" :value="phase" @select="phase = $event" />
+      </div>
+
       <div v-if="failure" class="media-error">
         <span class="playback-status" role="status">{{ failure }}</span>
         <button type="button" class="text-button" aria-label="重试播放" @click="retry">重试</button>
@@ -528,21 +510,8 @@ onBeforeUnmount(() => {
 
       <RevealPanel :open="detailsOpen" liquid class="details-reveal">
         <div :id="`${uid}-details`" ref="detailsBody" class="player-details player-drawer scroll-viewport">
-          <div class="condition-row">
-            <SegmentedChoice label="音乐模式" :choices="musicModes" :value="browse.mode"
-                             @select="browse = {...browse, mode: $event}" />
-            <Transition name="phase-choice">
-              <div v-if="phaseChoices.length" v-show="phaseCondition" class="phase-choice"
-                   :inert="!phaseCondition">
-                <div class="phase-choice-content">
-                  <SegmentedChoice label="昼夜" :choices="phaseChoices" :value="phaseCondition?.value"
-                                   @select="browseCondition(phaseGroup, $event)" />
-                </div>
-              </div>
-            </Transition>
-          </div>
           <SegmentedChoice
-            v-for="condition in otherConditions"
+            v-for="condition in browseMusic.conditions"
             :key="condition.id"
             :label="condition.title"
             :choices="condition.entries"
@@ -573,7 +542,7 @@ onBeforeUnmount(() => {
                     </li>
                   </ul>
                   <p v-else :key="queueKey" class="track-source">
-                    {{ browseMusic.incomplete ? '暂无可试听曲目' : '此条件下暂无曲目' }}
+                    暂无曲目
                   </p>
                 </Transition>
               </div>
@@ -631,8 +600,45 @@ onBeforeUnmount(() => {
 .player-heading {
   display: flex;
   align-items: flex-start;
-  gap: 2px;
+  gap: 12px;
   min-width: 0;
+}
+
+.cover-slot {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  overflow: clip;
+  border-radius: 12px;
+  background: rgb(10 30 38 / .55);
+  box-shadow: 0 4px 14px rgb(0 0 0 / .35);
+}
+
+.album-cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-placeholder {
+  width: 100%;
+  height: 100%;
+  padding: 21px;
+  box-sizing: border-box;
+  fill: #63d3e8;
+  opacity: .85;
+}
+
+.album-row {
+  min-height: 17px;
+  margin: 1px 0 0;
+  overflow: hidden;
+  color: var(--player-secondary);
+  font-size: 12px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .track-heading {
@@ -980,40 +986,9 @@ onBeforeUnmount(() => {
   text-underline-offset: 3px;
 }
 
-.condition-row {
+.phase-control {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-start;
-  row-gap: 7px;
-}
-
-.phase-choice {
-  display: grid;
-  grid-template-columns: 1fr;
-  min-width: 0;
-  margin-inline-start: 7px;
-}
-
-.phase-choice-content {
-  min-width: 0;
-}
-
-.phase-choice-enter-active,
-.phase-choice-leave-active {
-  transition: grid-template-columns 240ms var(--ease-glass-in),
-    margin-inline-start 240ms var(--ease-glass-in), opacity 160ms ease;
-}
-
-.phase-choice-enter-active .phase-choice-content,
-.phase-choice-leave-active .phase-choice-content {
-  overflow: clip;
-}
-
-.phase-choice-enter-from,
-.phase-choice-leave-to {
-  grid-template-columns: 0fr;
-  margin-inline-start: 0;
-  opacity: 0;
 }
 
 .details-reveal {
@@ -1176,6 +1151,16 @@ onBeforeUnmount(() => {
     line-height: 32px;
   }
 
+  .cover-slot {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+
+  .cover-placeholder {
+    padding: 16px;
+  }
+
   .music-player .icon-button {
     width: 44px;
     height: 44px;
@@ -1239,17 +1224,8 @@ onBeforeUnmount(() => {
 @media (prefers-reduced-motion: reduce) {
   .music-player button,
   .queue-switch-enter-active,
-  .queue-switch-leave-active,
-  .phase-choice-enter-active,
-  .phase-choice-leave-active {
+  .queue-switch-leave-active {
     transition: none;
-  }
-
-  .phase-choice-enter-from,
-  .phase-choice-leave-to {
-    grid-template-columns: 1fr;
-    margin-inline-start: 7px;
-    opacity: 1;
   }
 
   .queue-switch-enter-from {

@@ -15,6 +15,7 @@ import {BGM_STATUS, loadRegionBgm} from './features/bgm/bgmStatus.js';
 import {loadMapData} from './features/map/mapData.js';
 import {layerModeActive, loadLayers, reloadLayers} from './features/layers/layerSelection.js';
 import {loadLayerBases, mapLabels} from './features/layers/mapBases.js';
+import {isMobileDevice} from './features/map/isMobileDevice.js';
 
 const GlobeSurface = defineAsyncComponent(() => import('./features/map/GlobeSurface.vue'));
 const ReliefPreview = defineAsyncComponent(() => import('./features/map/ReliefPreview.vue'));
@@ -34,7 +35,6 @@ const bgm = reactive({
 });
 const activeZone = ref(null); // 播放器当前绑定的音乐分区（真实清单条目）
 const presentedZone = ref(null);
-const mode = ref('exploration');
 const view = reactive({canZoomIn: true, canZoomOut: true});
 const surfaceRef = ref(null);
 const mapToolbar = ref(null);
@@ -50,19 +50,53 @@ const lunarResetLabel = computed(() => {
   return view.globeMap === 'MoonCanon' && view.magnified ? '复位到霜月全览' : '返回全局预览';
 });
 const desktopRelief = matchMedia('(pointer: fine) and (hover: hover) and (min-width: 760px) and (min-height: 480px)');
-const showRelief = ref(desktopRelief.matches);
+// 手机（竖屏/横屏/桌面模式/iPad 桌面 UA）不请求点云：媒体查询之外用
+// 共用移动判定兜底，接鼠标改不掉触屏身份；触屏笔记本正常放行。
+function reliefViewportAllows() {
+  return desktopRelief.matches && !isMobileDevice();
+}
+const showRelief = ref(reliefViewportAllows());
 const reliefUnavailable = ref(false);
+const reliefPackStatus = ref(null);
+let reliefPackReady = false;
+const reliefPackLabels = {
+  index: '正在读取点云索引',
+  download: '正在下载分片点云',
+  decompress: '正在解压分片点云',
+  error: '暂时无法加载点云',
+};
 const reliefZone = ref(null);
 const reliefAspect = ref(null);
 const emptyReliefKey = ref(null);
+function preloadToyRelief() {
+  if (reliefPackReady || !showRelief.value || !mapData.value?.preloadRelief
+    || (reliefPackStatus.value && reliefPackStatus.value.stage !== 'error')) return;
+  reliefPackStatus.value = {stage: 'index'};
+  import('./features/map/reliefData.js')
+    .then(({preloadRelief}) => preloadRelief((status) => { reliefPackStatus.value = status; }))
+    .then(() => {
+      reliefPackReady = true;
+      reliefPackStatus.value = null;
+    })
+    .catch(() => { reliefPackStatus.value = {stage: 'error'}; });
+}
+watch(showRelief, preloadToyRelief);
 function focusRelief(zone) {
   if (reliefZone.value?.key !== zone?.key) reliefAspect.value = null;
   reliefZone.value = zone;
   emptyReliefKey.value = null;
 }
-const updateReliefViewport = (event) => { showRelief.value = event.matches; };
-onMounted(() => desktopRelief.addEventListener('change', updateReliefViewport));
-onBeforeUnmount(() => desktopRelief.removeEventListener('change', updateReliefViewport));
+const updateReliefViewport = () => { showRelief.value = reliefViewportAllows(); };
+onMounted(() => {
+  desktopRelief.addEventListener('change', updateReliefViewport);
+  screen.orientation?.addEventListener?.('change', updateReliefViewport);
+  addEventListener('resize', updateReliefViewport);
+});
+onBeforeUnmount(() => {
+  desktopRelief.removeEventListener('change', updateReliefViewport);
+  screen.orientation?.removeEventListener?.('change', updateReliefViewport);
+  removeEventListener('resize', updateReliefViewport);
+});
 const smoothingKey = 'teyvat-region-map.smooth-boundaries';
 const smoothBoundaries = ref(true);
 try {
@@ -97,6 +131,7 @@ async function initialize() {
   loadError.value = null;
   try {
     mapData.value = await loadMapData();
+    preloadToyRelief();
     void loadLayers({appCanvas: mapData.value.canvas});
     void loadLayerBases(mapData.value).then((maps) => { baseMaps.value = maps; });
     void loadMusic();
@@ -227,8 +262,14 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         @unavailable="globeError = $event"
       />
       <div v-if="globeError" class="music-unavailable" role="status">{{ globeError }}</div>
+      <div v-if="showRelief && reliefPackStatus" class="music-unavailable relief-loading">
+        <span role="status">{{ reliefPackLabels[reliefPackStatus.stage] }}</span>
+        <progress v-if="reliefPackStatus.stage === 'download'" aria-label="点云下载进度"
+                  :value="reliefPackStatus.received" :max="reliefPackStatus.total" />
+        <button v-if="reliefPackStatus.stage === 'error'" type="button" @click="preloadToyRelief">重试</button>
+      </div>
       <aside v-if="showGlobe && mapName === 'Teyvat' && showRelief && !reliefUnavailable
-               && reliefZone && reliefZone.key !== emptyReliefKey"
+               && !reliefPackStatus && reliefZone && reliefZone.key !== emptyReliefKey"
              class="relief-dock map-glass" aria-label="高程点阵预览"
              :style="reliefAspect == null ? undefined : {'--relief-aspect': reliefAspect}">
         <LiquidGlass :rim="false" :displacement="false" />
@@ -242,7 +283,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           v-show="activeZone"
           ref="playerRef"
           :zone="presentedZone"
-          v-model:mode="mode"
           @close="closePlayer"
         />
       </Transition>
@@ -298,6 +338,14 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   backdrop-filter: var(--glass-effect);
   animation: ui-fade-in 240ms cubic-bezier(0, 0, 0.2, 1);
   font-size: 14px;
+}
+.relief-loading {
+  inset-inline-start: auto;
+  inset-inline-end: var(--map-inline-end, 18px);
+}
+.relief-loading progress {
+  inline-size: min(22vw, 160px);
+  accent-color: var(--accent);
 }
 .music-unavailable button, .app-message button {
   min-height: 44px;

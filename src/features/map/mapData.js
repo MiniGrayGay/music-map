@@ -2,8 +2,8 @@ export const SUPPORTED_DATA_VERSION = '7.2.0';
 
 export async function loadMapData() {
   const [dataResponse, indexResponse] = await Promise.all([
-    fetch('/data/map-data.json'),
-    fetch('/tiles/meta.json'),
+    fetch('./data/map-data.json'),
+    fetch('./tiles/meta.json'),
   ]);
   if (!dataResponse.ok) {
     throw new Error(`map-data.json 加载失败（HTTP ${dataResponse.status}）；先运行 pnpm run data`);
@@ -33,5 +33,6 @@ export async function loadMapData() {
     pyramids: tilesIndex.maps,
     seaColor: '#163c4c',
     dataVersion: raw.dataVersion,
+    preloadRelief: raw.preloadRelief === true,
   };
 }

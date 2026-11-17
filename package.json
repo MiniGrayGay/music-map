@@ -19,6 +19,7 @@
     "build": "vite build && node scripts/package-static-assets.mjs",
     "build:hosted": "node scripts/build-hosted.mjs",
     "export:site": "node scripts/export-static-site.mjs",
+    "export:toy": "node scripts/export-toy.mjs",
     "preview": "vite preview",
     "verify": "node scripts/verify-headless.mjs",
     "verify:audio": "node scripts/verify-bgm-batch.mjs",

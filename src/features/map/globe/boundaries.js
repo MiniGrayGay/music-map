@@ -45,7 +45,8 @@ export function drawGlobeBoundaries(globe, time, radius, basis) {
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+  // 极窄视口下球体直径可不足 2px，radius - 1 会变负使 arc 抛 IndexSizeError；退化时收到 0。
+  ctx.arc(cx, cy, Math.max(0, radius - 1), 0, Math.PI * 2);
   ctx.clip();
   ctx.globalAlpha = .48 * zoomOpacity * reveal;
   ctx.strokeStyle = '#e6f4ef';

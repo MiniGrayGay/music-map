@@ -57,7 +57,8 @@ export class DetailTiles {
   update(world, view) {
     const maxZoom = world.pyramid.maxTileZoom;
     const native = world.pyramid.native;
-    const nativeThreshold = this.compact ? 5 : view.focused ? 1.85 : 3.8;
+    // 手机屏幕像素少，2048 细节与桌面同门槛即可及时换清晰纹理，容量仍受紧凑限制。
+    const nativeThreshold = view.focused ? 1.85 : 3.8;
     const eligible = native && world.projection !== 2 && view.zoom >= nativeThreshold;
     const level = this.native ? (eligible ? native.level : 0) : maxZoom > 3 && view.zoom >= 1.85
       ? Math.min(maxZoom, view.zoom >= 3.45 ? 5 : 4)
@@ -74,8 +75,10 @@ export class DetailTiles {
     const right = Math.min(width, cx + radius);
     const top = Math.max(0, cy - radius);
     const bottom = Math.min(height, cy + radius);
-    const rows = this.compact ? 6 : 10;
-    const columns = this.compact ? 9 : 15;
+    // 紧凑网格过稀会让盘面只剩零星清晰瓦片、其余回落低清图集（块状观感）；
+    // 8×12 覆盖可见盘面，加载量仍由 capacity 与 concurrency 约束。
+    const rows = this.compact ? 8 : 10;
+    const columns = this.compact ? 12 : 15;
     for (let row = 0; row <= rows; row += 1) {
       for (let col = 0; col <= columns; col += 1) {
         const x = (left + (right - left) * col / columns - cx) / radius;
