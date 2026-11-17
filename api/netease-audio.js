@@ -1,5 +1,6 @@
 // 网易云外链解析兜底：只读公开元数据接口换取官方 CDN 地址，307 交给浏览器直连。
 // 绝不代理或传输音频字节，绝不缓存、硬编码或记录签名地址。曲目 id 仅来自既有曲库白名单。
+// 诊断：并行竞速多个上游取首个成功；全部失败时 502 附带脱敏分层原因（不含完整 URL/签名/响应体）。
 import catalog from '../src/features/bgm/netease-tracks.json' with {type: 'json'};
 
 const upstreamHosts = [
@@ -7,6 +8,7 @@ const upstreamHosts = [
   'https://interface.music.163.com',
 ];
 const upstreamPath = '/api/song/enhance/player/url';
+const outerMediaPath = (id) => `/song/media/outer/url?id=${id}.mp3`;
 const perRequestTimeoutMs = 2500;
 const totalDeadlineMs = 5500;
 
@@ -25,42 +27,6 @@ function isWhitelisted(id) {
   return /^\d+$/.test(id) && publicTrackIds.has(id);
 }
 
-async function resolveUpstreamUrl(id) {
-  const query = new URLSearchParams({br: '128000', ids: `[${id}]`});
-  const deadline = Date.now() + totalDeadlineMs;
-  for (const host of upstreamHosts) {
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) break;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(perRequestTimeoutMs, remaining));
-    try {
-      const res = await fetch(`${host}${upstreamPath}?${query}`, {
-        signal: controller.signal,
-        redirect: 'error',
-        headers: {accept: 'application/json'},
-      });
-      if (!res.ok) {
-        // 立即取消响应体，不等连接自然收尾。
-        await res.body?.cancel();
-        continue;
-      }
-      const item = (await res.json())?.data?.[0];
-      // 只接受完整曲目：id 对得上、code 200、非试听、有 url。
-      if (item?.id === Number(id) && item.code === 200 && item.freeTrialInfo === null
-        && typeof item.url === 'string' && item.url) {
-        // 返回前先 canonical，得到有效 CDN 目标才采用，否则换下一个上游。
-        const target = canonicalCdnUrl(item.url);
-        if (target) return target;
-      }
-    } catch {
-      // 换下一个上游继续。
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  return null;
-}
-
 // 只放行网易云 CDN 的原始 http(s) 地址，http 升级 https；拒绝凭证、异常端口与非 126.net 音乐域。
 function canonicalCdnUrl(rawUrl) {
   let parsed;
@@ -75,6 +41,106 @@ function canonicalCdnUrl(rawUrl) {
   if (hostname !== 'music.126.net' && !hostname.endsWith('.music.126.net')) return null;
   if (parsed.username || parsed.password || parsed.port) return null;
   return parsed.href;
+}
+
+// 失败时抛出的脱敏原因：op + 层内细节（HTTP 状态 / JSON 业务 code / 网络错误名）。
+class ResolveFailure extends Error {
+  constructor(detail) {
+    super(detail);
+    this.detail = detail;
+  }
+}
+
+// JSON 元数据上游。resolve：成功返回 CDN 目标，失败抛 ResolveFailure。
+async function attemptJsonApi(host, id, remainingMs) {
+  const query = new URLSearchParams({br: '128000', ids: `[${id}]`});
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(perRequestTimeoutMs, remainingMs)));
+  const label = host === upstreamHosts[0] ? 'music-json' : 'interface-json';
+  let res;
+  try {
+    res = await fetch(`${host}${upstreamPath}?${query}`, {
+      signal: controller.signal,
+      redirect: 'error',
+      headers: {accept: 'application/json'},
+    });
+  } catch (error) {
+    throw new ResolveFailure(`${label}:conn-${error?.name === 'AbortError' ? 'timeout' : 'error'}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    await res.body?.cancel();
+    throw new ResolveFailure(`${label}:http-${res.status}`);
+  }
+  let item;
+  try {
+    item = (await res.json())?.data?.[0];
+  } catch {
+    throw new ResolveFailure(`${label}:bad-json`);
+  }
+  if (item?.id !== Number(id)) throw new ResolveFailure(`${label}:item-mismatch`);
+  if (item.code !== 200) throw new ResolveFailure(`${label}:item-${item.code}`);
+  if (item.freeTrialInfo !== null) throw new ResolveFailure(`${label}:trial`);
+  if (typeof item.url !== 'string' || !item.url) throw new ResolveFailure(`${label}:missing-url`);
+  const target = canonicalCdnUrl(item.url);
+  if (!target) throw new ResolveFailure(`${label}:bad-cdn`);
+  return target;
+}
+
+// 网易云官方外链端点：服务端以 redirect:manual 请求，接受经 canonical 校验的 30x Location。
+async function attemptOuterMedia(id, remainingMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(perRequestTimeoutMs, remainingMs)));
+  let res;
+  try {
+    res = await fetch(`https://music.163.com${outerMediaPath(id)}`, {
+      signal: controller.signal,
+      redirect: 'manual',
+      headers: {accept: 'audio/mpeg, */*'},
+    });
+  } catch (error) {
+    throw new ResolveFailure(`outer:conn-${error?.name === 'AbortError' ? 'timeout' : 'error'}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status < 300 || res.status >= 400) {
+    // 该端点对不可播曲目常返回 200 + HTML，绝不能当成功，也不能把 HTML 透传出去。
+    await res.body?.cancel();
+    throw new ResolveFailure(`outer:http-${res.status}`);
+  }
+  const location = res.headers.get('location');
+  await res.body?.cancel();
+  if (!location) throw new ResolveFailure('outer:no-location');
+  let parsed;
+  try {
+    parsed = new URL(location);
+  } catch {
+    throw new ResolveFailure('outer:bad-location');
+  }
+  const target = canonicalCdnUrl(location);
+  if (!target) throw new ResolveFailure(`outer:redirect-${parsed.hostname}`);
+  return target;
+}
+
+// 并行竞速所有路径，取首个成功；全部失败时聚合脱敏原因。
+async function resolveUpstreamUrl(id) {
+  const attempts = [];
+  const start = Date.now();
+  const makeRemaining = () => totalDeadlineMs - (Date.now() - start);
+  attempts.push(attemptJsonApi(upstreamHosts[0], id, makeRemaining()));
+  attempts.push(attemptJsonApi(upstreamHosts[1], id, makeRemaining()));
+  attempts.push(attemptOuterMedia(id, makeRemaining()));
+  try {
+    return await Promise.any(attempts);
+  } catch (error) {
+    if (error instanceof AggregateError) {
+      // 顺序与 attempts 一致，拼出可读的分层诊断串，如
+      // "music-json:http-403;interface-json:item-404;outer:redirect-music.163.com"。
+      throw new Error(error.errors.map((e) => e?.detail ?? 'unknown').join(';'));
+    }
+    throw error;
+  }
 }
 
 export default async function handler(request, response) {
@@ -95,13 +161,17 @@ export default async function handler(request, response) {
   }
 
   let upstreamUrl;
+  let failureDetail;
   try {
     upstreamUrl = await resolveUpstreamUrl(id);
-  } catch {
+  } catch (error) {
+    failureDetail = typeof error?.message === 'string' && error.message ? error.message : undefined;
     upstreamUrl = null;
   }
   if (!upstreamUrl) {
-    sendJson(response, 502, {error: 'upstream-unavailable'});
+    sendJson(response, 502, failureDetail
+      ? {error: 'upstream-unavailable', detail: failureDetail}
+      : {error: 'upstream-unavailable'});
     return;
   }
 
