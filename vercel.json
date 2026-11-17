@@ -3,5 +3,10 @@
   "framework": "vite",
   "installCommand": "corepack pnpm install --frozen-lockfile",
   "buildCommand": "corepack pnpm run build:hosted",
-  "outputDirectory": "dist/site"
+  "outputDirectory": "dist/site",
+  "functions": {
+    "api/netease-audio.js": {
+      "regions": ["hkg1"]
+    }
+  }
 }
