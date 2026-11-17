@@ -662,16 +662,16 @@ export class Globe {
       this.lastTileFocus = focused;
     }
     // 异步瓦片在上传后只标记 lookup 脏；渲染前统一合并为一次 texSubImage2D。
-    this.tiles.flushLookup();
-    this.nativeTiles.flushLookup();
-    if (changed || settled || detailFocusChanged) {
+    const detailUpdated = this.tiles.flushLookup();
+    const nativeUpdated = this.nativeTiles.flushLookup();
+    if (changed || settled || detailFocusChanged || detailUpdated || nativeUpdated) {
       const pixelWidth = Math.max(1, Math.round(width * ratio));
       const pixelHeight = Math.max(1, Math.round(height * ratio));
       if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
       if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
       renderSphere(this, this.canvas, {
         cx, cy, ratio, radius, world: this.world, basis,
-        zoom: this.zoom, detailSize: this.tiles.size, nativeSize: this.nativeTiles.size,
+        zoom: this.zoom, detailSize: this.tiles.drawSize, nativeSize: this.nativeTiles.drawSize,
         patchRect: this.patchInAtlas(),
       });
       this.sphereState = pose;

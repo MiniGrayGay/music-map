@@ -1,7 +1,8 @@
 import {clamp, viewAtlasPoints} from './projection.js';
+import {TILE_SIZE as TILE, MIP_LEVELS} from './tileMipData.js';
+import {loadTileMipmaps} from './tileMipLoader.js';
 
-const TILE = 512;
-const MIP_LEVELS = Math.log2(TILE) + 1;
+const EMPTY_SIZE = [0, 0];
 export function detailTextures(gl, mapUnit = 1, atlasUnit = 2) {
   const map = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0 + mapUnit);
@@ -39,8 +40,10 @@ export class DetailTiles {
     this.pending = new Map();
     this.failed = new Set();
     this.lastView = '';
+    this.lookupReady = false;
+    this.lookupDirty = Boolean(zoom);
     if (!zoom) {
-      this.size = [0, 0];
+      this.size = EMPTY_SIZE;
       return;
     }
     const raster = this.native ? world.pyramid.native : world.pyramid;
@@ -52,9 +55,6 @@ export class DetailTiles {
     this.columns = Math.ceil(this.size[0] / TILE);
     this.rows = Math.ceil(this.size[1] / TILE);
     this.lookup = new Uint8Array(this.columns * this.rows);
-    this.lookupDirty = false;
-    this.lookupReady = false;
-    this.uploadLookup();
   }
 
   update(world, view) {
@@ -119,18 +119,21 @@ export class DetailTiles {
   }
 
   async load(url, key, revision, controller) {
-    let image;
+    let tile;
     try {
       const response = await fetch(url, {signal: controller.signal});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      image = await createImageBitmap(await response.blob(), {premultiplyAlpha: 'none'});
+      const blob = await response.blob();
+      // 解码（含 CPU mipmap 生成）可能耗时，开始前再核一遍时效性
+      if (revision !== this.revision || controller.signal.aborted || !this.visible.has(key)) return;
+      tile = await loadTileMipmaps(blob, controller.signal);
       if (revision === this.revision && !controller.signal.aborted && this.visible.has(key)) {
-        this.uploadTile(key, image);
+        this.uploadTile(key, tile);
       }
     } catch (error) {
       if (revision === this.revision && !controller.signal.aborted) this.failed.add(key);
     } finally {
-      image?.close();
+      tile?.image.close();
       this.inflight -= 1;
       if (revision === this.revision) this.pending.delete(key);
       this.pump();
@@ -186,60 +189,45 @@ export class DetailTiles {
       }
       this.allocated = true;
     }
-    // Generate each tile's mip chain in a 2D staging texture. The read
-    // framebuffer never attaches the texture array being written.
-    if (!this.stagingTexture) {
-      const texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texStorage2D(gl.TEXTURE_2D, MIP_LEVELS, gl.RGBA8, TILE, TILE);
-      if (gl.getError() !== gl.NO_ERROR
-        && !gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_IMMUTABLE_FORMAT)) {
-        gl.deleteTexture(texture);
-        throw new Error('Cannot allocate tile staging texture');
-      }
-      this.stagingTexture = texture;
+    // mipmaps 为 level 1..9 连续紧排的 RGBA8 字节；level 0 直接传原始 512² 位图，
+    // 全部经 texSubImage3D 写入，不经过 staging 纹理或 read framebuffer。
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, slot, TILE, TILE, 1, gl.RGBA, gl.UNSIGNED_BYTE, image.image);
+    const {mipmaps} = image;
+    let srcOffset = 0;
+    for (let level = 1, size = TILE >> 1; level < MIP_LEVELS; level += 1, size >>= 1) {
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, level, 0, 0, slot, size, size, 1,
+        gl.RGBA, gl.UNSIGNED_BYTE, mipmaps, srcOffset);
+      srcOffset += size * size * 4;
     }
-    gl.bindTexture(gl.TEXTURE_2D, this.stagingTexture);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    gl.generateMipmap(gl.TEXTURE_2D);
-    this.stagingRead ??= gl.createFramebuffer();
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.stagingRead);
-    for (let level = 0, size = TILE; level < MIP_LEVELS; level += 1, size /= 2) {
-      gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-        gl.TEXTURE_2D, this.stagingTexture, level);
-      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, level, 0, 0, slot, 0, 0, size, size);
-    }
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
     if (gl.getError() !== gl.NO_ERROR) throw new Error('Cannot upload complete tile mip chain');
   }
 
-  uploadLookup() {
-    const {gl, textures} = this;
-    gl.activeTexture(gl.TEXTURE0 + textures.mapUnit);
-    gl.bindTexture(gl.TEXTURE_2D, textures.map);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, this.columns, this.rows, 0, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.activeTexture(gl.TEXTURE0);
-    this.lookupReady = true;
-    this.lookupDirty = false;
+  get drawSize() {
+    return this.lookupReady ? this.size : EMPTY_SIZE;
   }
 
-  // 把批次内累计的 lookup 改动用一次 texSubImage2D 写入既有存储，
+  // 把批次内累计的 lookup 改动写入 map 纹理：已有存储时用一次 texSubImage2D，
+  // 否则先 texImage2D 重定义尺寸（成功即视为 ready）。干净时返回 false，
   // 须在每个 draw 的渲染前调用（存储尺寸只会随 reset 的整次重定义变化）。
   flushLookup() {
-    if (!this.lookupDirty) return;
-    if (!this.lookupReady) {
-      this.uploadLookup();
-      return;
-    }
-    this.lookupDirty = false;
+    if (!this.lookupDirty) return false;
     const {gl, textures} = this;
     gl.activeTexture(gl.TEXTURE0 + textures.mapUnit);
     gl.bindTexture(gl.TEXTURE_2D, textures.map);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.columns, this.rows, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
+    let ready = this.lookupReady;
+    if (ready) {
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.columns, this.rows, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
+      if (gl.getError() !== gl.NO_ERROR) ready = false;
+    }
+    if (!ready) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, this.columns, this.rows, 0, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
+      ready = gl.getError() === gl.NO_ERROR;
+    }
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.activeTexture(gl.TEXTURE0);
+    this.lookupReady = ready;
+    this.lookupDirty = !ready;
+    return ready;
   }
 }

@@ -1,4 +1,5 @@
 import catalog from './netease-tracks.json' with { type: 'json' };
+import authoredPreviews from './authored-previews.json' with { type: 'json' };
 import {musicClockState, normalizeGameStates, resolveMusic} from './musicGraph.js';
 
 const phaseMinutes = {day: 12 * 60, night: 23 * 60};
@@ -47,6 +48,14 @@ export function resolveRegionalPlaylist(zone, phase, overrides = {}) {
   for (const {id} of sources) {
     const song = neteaseTrack(id);
     if (song && !songs.has(song.neteaseId)) songs.set(song.neteaseId, song);
+  }
+  // Verified previews for zones whose graph resolves to an empty playlist (no explicit user
+  // conditions active): fall back to the audit-backed authored list for this zone and phase.
+  if (!songs.size && !Object.keys(overrides).length && !hasGameStates) {
+    for (const id of authoredPreviews[musicState]?.[phase] ?? []) {
+      const song = neteaseTrack(id);
+      if (song && !songs.has(song.neteaseId)) songs.set(song.neteaseId, song);
+    }
   }
   return {
     tracks: [...songs.values()],

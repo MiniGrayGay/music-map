@@ -1,1 +1,14315 @@
-{"format":"teyvat-region-map-data-v1","dataVersion":"7.2.0","canvas":{"width":5632,"height":4864,"block":256}}
+{
+ "format": "teyvat-region-map-data-v1",
+ "dataVersion": "7.2.0",
+ "generatedAt": "2026-11-15T02:48:46.846Z",
+ "canvas": {
+  "width": 5632,
+  "height": 4864,
+  "block": 256
+ },
+ "tiles": [
+  {
+   "file": "r-7c-4.webp",
+   "row": -7,
+   "col": -4,
+   "left": 4864,
+   "top": 4608,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-7_-4.png",
+    "sha256": "d8b22958ab0de36c6b1a02a5aa691275be2e25a529e5844592912b601d7c0259"
+   }
+  },
+  {
+   "file": "r-7c-3.webp",
+   "row": -7,
+   "col": -3,
+   "left": 4608,
+   "top": 4608,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-7_-3.png",
+    "sha256": "2e6c6f61ac067e4d6271f3abdfa0b332ff84aa4d6dc228907bea015e51203709"
+   }
+  },
+  {
+   "file": "r-7c-2.webp",
+   "row": -7,
+   "col": -2,
+   "left": 4352,
+   "top": 4608,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-7_-2.png",
+    "sha256": "8809d653648c7b1d6ed09cf7d76e7524f5c334c692c6d65ed26fd0597322ffd9"
+   }
+  },
+  {
+   "file": "r-6c-6.webp",
+   "row": -6,
+   "col": -6,
+   "left": 5376,
+   "top": 4352,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-6_-6.png",
+    "sha256": "b157633dfdca311a72b940fb807c2f1ead07dc7eca0e554c658cc284169f4494"
+   }
+  },
+  {
+   "file": "r-6c-5.webp",
+   "row": -6,
+   "col": -5,
+   "left": 5120,
+   "top": 4352,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-6_-5.png",
+    "sha256": "e28d59fc7de09aa48c685fa5d88131814a2b23ec0f8ac9ad925a850ab78593ac"
+   }
+  },
+  {
+   "file": "r-6c-4.webp",
+   "row": -6,
+   "col": -4,
+   "left": 4864,
+   "top": 4352,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-6_-4.png",
+    "sha256": "88fd840952378e9cdaa332d54d789eb6e82e51acd79ebd04ceaef1bbf2529bc0"
+   }
+  },
+  {
+   "file": "r-6c-3.webp",
+   "row": -6,
+   "col": -3,
+   "left": 4608,
+   "top": 4352,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-6_-3.png",
+    "sha256": "6aa38218bd62049ab5f30037b0163b4e03d07f0249974a2dbd96cff5a583fb40"
+   }
+  },
+  {
+   "file": "r-6c-2.webp",
+   "row": -6,
+   "col": -2,
+   "left": 4352,
+   "top": 4352,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-6_-2.png",
+    "sha256": "18c8ba65d5eec3389dbbc1a03fcb7e16e8d134e469b9c1adb3c4fa153808ad05"
+   }
+  },
+  {
+   "file": "r-5c-6.webp",
+   "row": -5,
+   "col": -6,
+   "left": 5376,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-6.png",
+    "sha256": "872b028833092169ba033c8fff89bcd9f8616ef2606e96dba201d779a5a8210c"
+   }
+  },
+  {
+   "file": "r-5c-5.webp",
+   "row": -5,
+   "col": -5,
+   "left": 5120,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-5.png",
+    "sha256": "0ff9017bf8b5efbc019ad4209c4819ef8ed079a195f74e97b8e01be8a082dce1"
+   }
+  },
+  {
+   "file": "r-5c-4.webp",
+   "row": -5,
+   "col": -4,
+   "left": 4864,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-4.png",
+    "sha256": "080121c138a437bf1c47bd098a2987dba196f515214d3728c8f4b0666e64a67c"
+   }
+  },
+  {
+   "file": "r-5c-3.webp",
+   "row": -5,
+   "col": -3,
+   "left": 4608,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-3.png",
+    "sha256": "175cdf8870118e692f619a6871e484039bc42fa2c69486cd05320bde7702a7dc"
+   }
+  },
+  {
+   "file": "r-5c-2.webp",
+   "row": -5,
+   "col": -2,
+   "left": 4352,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-2.png",
+    "sha256": "7f07508d57c623a07f51e057f6646e807d61c903192812bdfe7b7fc33aa86341"
+   }
+  },
+  {
+   "file": "r-5c-1.webp",
+   "row": -5,
+   "col": -1,
+   "left": 4096,
+   "top": 4096,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_-1.png",
+    "sha256": "c1d88bda220932dcd86204300b9503c651a77afdc3f3823a22e740db73fa6712"
+   }
+  },
+  {
+   "file": "r-5c0.webp",
+   "row": -5,
+   "col": 0,
+   "left": 3840,
+   "top": 4096,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_0.png",
+    "sha256": "edd9861c270f32910174a6f41c3376247fca9c4816858b8182f9e29e0144badf"
+   }
+  },
+  {
+   "file": "r-5c8.webp",
+   "row": -5,
+   "col": 8,
+   "left": 1792,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_8.png",
+    "sha256": "6143ccf392d1a1686032ae7599e8c1c4cddda200132a2c55ce87489d4343d0a7"
+   }
+  },
+  {
+   "file": "r-5c9.webp",
+   "row": -5,
+   "col": 9,
+   "left": 1536,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_9.png",
+    "sha256": "c3b41046692490354194fa506663734442e81e246a30261b448957bdb33ead6d"
+   }
+  },
+  {
+   "file": "r-5c10.webp",
+   "row": -5,
+   "col": 10,
+   "left": 1280,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_10.png",
+    "sha256": "9d7d141fc2aa212a2986d195a2da4384dd0af68790d7c84d44fdfae2117664a2"
+   }
+  },
+  {
+   "file": "r-5c11.webp",
+   "row": -5,
+   "col": 11,
+   "left": 1024,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_11.png",
+    "sha256": "c2d75764a11ab2c553b45f1ae76204792f7aef66d7b091d4cb2c3aeb422074a1"
+   }
+  },
+  {
+   "file": "r-5c12.webp",
+   "row": -5,
+   "col": 12,
+   "left": 768,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_12.png",
+    "sha256": "1e946ad30ab5072e0241416cc776461cd00162c3c515935ed5a021d61f0fecf6"
+   }
+  },
+  {
+   "file": "r-5c13.webp",
+   "row": -5,
+   "col": 13,
+   "left": 512,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_13.png",
+    "sha256": "c7ccf2cc6de5fd27ab7f8e40706ee49d903899a371c8c3385f420f3808f389e6"
+   }
+  },
+  {
+   "file": "r-5c14.webp",
+   "row": -5,
+   "col": 14,
+   "left": 256,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_14.png",
+    "sha256": "fffcd7bfa36cd354dbad91f682a21b3aee89ce9e3267267e1b3d96897eb5db41"
+   }
+  },
+  {
+   "file": "r-5c15.webp",
+   "row": -5,
+   "col": 15,
+   "left": 0,
+   "top": 4096,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-5_15.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r-4c-6.webp",
+   "row": -4,
+   "col": -6,
+   "left": 5376,
+   "top": 3840,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-6.png",
+    "sha256": "377450c5d5cea9f546a74220c27e0166ef51d9c8bfab5c6f929c74e66d3631a4"
+   }
+  },
+  {
+   "file": "r-4c-5.webp",
+   "row": -4,
+   "col": -5,
+   "left": 5120,
+   "top": 3840,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-5.png",
+    "sha256": "73c456010246101697ca73f4c2f8cf898159f2a0122f765f03193a13c2a9fdd7"
+   }
+  },
+  {
+   "file": "r-4c-4.webp",
+   "row": -4,
+   "col": -4,
+   "left": 4864,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-4.png",
+    "sha256": "85677c33ffcfce661909df0cf564351b4bb7236e06d9a780f372a67a29ecf093"
+   }
+  },
+  {
+   "file": "r-4c-3.webp",
+   "row": -4,
+   "col": -3,
+   "left": 4608,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-3.png",
+    "sha256": "6d60bb5f242d981df89f923b2de3ab66a5a25cb553846d7954361519c002db1e"
+   }
+  },
+  {
+   "file": "r-4c-2.webp",
+   "row": -4,
+   "col": -2,
+   "left": 4352,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-2.png",
+    "sha256": "cc93b600e4d63d2e483e5090790ed05e27a7913c52925eb2d064abd6bf57dc1d"
+   }
+  },
+  {
+   "file": "r-4c-1.webp",
+   "row": -4,
+   "col": -1,
+   "left": 4096,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_-1.png",
+    "sha256": "4a777d44bafe9095184ed8a72c7724a72a3449c0c3ac53413b7c9d593b9668bf"
+   }
+  },
+  {
+   "file": "r-4c0.webp",
+   "row": -4,
+   "col": 0,
+   "left": 3840,
+   "top": 3840,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_0.png",
+    "sha256": "b6ca55b55d4ea3e2f1bb990d0907fb71c528da797993e1822f83e177813a8dc7"
+   }
+  },
+  {
+   "file": "r-4c1.webp",
+   "row": -4,
+   "col": 1,
+   "left": 3584,
+   "top": 3840,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_1.png",
+    "sha256": "27cdfbcfaa4a43dfa072db9cac4f66e88be863df79c31946a75853ed1aa2e79a"
+   }
+  },
+  {
+   "file": "r-4c2.webp",
+   "row": -4,
+   "col": 2,
+   "left": 3328,
+   "top": 3840,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_2.png",
+    "sha256": "e8342c41b40d115c9c3ca9dd1ea2a5f531cf6ad871cb595a0b04d224528c9110"
+   }
+  },
+  {
+   "file": "r-4c3.webp",
+   "row": -4,
+   "col": 3,
+   "left": 3072,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_3.png",
+    "sha256": "161e0ed69df86b6f15bfd75eba411e42003fff4130363ec84cf791eab1bbe379"
+   }
+  },
+  {
+   "file": "r-4c4.webp",
+   "row": -4,
+   "col": 4,
+   "left": 2816,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_4.png",
+    "sha256": "95ab5ebfabe47e4e737c796f96b6d67f8b705a368937c97849ef6426077b89d1"
+   }
+  },
+  {
+   "file": "r-4c5.webp",
+   "row": -4,
+   "col": 5,
+   "left": 2560,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_5.png",
+    "sha256": "d5719934d52d9f5171dfc2e0934c728da8828d9d8c26cf9257ddee91c9fb2dc2"
+   }
+  },
+  {
+   "file": "r-4c6.webp",
+   "row": -4,
+   "col": 6,
+   "left": 2304,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_6.png",
+    "sha256": "1c2419bafd80303bad0b5e35ec1f0127efc0f5553219867f2da89b01c6bb5cbc"
+   }
+  },
+  {
+   "file": "r-4c7.webp",
+   "row": -4,
+   "col": 7,
+   "left": 2048,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_7.png",
+    "sha256": "3abdb4ae74f71679e3d2f405c2465ffea62321f4da766b85503ed8f0095f62fe"
+   }
+  },
+  {
+   "file": "r-4c8.webp",
+   "row": -4,
+   "col": 8,
+   "left": 1792,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_8.png",
+    "sha256": "14caf4ac7ba88495c265b1a7c2db4cd86a1f5f77d9768e03bc57d34a9be6bfab"
+   }
+  },
+  {
+   "file": "r-4c9.webp",
+   "row": -4,
+   "col": 9,
+   "left": 1536,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_9.png",
+    "sha256": "25ec04a39cbabb506f5a21c4050e25b8730a41cc70602cbc44387c9ced9f1a59"
+   }
+  },
+  {
+   "file": "r-4c10.webp",
+   "row": -4,
+   "col": 10,
+   "left": 1280,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_10.png",
+    "sha256": "7902a36c8bf768d3c8efffbb1e9536cdcf2172360d31ff98f4fe8d13bea019cb"
+   }
+  },
+  {
+   "file": "r-4c11.webp",
+   "row": -4,
+   "col": 11,
+   "left": 1024,
+   "top": 3840,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_11.png",
+    "sha256": "916f79d09968b3c44c0df7e5c68620c3229e923c26e26217e70e46f0e9d38c7f"
+   }
+  },
+  {
+   "file": "r-4c12.webp",
+   "row": -4,
+   "col": 12,
+   "left": 768,
+   "top": 3840,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_12.png",
+    "sha256": "050ec753d92058af1542eb582b92de322cc73a65ef409a0cdcdcccec5f7fb7d1"
+   }
+  },
+  {
+   "file": "r-4c13.webp",
+   "row": -4,
+   "col": 13,
+   "left": 512,
+   "top": 3840,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_13.png",
+    "sha256": "fad757b0fcf6bc77b15a6a98e7d1fdeb68e90456f703c190adfb6190cf8c7154"
+   }
+  },
+  {
+   "file": "r-4c14.webp",
+   "row": -4,
+   "col": 14,
+   "left": 256,
+   "top": 3840,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_14.png",
+    "sha256": "8a8eb875565015493bc8ef5ff9c5696703b41f8fe1c772a9a1ca316320c7c380"
+   }
+  },
+  {
+   "file": "r-4c15.webp",
+   "row": -4,
+   "col": 15,
+   "left": 0,
+   "top": 3840,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-4_15.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r-3c-6.webp",
+   "row": -3,
+   "col": -6,
+   "left": 5376,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-6.png",
+    "sha256": "a3f878ec5b636fbb8958050fb598d0318dfd6c4d3c03c22a1190eacc16a16286"
+   }
+  },
+  {
+   "file": "r-3c-5.webp",
+   "row": -3,
+   "col": -5,
+   "left": 5120,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-5.png",
+    "sha256": "14f59e0b350172522adab4571c52a0d81ee65ba7c17dfcbf0fb976daae357069"
+   }
+  },
+  {
+   "file": "r-3c-4.webp",
+   "row": -3,
+   "col": -4,
+   "left": 4864,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-4.png",
+    "sha256": "8ede03c9a8ea47bf7280038f7f2c4fc9968c05c4c9d1234c78437922d8ee6d09"
+   }
+  },
+  {
+   "file": "r-3c-3.webp",
+   "row": -3,
+   "col": -3,
+   "left": 4608,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-3.png",
+    "sha256": "6908243f73e91d8a7961ba15f48977a245c981da1bda177f8f88dcdcf927125c"
+   }
+  },
+  {
+   "file": "r-3c-2.webp",
+   "row": -3,
+   "col": -2,
+   "left": 4352,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-2.png",
+    "sha256": "f9808f2a8d2002e00850531d6c92c05ae38a5fe8e638c276e973172a93d9139e"
+   }
+  },
+  {
+   "file": "r-3c-1.webp",
+   "row": -3,
+   "col": -1,
+   "left": 4096,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_-1.png",
+    "sha256": "422be684b59bbe631032d63d3f20f3d9aa629392bba7b3162902697b2f1e0b1e"
+   }
+  },
+  {
+   "file": "r-3c0.webp",
+   "row": -3,
+   "col": 0,
+   "left": 3840,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_0.png",
+    "sha256": "6928e660f7998b902d169a0c9ec67f98c738de7ac6b69ae2219e7045830baf4c"
+   }
+  },
+  {
+   "file": "r-3c1.webp",
+   "row": -3,
+   "col": 1,
+   "left": 3584,
+   "top": 3584,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_1.png",
+    "sha256": "0bf97a63f2228bda429518dd097af8fd5ac5ce5938292c4f0370f14d49508f73"
+   }
+  },
+  {
+   "file": "r-3c2.webp",
+   "row": -3,
+   "col": 2,
+   "left": 3328,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_2.png",
+    "sha256": "5dcfbd95e962b0e1aaab5e35c191d6ae30dda9da91a783b539dc28b9f2eb4594"
+   }
+  },
+  {
+   "file": "r-3c3.webp",
+   "row": -3,
+   "col": 3,
+   "left": 3072,
+   "top": 3584,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_3.png",
+    "sha256": "30584f03797a3fa99eae4c805433b18cf449570d125c0cf9b24c011b2c014aff"
+   }
+  },
+  {
+   "file": "r-3c4.webp",
+   "row": -3,
+   "col": 4,
+   "left": 2816,
+   "top": 3584,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_4.png",
+    "sha256": "bcd2ccd0bf6127984e39c116ebed7e0fab37e71feb503510a0df3aa1fe835524"
+   }
+  },
+  {
+   "file": "r-3c5.webp",
+   "row": -3,
+   "col": 5,
+   "left": 2560,
+   "top": 3584,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_5.png",
+    "sha256": "843f644d178c46f286fff1464267f1ebfab9b48812a62e39b0b6864046190bb9"
+   }
+  },
+  {
+   "file": "r-3c6.webp",
+   "row": -3,
+   "col": 6,
+   "left": 2304,
+   "top": 3584,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_6.png",
+    "sha256": "1283d94bf4b25b94952133d486a5f035459a2b8137172829120abbc382beba8f"
+   }
+  },
+  {
+   "file": "r-3c7.webp",
+   "row": -3,
+   "col": 7,
+   "left": 2048,
+   "top": 3584,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_7.png",
+    "sha256": "4ddbe94bb7ef0f742202d21a6a159b85e4cdedaf911101104585c304e7203ec5"
+   }
+  },
+  {
+   "file": "r-3c8.webp",
+   "row": -3,
+   "col": 8,
+   "left": 1792,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_8.png",
+    "sha256": "6aa9dfbb28447625a47a4e30dd685ba7277544da11941f9d74b4f944f2c3e3f7"
+   }
+  },
+  {
+   "file": "r-3c9.webp",
+   "row": -3,
+   "col": 9,
+   "left": 1536,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_9.png",
+    "sha256": "75fa2389e1ffbfd9d535045a9e8b450b56fc0594e916ba1f446533347b08512f"
+   }
+  },
+  {
+   "file": "r-3c10.webp",
+   "row": -3,
+   "col": 10,
+   "left": 1280,
+   "top": 3584,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_10.png",
+    "sha256": "93834f066b108e54b0f5c975f6db2226976604448a13dad27055dd0bc41f75f0"
+   }
+  },
+  {
+   "file": "r-3c11.webp",
+   "row": -3,
+   "col": 11,
+   "left": 1024,
+   "top": 3584,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_11.png",
+    "sha256": "d91a7d780760c564cee62c498e78dd098c3438e7e2c4b9744312ce0993254361"
+   }
+  },
+  {
+   "file": "r-3c12.webp",
+   "row": -3,
+   "col": 12,
+   "left": 768,
+   "top": 3584,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_12.png",
+    "sha256": "daeeefbb2942d184cbaf9d06da526df44e850671b26b9f7e8e47e564f9151c65"
+   }
+  },
+  {
+   "file": "r-3c13.webp",
+   "row": -3,
+   "col": 13,
+   "left": 512,
+   "top": 3584,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_13.png",
+    "sha256": "870adb2a22f7f8561b00061cf3319d7b5b538e45ddcaef971e4b71f0eed7643e"
+   }
+  },
+  {
+   "file": "r-3c14.webp",
+   "row": -3,
+   "col": 14,
+   "left": 256,
+   "top": 3584,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_14.png",
+    "sha256": "8bd2337d06eb8b007c37da877e728e8a0d80fcd0f699793e3a9bf97f802318b6"
+   }
+  },
+  {
+   "file": "r-3c15.webp",
+   "row": -3,
+   "col": 15,
+   "left": 0,
+   "top": 3584,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-3_15.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r-2c-6.webp",
+   "row": -2,
+   "col": -6,
+   "left": 5376,
+   "top": 3328,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-6.png",
+    "sha256": "5f2351cab00e0c3143d02797c02466b9c0569840f6b9512b3aba950cc3675751"
+   }
+  },
+  {
+   "file": "r-2c-5.webp",
+   "row": -2,
+   "col": -5,
+   "left": 5120,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-5.png",
+    "sha256": "a51ba3cdfac3c8204fb1d21b42081e8628944feb3a7503df9bafe7ee4bbefedb"
+   }
+  },
+  {
+   "file": "r-2c-4.webp",
+   "row": -2,
+   "col": -4,
+   "left": 4864,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-4.png",
+    "sha256": "cf80d03ab5fa500a9ee65228a664694fe4a45538b7507a74db2a6bce7f644a29"
+   }
+  },
+  {
+   "file": "r-2c-3.webp",
+   "row": -2,
+   "col": -3,
+   "left": 4608,
+   "top": 3328,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-3.png",
+    "sha256": "26a1934c723006201c30c1a9f9c169a893fd7dae6dc3188195e1aea4925fe09e"
+   }
+  },
+  {
+   "file": "r-2c-2.webp",
+   "row": -2,
+   "col": -2,
+   "left": 4352,
+   "top": 3328,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-2.png",
+    "sha256": "fb7ee08abbf9745a83fff09bcd8836d1337a2c3a1e6db3b0998fd4d519394834"
+   }
+  },
+  {
+   "file": "r-2c-1.webp",
+   "row": -2,
+   "col": -1,
+   "left": 4096,
+   "top": 3328,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_-1.png",
+    "sha256": "32f946e3f413d8cce2be5319010cd398bae4213ef9a7d42f36012a82e87604e3"
+   }
+  },
+  {
+   "file": "r-2c0.webp",
+   "row": -2,
+   "col": 0,
+   "left": 3840,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_0.png",
+    "sha256": "07a4c2e389d82e98ab9b065d265fb79b4084e0b8a5d2ff39da25c34fd1558af8"
+   }
+  },
+  {
+   "file": "r-2c1.webp",
+   "row": -2,
+   "col": 1,
+   "left": 3584,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_1.png",
+    "sha256": "3608466ed6b52f9163679b6411a63eaf4bab0b73d305662ae331eced899c95fc"
+   }
+  },
+  {
+   "file": "r-2c2.webp",
+   "row": -2,
+   "col": 2,
+   "left": 3328,
+   "top": 3328,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_2.png",
+    "sha256": "91b23dccb18650fb365a8b0c6c3684fdc99bca86f4b53d89d965927bbe421bf4"
+   }
+  },
+  {
+   "file": "r-2c3.webp",
+   "row": -2,
+   "col": 3,
+   "left": 3072,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_3.png",
+    "sha256": "28983bb78a5eea3d61397dbc82ed47252b9480362a7432f28358ecbff82fb036"
+   }
+  },
+  {
+   "file": "r-2c4.webp",
+   "row": -2,
+   "col": 4,
+   "left": 2816,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_4.png",
+    "sha256": "cd027b5acff515599372b221530b761884297283bc5de23d3fd78710395da741"
+   }
+  },
+  {
+   "file": "r-2c5.webp",
+   "row": -2,
+   "col": 5,
+   "left": 2560,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_5.png",
+    "sha256": "a9bd8dbfe20ab2bf0d97cf9322169b28b72cb16c0dea0567c1854f4059db0f72"
+   }
+  },
+  {
+   "file": "r-2c6.webp",
+   "row": -2,
+   "col": 6,
+   "left": 2304,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_6.png",
+    "sha256": "eca3c3a232ced1138401c8ca00fc4b8c8cbf86a0c60acb8a4975d54b59902f30"
+   }
+  },
+  {
+   "file": "r-2c7.webp",
+   "row": -2,
+   "col": 7,
+   "left": 2048,
+   "top": 3328,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_7.png",
+    "sha256": "613c3d5afa4a2c134b265d0e123d62067903b1d5674c6553e348b9e729cc0816"
+   }
+  },
+  {
+   "file": "r-2c8.webp",
+   "row": -2,
+   "col": 8,
+   "left": 1792,
+   "top": 3328,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_8.png",
+    "sha256": "176cdb900e09ac9d3e68a10cad8001de0af5e8b6387ba383bb6a6beac37620f6"
+   }
+  },
+  {
+   "file": "r-2c9.webp",
+   "row": -2,
+   "col": 9,
+   "left": 1536,
+   "top": 3328,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_9.png",
+    "sha256": "2530a768af959e653ffc756b58f08ff4f4ef2a4d6a3f12a2829b27048ffb1a6b"
+   }
+  },
+  {
+   "file": "r-2c10.webp",
+   "row": -2,
+   "col": 10,
+   "left": 1280,
+   "top": 3328,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_10.png",
+    "sha256": "aaa6909ec13841cfa8350d0d6f2b730637be049374f392ea2e567255017dd332"
+   }
+  },
+  {
+   "file": "r-2c11.webp",
+   "row": -2,
+   "col": 11,
+   "left": 1024,
+   "top": 3328,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_11.png",
+    "sha256": "db742973cc67e863251dfadce9f14770e3b7107418299015c17dfc52aa6b8001"
+   }
+  },
+  {
+   "file": "r-2c12.webp",
+   "row": -2,
+   "col": 12,
+   "left": 768,
+   "top": 3328,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_12.png",
+    "sha256": "e77667ed96ac723b092cffd6764c75f830c1346c3514f9a2a485e34105f1fca3"
+   }
+  },
+  {
+   "file": "r-2c13.webp",
+   "row": -2,
+   "col": 13,
+   "left": 512,
+   "top": 3328,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_13.png",
+    "sha256": "45f2815e91cd8e9d634fc0051ded5feb10a093fc291c157f836bc99b83067e8e"
+   }
+  },
+  {
+   "file": "r-2c14.webp",
+   "row": -2,
+   "col": 14,
+   "left": 256,
+   "top": 3328,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_14.png",
+    "sha256": "a174957d42a35d6ffda3a9a3c0468b6ffd52236ac9b617618679c25de4c01c01"
+   }
+  },
+  {
+   "file": "r-2c15.webp",
+   "row": -2,
+   "col": 15,
+   "left": 0,
+   "top": 3328,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-2_15.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r-1c-6.webp",
+   "row": -1,
+   "col": -6,
+   "left": 5376,
+   "top": 3072,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-6.png",
+    "sha256": "5355bd65524cfaa0c02b02efb6dd996cec4b96c9a045151e7b35fc1e3e127f88"
+   }
+  },
+  {
+   "file": "r-1c-5.webp",
+   "row": -1,
+   "col": -5,
+   "left": 5120,
+   "top": 3072,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-5.png",
+    "sha256": "c3a0d77720a42f891f7073dc4018905b34f12921c740557f9ac50e34f71380df"
+   }
+  },
+  {
+   "file": "r-1c-4.webp",
+   "row": -1,
+   "col": -4,
+   "left": 4864,
+   "top": 3072,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-4.png",
+    "sha256": "003b8ae8fbd84c72d848ddea8796e96a2de87138b53630c888815b80830b0c43"
+   }
+  },
+  {
+   "file": "r-1c-3.webp",
+   "row": -1,
+   "col": -3,
+   "left": 4608,
+   "top": 3072,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-3.png",
+    "sha256": "f877a65fae5e2ad774bc3cf258e1d1c1f99dbb7594aaf84d8cfb42dd4a3c3781"
+   }
+  },
+  {
+   "file": "r-1c-2.webp",
+   "row": -1,
+   "col": -2,
+   "left": 4352,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-2.png",
+    "sha256": "1183e86928d955ae2da35d1d4f16b7ecae2ffa79a44b3cb35ffac1cfad958eeb"
+   }
+  },
+  {
+   "file": "r-1c-1.webp",
+   "row": -1,
+   "col": -1,
+   "left": 4096,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_-1.png",
+    "sha256": "29a045ea95eebf7c9d1bfa535f6e6e0713d781a762af32c8dbdf452ddf7a92f1"
+   }
+  },
+  {
+   "file": "r-1c0.webp",
+   "row": -1,
+   "col": 0,
+   "left": 3840,
+   "top": 3072,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_0.png",
+    "sha256": "8c159f0f2e43074b31bf613489b3dbc7d50bebedfa961efb78dba89635d5ac11"
+   }
+  },
+  {
+   "file": "r-1c1.webp",
+   "row": -1,
+   "col": 1,
+   "left": 3584,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_1.png",
+    "sha256": "b0fedba4fb45b829f843c89a1797f9491ed9f7541988815abaf5298198b9c600"
+   }
+  },
+  {
+   "file": "r-1c2.webp",
+   "row": -1,
+   "col": 2,
+   "left": 3328,
+   "top": 3072,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_2.png",
+    "sha256": "c0ec2f1d3df32f5afa73fbd9faada3e1da9141dd9ddfcad78f89de394b68f7a2"
+   }
+  },
+  {
+   "file": "r-1c3.webp",
+   "row": -1,
+   "col": 3,
+   "left": 3072,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_3.png",
+    "sha256": "c1b7b49090db289c95e70f3713f1176ee7abc597429c27c71256786984fe6c42"
+   }
+  },
+  {
+   "file": "r-1c4.webp",
+   "row": -1,
+   "col": 4,
+   "left": 2816,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_4.png",
+    "sha256": "1d85c5935b88f3d18bcd6b8a0d53001d4555b52aef01817f4e73874a91e23a15"
+   }
+  },
+  {
+   "file": "r-1c5.webp",
+   "row": -1,
+   "col": 5,
+   "left": 2560,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_5.png",
+    "sha256": "cf0620e68d547748e655a4504390e907dbfc62d183fcb1e746e1848ca5f99e44"
+   }
+  },
+  {
+   "file": "r-1c6.webp",
+   "row": -1,
+   "col": 6,
+   "left": 2304,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_6.png",
+    "sha256": "836604f6e03aac949901197886c38c3de867778bbb561c48039e5d3d8a962777"
+   }
+  },
+  {
+   "file": "r-1c7.webp",
+   "row": -1,
+   "col": 7,
+   "left": 2048,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_7.png",
+    "sha256": "6152893c98e5e04add457ddd5a56e458ef6c94a6e923204b896417d65acca6be"
+   }
+  },
+  {
+   "file": "r-1c8.webp",
+   "row": -1,
+   "col": 8,
+   "left": 1792,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_8.png",
+    "sha256": "49ee28925c70f80a231747e0f4263a8431eec580268c61b1e42541c72294e093"
+   }
+  },
+  {
+   "file": "r-1c9.webp",
+   "row": -1,
+   "col": 9,
+   "left": 1536,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_9.png",
+    "sha256": "a1492cde748c3b75008c94838ee74b38f4526c4a56fd56945dd20188ada80044"
+   }
+  },
+  {
+   "file": "r-1c10.webp",
+   "row": -1,
+   "col": 10,
+   "left": 1280,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_10.png",
+    "sha256": "aeb78f45d864a523c2cb32569bf9bc5514f99028449378acedcf43386d504968"
+   }
+  },
+  {
+   "file": "r-1c11.webp",
+   "row": -1,
+   "col": 11,
+   "left": 1024,
+   "top": 3072,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_11.png",
+    "sha256": "402e6871a6dca885639f51c3cbea6891222913e3b6cc3bac383dae58b781c509"
+   }
+  },
+  {
+   "file": "r-1c12.webp",
+   "row": -1,
+   "col": 12,
+   "left": 768,
+   "top": 3072,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_12.png",
+    "sha256": "e934b53253293da89d7436969ebd180acf46aeeb82340fe9a18a1c161d11c7f6"
+   }
+  },
+  {
+   "file": "r-1c13.webp",
+   "row": -1,
+   "col": 13,
+   "left": 512,
+   "top": 3072,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_13.png",
+    "sha256": "ef417b4ae2b0c21a81b40f29981f68c4c18b7faae73746a4541e0f5b6b023c62"
+   }
+  },
+  {
+   "file": "r-1c14.webp",
+   "row": -1,
+   "col": 14,
+   "left": 256,
+   "top": 3072,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_14.png",
+    "sha256": "31c90d94db04e49feacd336e0602481bd153a4f08f0984cc310c614ad7d0291d"
+   }
+  },
+  {
+   "file": "r-1c15.webp",
+   "row": -1,
+   "col": 15,
+   "left": 0,
+   "top": 3072,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_-1_15.png",
+    "sha256": "72eddf7c52bd8edb20b1fd47e0c546ff5f231604933096cac12cb4a0d794cf52"
+   }
+  },
+  {
+   "file": "r0c-6.webp",
+   "row": 0,
+   "col": -6,
+   "left": 5376,
+   "top": 2816,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-6.png",
+    "sha256": "72719091d5075830067f44495ca90406088e5ff6db1714cdaffbccd51ae3c7e9"
+   }
+  },
+  {
+   "file": "r0c-5.webp",
+   "row": 0,
+   "col": -5,
+   "left": 5120,
+   "top": 2816,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-5.png",
+    "sha256": "b9f3a1e90ad474efefc360584177ae5ad769ddb637a2d8cddfb2faefc8f364b7"
+   }
+  },
+  {
+   "file": "r0c-4.webp",
+   "row": 0,
+   "col": -4,
+   "left": 4864,
+   "top": 2816,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-4.png",
+    "sha256": "38d133754701ba8fb8d32b02605af3b0b35936198711105152a36cb3a4496bcd"
+   }
+  },
+  {
+   "file": "r0c-3.webp",
+   "row": 0,
+   "col": -3,
+   "left": 4608,
+   "top": 2816,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-3.png",
+    "sha256": "7984ff1909b7f72fceabcff3c5ea1ee785ac1a688af19f69af65ed318a7eb344"
+   }
+  },
+  {
+   "file": "r0c-2.webp",
+   "row": 0,
+   "col": -2,
+   "left": 4352,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-2.png",
+    "sha256": "f0f757cde301632b3f99b733f3808a013e91b1a2e29aefabdb771e7874ea07ab"
+   }
+  },
+  {
+   "file": "r0c-1.webp",
+   "row": 0,
+   "col": -1,
+   "left": 4096,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_-1.png",
+    "sha256": "842d8eadb1b620a8ed37d54ad3c7dcca3da95e06a802d1e3867c46d952777def"
+   }
+  },
+  {
+   "file": "r0c0.webp",
+   "row": 0,
+   "col": 0,
+   "left": 3840,
+   "top": 2816,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_0.png",
+    "sha256": "65e450c22961c894c08982327249cefb747fbcff4925fd261d43cbcbaec3b68b"
+   }
+  },
+  {
+   "file": "r0c1.webp",
+   "row": 0,
+   "col": 1,
+   "left": 3584,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_1.png",
+    "sha256": "50b467b4bfc8f317884c038b17ada2d0db6999046d10ef6a139c8bc5b212dfe0"
+   }
+  },
+  {
+   "file": "r0c2.webp",
+   "row": 0,
+   "col": 2,
+   "left": 3328,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_2.png",
+    "sha256": "75eb7fd7b3a46c812979afb16a1f1814172ae732b1ad86c085e4ac6a189e9c60"
+   }
+  },
+  {
+   "file": "r0c3.webp",
+   "row": 0,
+   "col": 3,
+   "left": 3072,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_3.png",
+    "sha256": "d8ffcab38d8b2802c3119da0c89e6c64d690b6dc612cbf644e8a8085952b6a2f"
+   }
+  },
+  {
+   "file": "r0c4.webp",
+   "row": 0,
+   "col": 4,
+   "left": 2816,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_4.png",
+    "sha256": "9d8467a1e95243dc55a3a9629849e97b25732d36f452079bc95405d3550a36ab"
+   }
+  },
+  {
+   "file": "r0c5.webp",
+   "row": 0,
+   "col": 5,
+   "left": 2560,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_5.png",
+    "sha256": "3665d1ee2be1de0fd073387eec89372c92db7223a6c620c35efb93d4c4b064fc"
+   }
+  },
+  {
+   "file": "r0c6.webp",
+   "row": 0,
+   "col": 6,
+   "left": 2304,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_6.png",
+    "sha256": "07fc9b75beec66a5bba7ec1b8865c4a2838f60a7c0dc5034a77313d940498a7d"
+   }
+  },
+  {
+   "file": "r0c7.webp",
+   "row": 0,
+   "col": 7,
+   "left": 2048,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_7.png",
+    "sha256": "9c14825b1d98858e9f6342231f893a2b3729cfc60efb34d437aeaeac44cb3e2c"
+   }
+  },
+  {
+   "file": "r0c8.webp",
+   "row": 0,
+   "col": 8,
+   "left": 1792,
+   "top": 2816,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_8.png",
+    "sha256": "c95480bdf41d1f377d0899f19e70497c618815dc44ddc6e005fe0f5b0ed855bc"
+   }
+  },
+  {
+   "file": "r0c9.webp",
+   "row": 0,
+   "col": 9,
+   "left": 1536,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_9.png",
+    "sha256": "f08990ddb25d2d0049962c1b1b2a9da4795b5febe334f2a91f9d5ca0856d410c"
+   }
+  },
+  {
+   "file": "r0c10.webp",
+   "row": 0,
+   "col": 10,
+   "left": 1280,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_10.png",
+    "sha256": "88c101b8b1c82bce86966fcdefcd89dc1d20299c529c62bc76015d12be096e2e"
+   }
+  },
+  {
+   "file": "r0c11.webp",
+   "row": 0,
+   "col": 11,
+   "left": 1024,
+   "top": 2816,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_11.png",
+    "sha256": "004157564da45a6c7e13c4abe37bcca973f6906bc25d071cfb11ec259c97ee01"
+   }
+  },
+  {
+   "file": "r0c12.webp",
+   "row": 0,
+   "col": 12,
+   "left": 768,
+   "top": 2816,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_12.png",
+    "sha256": "44a811b7391d8b3d90731e45c092242a8a5f557eeae7d75b04c4e1e6f41ea8eb"
+   }
+  },
+  {
+   "file": "r0c13.webp",
+   "row": 0,
+   "col": 13,
+   "left": 512,
+   "top": 2816,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_13.png",
+    "sha256": "17c85281c8d32a89b4464c08c8c9b40bc45f50b074baba14610ac4fd0713b07c"
+   }
+  },
+  {
+   "file": "r0c14.webp",
+   "row": 0,
+   "col": 14,
+   "left": 256,
+   "top": 2816,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_14.png",
+    "sha256": "e877c41a1fa5c2da4219af890bcc562905b054f75e9f52c5322fe8ba3201cfa9"
+   }
+  },
+  {
+   "file": "r0c15.webp",
+   "row": 0,
+   "col": 15,
+   "left": 0,
+   "top": 2816,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_0_15.png",
+    "sha256": "9e5ab7328fa404035f4a5246eeac870b5b3f7510e4c0f02675e11fe3b80a6c7c"
+   }
+  },
+  {
+   "file": "r1c-5.webp",
+   "row": 1,
+   "col": -5,
+   "left": 5120,
+   "top": 2560,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_-5.png",
+    "sha256": "5905a4306839459da478b2cd2fc03577e5008253a2e460cb1d6226f886073753"
+   }
+  },
+  {
+   "file": "r1c-4.webp",
+   "row": 1,
+   "col": -4,
+   "left": 4864,
+   "top": 2560,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_-4.png",
+    "sha256": "4f5997281035f6533515c5ce13469a8bd845689f0587e41c6d0edecc5e5e945f"
+   }
+  },
+  {
+   "file": "r1c-3.webp",
+   "row": 1,
+   "col": -3,
+   "left": 4608,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_-3.png",
+    "sha256": "dbcf70bf7ac90014f962980b499e9b22dac7c387f591eefa61a6fb2e77ce4adf"
+   }
+  },
+  {
+   "file": "r1c-2.webp",
+   "row": 1,
+   "col": -2,
+   "left": 4352,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_-2.png",
+    "sha256": "721f2f4fbfcda2b2a2d67269cec4971a80ae84b01c83bfa77bca17c2c0ad224b"
+   }
+  },
+  {
+   "file": "r1c-1.webp",
+   "row": 1,
+   "col": -1,
+   "left": 4096,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_-1.png",
+    "sha256": "5c4c21d4fb14d514e54be154b1a6690f79a156320aa419a5cd0386bbe6dfa54f"
+   }
+  },
+  {
+   "file": "r1c0.webp",
+   "row": 1,
+   "col": 0,
+   "left": 3840,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_0.png",
+    "sha256": "fa1566b8e6aec2e1ef37b47daac588e34edd7422653b8c9be6849fee5fd0cb96"
+   }
+  },
+  {
+   "file": "r1c1.webp",
+   "row": 1,
+   "col": 1,
+   "left": 3584,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_1.png",
+    "sha256": "830172caa24f578402faa057c47be971ea90745d407d1fb4fa1dd12b035f0efa"
+   }
+  },
+  {
+   "file": "r1c2.webp",
+   "row": 1,
+   "col": 2,
+   "left": 3328,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_2.png",
+    "sha256": "ecb8130d90dfbbce52db624e6f78d0443100e27c8083ff83c9425ecfb2b43923"
+   }
+  },
+  {
+   "file": "r1c3.webp",
+   "row": 1,
+   "col": 3,
+   "left": 3072,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_3.png",
+    "sha256": "64106867c7caea58e6f6060107bbe19274f503abdf60994046dedd90aa1cf765"
+   }
+  },
+  {
+   "file": "r1c4.webp",
+   "row": 1,
+   "col": 4,
+   "left": 2816,
+   "top": 2560,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_4.png",
+    "sha256": "1a143ac14de2c2a6f935bc0afeb27eed2c91b105aa38204a72c5b24b3daac8c9"
+   }
+  },
+  {
+   "file": "r1c5.webp",
+   "row": 1,
+   "col": 5,
+   "left": 2560,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_5.png",
+    "sha256": "cd7c8552adc00e6f3c43d9acc70c521a73cab7c14c2d56e5e88bab6adab45e3d"
+   }
+  },
+  {
+   "file": "r1c6.webp",
+   "row": 1,
+   "col": 6,
+   "left": 2304,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_6.png",
+    "sha256": "2fb7cc27470ebe13e1d55a5cd822c0e3e60bd7b7f22fa7fe4a46f88a10b9ccba"
+   }
+  },
+  {
+   "file": "r1c7.webp",
+   "row": 1,
+   "col": 7,
+   "left": 2048,
+   "top": 2560,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_7.png",
+    "sha256": "1c246298f3588a21bcec580b3c109ef37f90acccdad5d756e010a63a578ee462"
+   }
+  },
+  {
+   "file": "r1c8.webp",
+   "row": 1,
+   "col": 8,
+   "left": 1792,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_8.png",
+    "sha256": "64c44aed067f8c31066540eef3c1a13b769c5cdc9a459adf8343a7e1bf15d739"
+   }
+  },
+  {
+   "file": "r1c9.webp",
+   "row": 1,
+   "col": 9,
+   "left": 1536,
+   "top": 2560,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_9.png",
+    "sha256": "7139e3dd207896c9dffa84528fb17f3a29484adbf8273b40ff3d91e46263a453"
+   }
+  },
+  {
+   "file": "r1c10.webp",
+   "row": 1,
+   "col": 10,
+   "left": 1280,
+   "top": 2560,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_10.png",
+    "sha256": "bebda186ad3246b694c92bcffae047eeb754839d453b6aa2e39c60bdcb9a240e"
+   }
+  },
+  {
+   "file": "r1c11.webp",
+   "row": 1,
+   "col": 11,
+   "left": 1024,
+   "top": 2560,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_11.png",
+    "sha256": "3d24c234439cd1a881428f749045ac68255bcf3f6f72caf0afb69e8bb6d69f7a"
+   }
+  },
+  {
+   "file": "r1c12.webp",
+   "row": 1,
+   "col": 12,
+   "left": 768,
+   "top": 2560,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_12.png",
+    "sha256": "bd4181ad8733fb15c20776e866f47f81492f75d19a07bdcac6f7c7baee1efd3e"
+   }
+  },
+  {
+   "file": "r1c13.webp",
+   "row": 1,
+   "col": 13,
+   "left": 512,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_13.png",
+    "sha256": "ef3a5bd9c13cfda42e81450539980990a15dda7a9646bb80d84a469b485b6a0b"
+   }
+  },
+  {
+   "file": "r1c14.webp",
+   "row": 1,
+   "col": 14,
+   "left": 256,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_14.png",
+    "sha256": "4a8c7350e9e6a5c6d5e8c05ab85492a25d565b55b19bb6d4e575751d2dcc51a0"
+   }
+  },
+  {
+   "file": "r1c15.webp",
+   "row": 1,
+   "col": 15,
+   "left": 0,
+   "top": 2560,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_1_15.png",
+    "sha256": "95773bb59d3b58867040aab8ddef6a941443ea51392f5578b32ea78684cae161"
+   }
+  },
+  {
+   "file": "r2c-4.webp",
+   "row": 2,
+   "col": -4,
+   "left": 4864,
+   "top": 2304,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_-4.png",
+    "sha256": "61c60cba9210133b30935166ec241aa3c459208b3d2cedf049eb3356793f85fa"
+   }
+  },
+  {
+   "file": "r2c-3.webp",
+   "row": 2,
+   "col": -3,
+   "left": 4608,
+   "top": 2304,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_-3.png",
+    "sha256": "26d7a2db19033e598187df2f83d2cb58da891c162becc2a32946abb7d0d9a78b"
+   }
+  },
+  {
+   "file": "r2c-2.webp",
+   "row": 2,
+   "col": -2,
+   "left": 4352,
+   "top": 2304,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_-2.png",
+    "sha256": "61c01546e99d33cb618377a418a84f9b4486031e2baf0fad92f8a83b306554e7"
+   }
+  },
+  {
+   "file": "r2c-1.webp",
+   "row": 2,
+   "col": -1,
+   "left": 4096,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_-1.png",
+    "sha256": "7ea69c2a2360b91d98847af86c2965fa9ae45158f4c22f4beaa705e85eea9d7e"
+   }
+  },
+  {
+   "file": "r2c0.webp",
+   "row": 2,
+   "col": 0,
+   "left": 3840,
+   "top": 2304,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_0.png",
+    "sha256": "0cb57b40f1abba8bb0a570a3e02b6be9a4cde057470fb23e5d325de2d26129a8"
+   }
+  },
+  {
+   "file": "r2c1.webp",
+   "row": 2,
+   "col": 1,
+   "left": 3584,
+   "top": 2304,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_1.png",
+    "sha256": "80561ce0d2210fe9df529f77649c9a1917fd4b24942081cb81e938de3ff5f96e"
+   }
+  },
+  {
+   "file": "r2c2.webp",
+   "row": 2,
+   "col": 2,
+   "left": 3328,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_2.png",
+    "sha256": "97829447c210c73bfd16990af0cd6843c76b490ee4ed9dd86794ba13955ffe63"
+   }
+  },
+  {
+   "file": "r2c3.webp",
+   "row": 2,
+   "col": 3,
+   "left": 3072,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_3.png",
+    "sha256": "d96014f776e7f2c2dc18d2b9b84eae57b691cb5c5587e706642e05da45ca5a25"
+   }
+  },
+  {
+   "file": "r2c4.webp",
+   "row": 2,
+   "col": 4,
+   "left": 2816,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_4.png",
+    "sha256": "5fcd91d5b41f2b7cc9cdefd399c772bc1b28ee4583272a611358be30c03fa3d8"
+   }
+  },
+  {
+   "file": "r2c5.webp",
+   "row": 2,
+   "col": 5,
+   "left": 2560,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_5.png",
+    "sha256": "45bac72299af0399be81c6236aaa227a7c8ce079addc9321d05679d8aa64d3a2"
+   }
+  },
+  {
+   "file": "r2c6.webp",
+   "row": 2,
+   "col": 6,
+   "left": 2304,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_6.png",
+    "sha256": "4db3c74c6dc67647636bce461950e1571d3b42c573f57e6b16fce02528760bdb"
+   }
+  },
+  {
+   "file": "r2c7.webp",
+   "row": 2,
+   "col": 7,
+   "left": 2048,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_7.png",
+    "sha256": "2e57f6cc632034150383b05a8e8972cfc8a0151de0bdd49152a21c08afece530"
+   }
+  },
+  {
+   "file": "r2c8.webp",
+   "row": 2,
+   "col": 8,
+   "left": 1792,
+   "top": 2304,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_8.png",
+    "sha256": "9061e3141bf396c88bfb4bd71c13caa83177125ceaf62a845c686ace159f7381"
+   }
+  },
+  {
+   "file": "r2c9.webp",
+   "row": 2,
+   "col": 9,
+   "left": 1536,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_9.png",
+    "sha256": "161830c07695464d0cd53f18a18d37ae6ad4af8fa8ec4c43b476e76d598769ad"
+   }
+  },
+  {
+   "file": "r2c10.webp",
+   "row": 2,
+   "col": 10,
+   "left": 1280,
+   "top": 2304,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_10.png",
+    "sha256": "17c12ca8d9ede0c64764cb635db145f34ea364261303ce576ef7ea2b44475e50"
+   }
+  },
+  {
+   "file": "r2c11.webp",
+   "row": 2,
+   "col": 11,
+   "left": 1024,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_11.png",
+    "sha256": "cf378851370c8af15834537074dec33ef56767c24658042db54baa13313d838d"
+   }
+  },
+  {
+   "file": "r2c12.webp",
+   "row": 2,
+   "col": 12,
+   "left": 768,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_12.png",
+    "sha256": "73d2a5580525f22a8bf778030de2fd55ad750dc1993f90fe067b63ef851bb94e"
+   }
+  },
+  {
+   "file": "r2c13.webp",
+   "row": 2,
+   "col": 13,
+   "left": 512,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_13.png",
+    "sha256": "99b59de76146e2d7647e6c37dff72402c79c439b6e0139459513d4fe1c915962"
+   }
+  },
+  {
+   "file": "r2c14.webp",
+   "row": 2,
+   "col": 14,
+   "left": 256,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_14.png",
+    "sha256": "0e21f56fc7cd4438258409dd70f22d544852a2e13b0755e05550a28300310d46"
+   }
+  },
+  {
+   "file": "r2c15.webp",
+   "row": 2,
+   "col": 15,
+   "left": 0,
+   "top": 2304,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_2_15.png",
+    "sha256": "e5bcde1b62aaaf18b974cf6c88a50f261e0e95eadd4e4ae6cfca620ff492f6d8"
+   }
+  },
+  {
+   "file": "r3c-4.webp",
+   "row": 3,
+   "col": -4,
+   "left": 4864,
+   "top": 2048,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_-4.png",
+    "sha256": "7108593f76abc4a3ff8b711e1bc3fc2b4c602ef3ed43567ca630f1c56195e88d"
+   }
+  },
+  {
+   "file": "r3c-3.webp",
+   "row": 3,
+   "col": -3,
+   "left": 4608,
+   "top": 2048,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_-3.png",
+    "sha256": "865274228060c4d409d0ce45b78c76a3a9f9c9ee32db27b54c4d9cfb90b8059d"
+   }
+  },
+  {
+   "file": "r3c-2.webp",
+   "row": 3,
+   "col": -2,
+   "left": 4352,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_-2.png",
+    "sha256": "e23b096a76648068a6644971b4e372770baeb4ccac8cb09122abd59be320f258"
+   }
+  },
+  {
+   "file": "r3c-1.webp",
+   "row": 3,
+   "col": -1,
+   "left": 4096,
+   "top": 2048,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_-1.png",
+    "sha256": "066d01879f4e375944ee22ad026cf6eaefc1b9936256c2928b052d11afd3a284"
+   }
+  },
+  {
+   "file": "r3c0.webp",
+   "row": 3,
+   "col": 0,
+   "left": 3840,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_0.png",
+    "sha256": "1eab2a9ac463a55c0d881f2ed86a74cc25564e0b71e16cbe9f29e18e5ed1c54c"
+   }
+  },
+  {
+   "file": "r3c1.webp",
+   "row": 3,
+   "col": 1,
+   "left": 3584,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_1.png",
+    "sha256": "07f4570d0751c159ce5d670f5e3f559bfc2d2f84dfa0cde5f6955733d75f7995"
+   }
+  },
+  {
+   "file": "r3c2.webp",
+   "row": 3,
+   "col": 2,
+   "left": 3328,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_2.png",
+    "sha256": "8a4f2b9be218afc595b88f39756661ec34744a295f57ce309629933332815b90"
+   }
+  },
+  {
+   "file": "r3c3.webp",
+   "row": 3,
+   "col": 3,
+   "left": 3072,
+   "top": 2048,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_3.png",
+    "sha256": "e299c2526ed63ddc9c544efb79a959def3b43c159e33f50686d663bfcb366916"
+   }
+  },
+  {
+   "file": "r3c4.webp",
+   "row": 3,
+   "col": 4,
+   "left": 2816,
+   "top": 2048,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_4.png",
+    "sha256": "a634b5ddda6d92522715d820bfd16f6604a19de03f092e204edbab732c9b2bb4"
+   }
+  },
+  {
+   "file": "r3c5.webp",
+   "row": 3,
+   "col": 5,
+   "left": 2560,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_5.png",
+    "sha256": "182d29234c35534577561c2c4af33b61b1f8a97e4c9b11251164d458c2ea1811"
+   }
+  },
+  {
+   "file": "r3c6.webp",
+   "row": 3,
+   "col": 6,
+   "left": 2304,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_6.png",
+    "sha256": "4720e3e0cf5f16457f6c800ddf09c47b67bb741622ccb2821cf91d39ead32681"
+   }
+  },
+  {
+   "file": "r3c7.webp",
+   "row": 3,
+   "col": 7,
+   "left": 2048,
+   "top": 2048,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_7.png",
+    "sha256": "2f5f640e9532c45d0075959eeff8639d6608f17d90b7f5da43d2cc290a649326"
+   }
+  },
+  {
+   "file": "r3c8.webp",
+   "row": 3,
+   "col": 8,
+   "left": 1792,
+   "top": 2048,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_8.png",
+    "sha256": "4acd52fa536bf68524dee34c69a221055fcee07ca70fa81fee958ce567625693"
+   }
+  },
+  {
+   "file": "r3c9.webp",
+   "row": 3,
+   "col": 9,
+   "left": 1536,
+   "top": 2048,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_9.png",
+    "sha256": "580adf14c3d2b771b0d915b70e2a64000c006dcd277973cbbf23b8f0e0dc1445"
+   }
+  },
+  {
+   "file": "r3c10.webp",
+   "row": 3,
+   "col": 10,
+   "left": 1280,
+   "top": 2048,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_10.png",
+    "sha256": "de1bff26f67115c089130c41dc9dbc1813b4faff335ea796b4f2fa305e94848c"
+   }
+  },
+  {
+   "file": "r3c11.webp",
+   "row": 3,
+   "col": 11,
+   "left": 1024,
+   "top": 2048,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_3_11.png",
+    "sha256": "4b5d498313fdd71f29476ef5a8a742fab1e7f6e73a5139fdbfded76f8d6f0ebb"
+   }
+  },
+  {
+   "file": "r4c-3.webp",
+   "row": 4,
+   "col": -3,
+   "left": 4608,
+   "top": 1792,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_-3.png",
+    "sha256": "deb24e25dc5edb9ddfe9fe00b87c97713420c73d0bf1e390805137028af8de91"
+   }
+  },
+  {
+   "file": "r4c-2.webp",
+   "row": 4,
+   "col": -2,
+   "left": 4352,
+   "top": 1792,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_-2.png",
+    "sha256": "afbad154fcaca6875ce5c29a1ded8101aa16abd7d6025bcff693d561e9b17696"
+   }
+  },
+  {
+   "file": "r4c-1.webp",
+   "row": 4,
+   "col": -1,
+   "left": 4096,
+   "top": 1792,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_-1.png",
+    "sha256": "209afb2a923e4540b96a268d6ef2b95fcc25608e437f551e331987b2a596d5e0"
+   }
+  },
+  {
+   "file": "r4c0.webp",
+   "row": 4,
+   "col": 0,
+   "left": 3840,
+   "top": 1792,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_0.png",
+    "sha256": "0b73ddb511829771554556ad4a6abc5be35f7dfbbe87ed6fc91f35fb38e76abd"
+   }
+  },
+  {
+   "file": "r4c1.webp",
+   "row": 4,
+   "col": 1,
+   "left": 3584,
+   "top": 1792,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_1.png",
+    "sha256": "5465cdeca854194447eed1e187e5dd0f5b17964b9e66db87ab7e96d2391c4d81"
+   }
+  },
+  {
+   "file": "r4c2.webp",
+   "row": 4,
+   "col": 2,
+   "left": 3328,
+   "top": 1792,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_2.png",
+    "sha256": "04b4813aea58030875a4cfe37daef23c82b8abf4ab239cb8bcfba8e864fbbb58"
+   }
+  },
+  {
+   "file": "r4c3.webp",
+   "row": 4,
+   "col": 3,
+   "left": 3072,
+   "top": 1792,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_3.png",
+    "sha256": "a2962b0213289df759170a637591426bb466a985ab04194aff870e5fe217f662"
+   }
+  },
+  {
+   "file": "r4c4.webp",
+   "row": 4,
+   "col": 4,
+   "left": 2816,
+   "top": 1792,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_4.png",
+    "sha256": "0510349ff503b4cd0026b772207a46ea6292bbe3d8b36ce4bcde9fb74afcc1ec"
+   }
+  },
+  {
+   "file": "r4c5.webp",
+   "row": 4,
+   "col": 5,
+   "left": 2560,
+   "top": 1792,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_5.png",
+    "sha256": "8f4f4bf37fb773bef4e4930c3c03f4462a23c8538406790711c9e7425eb0696f"
+   }
+  },
+  {
+   "file": "r4c6.webp",
+   "row": 4,
+   "col": 6,
+   "left": 2304,
+   "top": 1792,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_6.png",
+    "sha256": "bc6b3c35b01c6fe98e77447960eab0582952e4ac62edc649654f6b2670f8e190"
+   }
+  },
+  {
+   "file": "r4c7.webp",
+   "row": 4,
+   "col": 7,
+   "left": 2048,
+   "top": 1792,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_7.png",
+    "sha256": "119920a557810389217393e2a625fe868533fbe197ed1d185ee3c211d7acd1e4"
+   }
+  },
+  {
+   "file": "r4c8.webp",
+   "row": 4,
+   "col": 8,
+   "left": 1792,
+   "top": 1792,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_8.png",
+    "sha256": "b69691a7cce2a45e2502172f0e746159f1c69a2c43e4060362b046841b27eb4d"
+   }
+  },
+  {
+   "file": "r4c9.webp",
+   "row": 4,
+   "col": 9,
+   "left": 1536,
+   "top": 1792,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_9.png",
+    "sha256": "6d92e0c63e9dd3d18872e322cce568068478b1f2cdd39667101ae7d27e0b132d"
+   }
+  },
+  {
+   "file": "r4c10.webp",
+   "row": 4,
+   "col": 10,
+   "left": 1280,
+   "top": 1792,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_10.png",
+    "sha256": "f8b96da11dbd039839c4bdca1874145bddbcfaca517b7688db373e956959f593"
+   }
+  },
+  {
+   "file": "r4c11.webp",
+   "row": 4,
+   "col": 11,
+   "left": 1024,
+   "top": 1792,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_4_11.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r5c-3.webp",
+   "row": 5,
+   "col": -3,
+   "left": 4608,
+   "top": 1536,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_-3.png",
+    "sha256": "8cd5472365b9bb99bc1cb719b9af76025ffe0d1646901bf735248c58be113aab"
+   }
+  },
+  {
+   "file": "r5c-2.webp",
+   "row": 5,
+   "col": -2,
+   "left": 4352,
+   "top": 1536,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_-2.png",
+    "sha256": "ce127dd4151254d5a80c61a34a5651374150490922b91961fc8608a80e6307b2"
+   }
+  },
+  {
+   "file": "r5c-1.webp",
+   "row": 5,
+   "col": -1,
+   "left": 4096,
+   "top": 1536,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_-1.png",
+    "sha256": "b638a007e97524e4db72d1de96539a479cbc62bed25a713e30d444d0fb7f13c0"
+   }
+  },
+  {
+   "file": "r5c0.webp",
+   "row": 5,
+   "col": 0,
+   "left": 3840,
+   "top": 1536,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_0.png",
+    "sha256": "efe094bfcb26405c2f22197514e65a462d881c2636ab21ac09901e24553bf103"
+   }
+  },
+  {
+   "file": "r5c1.webp",
+   "row": 5,
+   "col": 1,
+   "left": 3584,
+   "top": 1536,
+   "width": 128,
+   "height": 128,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_1.png",
+    "sha256": "0835ecd3c719c54b4bef974bbd5b5a54e73d07c23c573664e841c07b2b35d94b"
+   }
+  },
+  {
+   "file": "r5c2.webp",
+   "row": 5,
+   "col": 2,
+   "left": 3328,
+   "top": 1536,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_2.png",
+    "sha256": "7187f728fff02d36aaf487a972403da85bf835be2d73d53195264b31613c6950"
+   }
+  },
+  {
+   "file": "r5c3.webp",
+   "row": 5,
+   "col": 3,
+   "left": 3072,
+   "top": 1536,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_3.png",
+    "sha256": "4e911d31482260130ba7bec3de9e612af518710bfb71539265bffbf81bc1738a"
+   }
+  },
+  {
+   "file": "r5c4.webp",
+   "row": 5,
+   "col": 4,
+   "left": 2816,
+   "top": 1536,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_4.png",
+    "sha256": "a25a1cc063b85e8f39eb352fffca50710d5f2220dcbb58cf76693ba79292bd2e"
+   }
+  },
+  {
+   "file": "r5c5.webp",
+   "row": 5,
+   "col": 5,
+   "left": 2560,
+   "top": 1536,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_5.png",
+    "sha256": "89a87869354ee6c1bbf39e9e768337497565ca3d5996e3a4c78fc3b025aef261"
+   }
+  },
+  {
+   "file": "r5c6.webp",
+   "row": 5,
+   "col": 6,
+   "left": 2304,
+   "top": 1536,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_6.png",
+    "sha256": "7187f728fff02d36aaf487a972403da85bf835be2d73d53195264b31613c6950"
+   }
+  },
+  {
+   "file": "r5c7.webp",
+   "row": 5,
+   "col": 7,
+   "left": 2048,
+   "top": 1536,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_7.png",
+    "sha256": "dcdf8fc9a2bf1a24749ada63ff14c84bf893e20701408502d1ebfa1b3661b042"
+   }
+  },
+  {
+   "file": "r5c8.webp",
+   "row": 5,
+   "col": 8,
+   "left": 1792,
+   "top": 1536,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_8.png",
+    "sha256": "cdac0b76f9437a7080d0961f9f19f3f29a32746bbc326e90ce055828a4ec86a1"
+   }
+  },
+  {
+   "file": "r5c9.webp",
+   "row": 5,
+   "col": 9,
+   "left": 1536,
+   "top": 1536,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_9.png",
+    "sha256": "202927beae2e5579279b819bfda124dffbdbaa8f5f6ae35467bee41b2d806f16"
+   }
+  },
+  {
+   "file": "r5c10.webp",
+   "row": 5,
+   "col": 10,
+   "left": 1280,
+   "top": 1536,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_10.png",
+    "sha256": "f4b13038a7cab6a5665521d505f4cd2268e3f49cf5532f5b7ebedc7cf959a604"
+   }
+  },
+  {
+   "file": "r5c11.webp",
+   "row": 5,
+   "col": 11,
+   "left": 1024,
+   "top": 1536,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_5_11.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r6c3.webp",
+   "row": 6,
+   "col": 3,
+   "left": 3072,
+   "top": 1280,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_3.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r6c4.webp",
+   "row": 6,
+   "col": 4,
+   "left": 2816,
+   "top": 1280,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_4.png",
+    "sha256": "b15db4a99c946c2b328f0f68c1f12271ee3fb226e55f9d9c176e8e1b30d86e3e"
+   }
+  },
+  {
+   "file": "r6c5.webp",
+   "row": 6,
+   "col": 5,
+   "left": 2560,
+   "top": 1280,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_5.png",
+    "sha256": "d38fdea62ac8ebad056d5aa559ce1d00de0cfd9f53d12854a01d99080cc5e658"
+   }
+  },
+  {
+   "file": "r6c6.webp",
+   "row": 6,
+   "col": 6,
+   "left": 2304,
+   "top": 1280,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_6.png",
+    "sha256": "c420568fa1387f26f2a7704fea0cbe89ec6e35b8af90723bb06a23d4f4d6605a"
+   }
+  },
+  {
+   "file": "r6c7.webp",
+   "row": 6,
+   "col": 7,
+   "left": 2048,
+   "top": 1280,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_7.png",
+    "sha256": "c608de9fb5ae16c313f4ae69d0a6a8f4db8ff63291770d446e055ef13d4630f3"
+   }
+  },
+  {
+   "file": "r6c8.webp",
+   "row": 6,
+   "col": 8,
+   "left": 1792,
+   "top": 1280,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_8.png",
+    "sha256": "48070603da65568680b279aaa090c8d6288e8065df01f2e424907a391d70a529"
+   }
+  },
+  {
+   "file": "r6c9.webp",
+   "row": 6,
+   "col": 9,
+   "left": 1536,
+   "top": 1280,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_9.png",
+    "sha256": "699ec01cdb43e1ff14d8fb2f680dbc5df8a24a991ed6816990e9d67bde5323ef"
+   }
+  },
+  {
+   "file": "r6c10.webp",
+   "row": 6,
+   "col": 10,
+   "left": 1280,
+   "top": 1280,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_10.png",
+    "sha256": "268ce65648e398e7e015b1fb0b74daafb574df50bd9c5fa416414eff740d70fc"
+   }
+  },
+  {
+   "file": "r6c11.webp",
+   "row": 6,
+   "col": 11,
+   "left": 1024,
+   "top": 1280,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_6_11.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r7c0.webp",
+   "row": 7,
+   "col": 0,
+   "left": 3840,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_0.png",
+    "sha256": "bd8eacc3068f701b956a8c90ac19b6188e3dfd25a491a1ad8dd34e4fd8559438"
+   }
+  },
+  {
+   "file": "r7c1.webp",
+   "row": 7,
+   "col": 1,
+   "left": 3584,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_1.png",
+    "sha256": "f4cb13d01e7edc12babee2d4d751e759782c0a120bd7538796abf4d1d9f5d9b3"
+   }
+  },
+  {
+   "file": "r7c2.webp",
+   "row": 7,
+   "col": 2,
+   "left": 3328,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_2.png",
+    "sha256": "83634ed33050d473dff2be37fcf9be75d09db02ab698f2157eb6912a545e7f48"
+   }
+  },
+  {
+   "file": "r7c3.webp",
+   "row": 7,
+   "col": 3,
+   "left": 3072,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_3.png",
+    "sha256": "94f1dc6030bc674ac6b4c5ed1b8c513f1865beb06275d7ca188379640dc99fd1"
+   }
+  },
+  {
+   "file": "r7c4.webp",
+   "row": 7,
+   "col": 4,
+   "left": 2816,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_4.png",
+    "sha256": "92233eaef5bccdf8df31151a89731eac64454e667818e6d33e5aebfd2007b1c1"
+   }
+  },
+  {
+   "file": "r7c5.webp",
+   "row": 7,
+   "col": 5,
+   "left": 2560,
+   "top": 1024,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_5.png",
+    "sha256": "8b4bee085eb3d37ae4db88fbdbf663d593ebd575b2d34a9fecd29401da01035f"
+   }
+  },
+  {
+   "file": "r7c6.webp",
+   "row": 7,
+   "col": 6,
+   "left": 2304,
+   "top": 1024,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_6.png",
+    "sha256": "99d210aea66c7905135493b117ee6362fbcffd5a816489d690d3d3ca87cd7e42"
+   }
+  },
+  {
+   "file": "r7c7.webp",
+   "row": 7,
+   "col": 7,
+   "left": 2048,
+   "top": 1024,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_7.png",
+    "sha256": "ce7f785e8bcaa92fd20a577422e31ff17acb4d6d7262a838be19b20eb3e89a82"
+   }
+  },
+  {
+   "file": "r7c8.webp",
+   "row": 7,
+   "col": 8,
+   "left": 1792,
+   "top": 1024,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_8.png",
+    "sha256": "ab4cc100786f4cea31bfc222b348b785fe20d830d7de9895881ec6ef86ba34a9"
+   }
+  },
+  {
+   "file": "r7c9.webp",
+   "row": 7,
+   "col": 9,
+   "left": 1536,
+   "top": 1024,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_9.png",
+    "sha256": "7525559a1b4b81b506e0b33de220b63073404dc52bbb0d934f385a8095b5a42e"
+   }
+  },
+  {
+   "file": "r7c10.webp",
+   "row": 7,
+   "col": 10,
+   "left": 1280,
+   "top": 1024,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_10.png",
+    "sha256": "9f613af757051aa4c8f0336dd15be46a018d46e03da40f70d1bf49b30218273c"
+   }
+  },
+  {
+   "file": "r7c11.webp",
+   "row": 7,
+   "col": 11,
+   "left": 1024,
+   "top": 1024,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_7_11.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r8c0.webp",
+   "row": 8,
+   "col": 0,
+   "left": 3840,
+   "top": 768,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_0.png",
+    "sha256": "d33256abcfff6e9a329d28daec8f0eb0496b103139a778d047e677f8b139170b"
+   }
+  },
+  {
+   "file": "r8c1.webp",
+   "row": 8,
+   "col": 1,
+   "left": 3584,
+   "top": 768,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_1.png",
+    "sha256": "e508ceafa45f64c639abe250bfea0af361564db8ac46bc2ffd40cd7faf218801"
+   }
+  },
+  {
+   "file": "r8c2.webp",
+   "row": 8,
+   "col": 2,
+   "left": 3328,
+   "top": 768,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_2.png",
+    "sha256": "4b7f27c9a64fc708ac317a4d9569e138f8d63abb28daf6712437a4f7e03197a2"
+   }
+  },
+  {
+   "file": "r8c3.webp",
+   "row": 8,
+   "col": 3,
+   "left": 3072,
+   "top": 768,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_3.png",
+    "sha256": "a8ac6ccc81abed800ae8f591475811c28e1853454b45af2b1d9d68524651eb5d"
+   }
+  },
+  {
+   "file": "r8c4.webp",
+   "row": 8,
+   "col": 4,
+   "left": 2816,
+   "top": 768,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_4.png",
+    "sha256": "810b41d9ebbaee77998ad2f05ac701b316cb6841bbbcea72243a52e658dedcc4"
+   }
+  },
+  {
+   "file": "r8c5.webp",
+   "row": 8,
+   "col": 5,
+   "left": 2560,
+   "top": 768,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_5.png",
+    "sha256": "cf22c655f6a909cea10f93e01b4e1bc5d2d09eab2f144321cd465395fe1f63b2"
+   }
+  },
+  {
+   "file": "r8c6.webp",
+   "row": 8,
+   "col": 6,
+   "left": 2304,
+   "top": 768,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_6.png",
+    "sha256": "a3b45f41c2720f4dedfccfff23c40984abce3679592e49f71a055f154e5c00e9"
+   }
+  },
+  {
+   "file": "r8c7.webp",
+   "row": 8,
+   "col": 7,
+   "left": 2048,
+   "top": 768,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_7.png",
+    "sha256": "edd7215d1db07458fe244deb9cea46ae555a82e0f04d55721a5edcd8d23da124"
+   }
+  },
+  {
+   "file": "r8c8.webp",
+   "row": 8,
+   "col": 8,
+   "left": 1792,
+   "top": 768,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_8.png",
+    "sha256": "38e7c5804b2304e6a6fbbd40e63e7f15fa83ab21601cfc6b323dbb5464473cfa"
+   }
+  },
+  {
+   "file": "r8c9.webp",
+   "row": 8,
+   "col": 9,
+   "left": 1536,
+   "top": 768,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_8_9.png",
+    "sha256": "cfca81f3e44bd95be1ed4409868472eeeca21c0e67a52647f60a8619ace87afa"
+   }
+  },
+  {
+   "file": "r9c0.webp",
+   "row": 9,
+   "col": 0,
+   "left": 3840,
+   "top": 512,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_0.png",
+    "sha256": "8eed9dcc79adb43c7d32d7589166214769999fd8c9e208d05310fd2b2b6496ee"
+   }
+  },
+  {
+   "file": "r9c1.webp",
+   "row": 9,
+   "col": 1,
+   "left": 3584,
+   "top": 512,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_1.png",
+    "sha256": "a50a1c2bd4e65659a407aa6c8aaea0cb02fcddc76ef0f30a3d8ed33cef4314e0"
+   }
+  },
+  {
+   "file": "r9c2.webp",
+   "row": 9,
+   "col": 2,
+   "left": 3328,
+   "top": 512,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_2.png",
+    "sha256": "4fedcd5397ed6447654a80d062a2d6408de2630e637e472fb8b40ab2f1eaf190"
+   }
+  },
+  {
+   "file": "r9c3.webp",
+   "row": 9,
+   "col": 3,
+   "left": 3072,
+   "top": 512,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_3.png",
+    "sha256": "a022572595383bffb728f05bfc4200abc69f9e3933b69fecb8bf4022c3a61399"
+   }
+  },
+  {
+   "file": "r9c4.webp",
+   "row": 9,
+   "col": 4,
+   "left": 2816,
+   "top": 512,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_4.png",
+    "sha256": "b7633dbbbd15c3388d2596f823e954c22e7d44d54bb7bd9b6b86d329bcd007e9"
+   }
+  },
+  {
+   "file": "r9c5.webp",
+   "row": 9,
+   "col": 5,
+   "left": 2560,
+   "top": 512,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_5.png",
+    "sha256": "e3f59a9fd6cd2aad864994a26d015b0582ad7f1835f16107c426e81ca4f2ba71"
+   }
+  },
+  {
+   "file": "r9c6.webp",
+   "row": 9,
+   "col": 6,
+   "left": 2304,
+   "top": 512,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_6.png",
+    "sha256": "d1bf340e2a6a5c23d39991b7edc6ab6154db87a17ced40fc01619deb5cd46ac5"
+   }
+  },
+  {
+   "file": "r9c7.webp",
+   "row": 9,
+   "col": 7,
+   "left": 2048,
+   "top": 512,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_7.png",
+    "sha256": "823f829ce982c6fb9068233488be95aa325d58fe0c1e6c001ad97e797f7f76fa"
+   }
+  },
+  {
+   "file": "r9c8.webp",
+   "row": 9,
+   "col": 8,
+   "left": 1792,
+   "top": 512,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_8.png",
+    "sha256": "afacaf4af20e2b82f049f0d9ee2942a865ff6ef0e500c959da666333c91dd292"
+   }
+  },
+  {
+   "file": "r9c9.webp",
+   "row": 9,
+   "col": 9,
+   "left": 1536,
+   "top": 512,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_9_9.png",
+    "sha256": "9e842438774f8870f447a525b157529d170d0e6608d592a4bfa87b45aacd4862"
+   }
+  },
+  {
+   "file": "r10c0.webp",
+   "row": 10,
+   "col": 0,
+   "left": 3840,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_0.png",
+    "sha256": "b7d57f4ef5f8a0e9df94b7e1618b7e4e5b1a0d3dc5caa4e3f20aa4af86d6fe5e"
+   }
+  },
+  {
+   "file": "r10c1.webp",
+   "row": 10,
+   "col": 1,
+   "left": 3584,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_1.png",
+    "sha256": "f31ba1a128aa85cada943752df98ca598801f95c4166a7e60aa3bc3a9149e6a0"
+   }
+  },
+  {
+   "file": "r10c2.webp",
+   "row": 10,
+   "col": 2,
+   "left": 3328,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_2.png",
+    "sha256": "0effe4816ba13e45d89107c9995ec4423f25fb8560f70ad570c4131c81639ee3"
+   }
+  },
+  {
+   "file": "r10c3.webp",
+   "row": 10,
+   "col": 3,
+   "left": 3072,
+   "top": 256,
+   "width": 2048,
+   "height": 2048,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_3.png",
+    "sha256": "6ebfc7368779d75fe39028d58bbfdf19fd7d1174585879826fc330f2bbb9094f"
+   }
+  },
+  {
+   "file": "r10c4.webp",
+   "row": 10,
+   "col": 4,
+   "left": 2816,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_4.png",
+    "sha256": "08ee88f192cac1b7424466ca78d69af78699ea2c7a65e3de1b55c9362eb9895e"
+   }
+  },
+  {
+   "file": "r10c5.webp",
+   "row": 10,
+   "col": 5,
+   "left": 2560,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_5.png",
+    "sha256": "9c38fc517bcd4c0dedd1252e007ff2f4feb581816022017b8b86579dd1326d05"
+   }
+  },
+  {
+   "file": "r10c6.webp",
+   "row": 10,
+   "col": 6,
+   "left": 2304,
+   "top": 256,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_6.png",
+    "sha256": "b1c6443f3ae1612fad68ba4484333a34b7f64195fa5fc5e3c038c96b861531b9"
+   }
+  },
+  {
+   "file": "r10c7.webp",
+   "row": 10,
+   "col": 7,
+   "left": 2048,
+   "top": 256,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_7.png",
+    "sha256": "b58e3b16cf421ee10a82357c501d998fa72b096a79391d729939313dd31df4c5"
+   }
+  },
+  {
+   "file": "r10c8.webp",
+   "row": 10,
+   "col": 8,
+   "left": 1792,
+   "top": 256,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_8.png",
+    "sha256": "a8cebce6b55944b7f046401be610c87d3b2be3461e4418d087393613834c8b0e"
+   }
+  },
+  {
+   "file": "r10c9.webp",
+   "row": 10,
+   "col": 9,
+   "left": 1536,
+   "top": 256,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_10_9.png",
+    "sha256": "5811f77bf325df4de2a24655209414674adabe84805e006697cbf167a5eab7ec"
+   }
+  },
+  {
+   "file": "r11c0.webp",
+   "row": 11,
+   "col": 0,
+   "left": 3840,
+   "top": 0,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_0.png",
+    "sha256": "1e3f391cb1220495aeaf9427a1b2123647928c2f0221649202b3efd4ec6e0055"
+   }
+  },
+  {
+   "file": "r11c1.webp",
+   "row": 11,
+   "col": 1,
+   "left": 3584,
+   "top": 0,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_1.png",
+    "sha256": "d2f59319be9ccf1cde5765429231eb0365170e4b6f3f37fa9e1e05efb19eb641"
+   }
+  },
+  {
+   "file": "r11c2.webp",
+   "row": 11,
+   "col": 2,
+   "left": 3328,
+   "top": 0,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_2.png",
+    "sha256": "ee468f8b3906cf024645e1753f3a7b4e5b43d6cab35dad5bb46b695a5731ac05"
+   }
+  },
+  {
+   "file": "r11c3.webp",
+   "row": 11,
+   "col": 3,
+   "left": 3072,
+   "top": 0,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_3.png",
+    "sha256": "9d1a2189ab7d28c26aae19b7c56a3e737cdff026ed0792076c5cae3fcea1f66e"
+   }
+  },
+  {
+   "file": "r11c4.webp",
+   "row": 11,
+   "col": 4,
+   "left": 2816,
+   "top": 0,
+   "width": 1024,
+   "height": 1024,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_4.png",
+    "sha256": "e02f903773807be577d033c829ff952d54dfc99e2e2c28be5493d407082fb34b"
+   }
+  },
+  {
+   "file": "r11c5.webp",
+   "row": 11,
+   "col": 5,
+   "left": 2560,
+   "top": 0,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_5.png",
+    "sha256": "c706c3ec8cbd9dc921001dfd9a8c341059a4e021d15817ca7f9213a444216ac8"
+   }
+  },
+  {
+   "file": "r11c6.webp",
+   "row": 11,
+   "col": 6,
+   "left": 2304,
+   "top": 0,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_6.png",
+    "sha256": "f519376a9b106886c53c7bc72a37558a6bd21762468d591b572314d51bdd6af5"
+   }
+  },
+  {
+   "file": "r11c7.webp",
+   "row": 11,
+   "col": 7,
+   "left": 2048,
+   "top": 0,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_7.png",
+    "sha256": "8a61026d969df044d1d9ac6e9bcc4c8c4b66af16672c71b476599bbf0ffd553a"
+   }
+  },
+  {
+   "file": "r11c8.webp",
+   "row": 11,
+   "col": 8,
+   "left": 1792,
+   "top": 0,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_8.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  },
+  {
+   "file": "r11c9.webp",
+   "row": 11,
+   "col": 9,
+   "left": 1536,
+   "top": 0,
+   "width": 64,
+   "height": 64,
+   "source": {
+    "kind": "ui-mapback-png-7.2",
+    "file": "UI_MapBack_11_9.png",
+    "sha256": "135bc0c61ab1a556f66b86d4f12d262656af32dedbc6009a669f654ccd9b5daf"
+   }
+  }
+ ],
+ "regions": [
+  {
+   "id1": 1,
+   "name": "坠星山谷",
+   "points": [
+    [
+     4466.5,
+     2299.8
+    ],
+    [
+     4513.8,
+     2299
+    ],
+    [
+     4567.7,
+     2306.5
+    ],
+    [
+     4632.2,
+     2320.4
+    ],
+    [
+     4680.8,
+     2343.8
+    ],
+    [
+     4721.4,
+     2382.4
+    ],
+    [
+     4725.3,
+     2472.3
+    ],
+    [
+     4735.7,
+     2551.8
+    ],
+    [
+     4632,
+     2570.8
+    ],
+    [
+     4540,
+     2557
+    ],
+    [
+     4516.7,
+     2556.1
+    ],
+    [
+     4501.8,
+     2567.1
+    ],
+    [
+     4496.4,
+     2580.5
+    ],
+    [
+     4485.5,
+     2591.4
+    ],
+    [
+     4475.9,
+     2592.1
+    ],
+    [
+     4462.4,
+     2587.3
+    ],
+    [
+     4458.7,
+     2575.9
+    ],
+    [
+     4442.6,
+     2565.2
+    ],
+    [
+     4429.3,
+     2557.8
+    ],
+    [
+     4409.3,
+     2555.6
+    ],
+    [
+     4396.8,
+     2547.5
+    ],
+    [
+     4384.8,
+     2547.5
+    ],
+    [
+     4378.5,
+     2543.9
+    ],
+    [
+     4369.1,
+     2542.6
+    ],
+    [
+     4354.4,
+     2545.3
+    ],
+    [
+     4344.4,
+     2546
+    ],
+    [
+     4335.4,
+     2549.6
+    ],
+    [
+     4323.8,
+     2552.7
+    ],
+    [
+     4314.3,
+     2553.6
+    ],
+    [
+     4304.2,
+     2552.9
+    ],
+    [
+     4294.3,
+     2552.1
+    ],
+    [
+     4285.2,
+     2548.2
+    ],
+    [
+     4275.8,
+     2542.6
+    ],
+    [
+     4270.7,
+     2539.9
+    ],
+    [
+     4266.9,
+     2533.8
+    ],
+    [
+     4264.5,
+     2528.6
+    ],
+    [
+     4260.2,
+     2521.2
+    ],
+    [
+     4252.1,
+     2515.3
+    ],
+    [
+     4243.8,
+     2511.3
+    ],
+    [
+     4233.1,
+     2511.8
+    ],
+    [
+     4229,
+     2503.6
+    ],
+    [
+     4224.4,
+     2496.7
+    ],
+    [
+     4220.9,
+     2489.8
+    ],
+    [
+     4216.5,
+     2483.1
+    ],
+    [
+     4209.9,
+     2476.7
+    ],
+    [
+     4206.1,
+     2469.6
+    ],
+    [
+     4203.8,
+     2460.2
+    ],
+    [
+     4207,
+     2455.7
+    ],
+    [
+     4207.1,
+     2450.5
+    ],
+    [
+     4210.2,
+     2445.5
+    ],
+    [
+     4217.5,
+     2433.7
+    ],
+    [
+     4223.4,
+     2430.9
+    ],
+    [
+     4228.8,
+     2415.4
+    ],
+    [
+     4237.5,
+     2408.9
+    ],
+    [
+     4238.5,
+     2407.7
+    ],
+    [
+     4238.1,
+     2406.1
+    ],
+    [
+     4238,
+     2400.9
+    ],
+    [
+     4251.9,
+     2389.4
+    ],
+    [
+     4257.5,
+     2390.4
+    ],
+    [
+     4261.2,
+     2391.4
+    ],
+    [
+     4273.6,
+     2388.7
+    ],
+    [
+     4284.2,
+     2384.5
+    ],
+    [
+     4295.9,
+     2378
+    ],
+    [
+     4302.6,
+     2375.5
+    ],
+    [
+     4309.7,
+     2371.8
+    ],
+    [
+     4321,
+     2365.8
+    ],
+    [
+     4328.2,
+     2362.4
+    ],
+    [
+     4346.4,
+     2355.3
+    ],
+    [
+     4353.9,
+     2350
+    ],
+    [
+     4360,
+     2331.9
+    ],
+    [
+     4362.5,
+     2315.8
+    ],
+    [
+     4363.4,
+     2315.3
+    ],
+    [
+     4371.3,
+     2310.8
+    ],
+    [
+     4411.2,
+     2299.8
+    ]
+   ],
+   "bbox": [
+    4203.8,
+    2299,
+    4735.7,
+    2592.1
+   ]
+  },
+  {
+   "id1": 2,
+   "name": "风啸山坡",
+   "points": [
+    [
+     4369.1,
+     2542.6
+    ],
+    [
+     4372.1,
+     2552.7
+    ],
+    [
+     4375.6,
+     2560.2
+    ],
+    [
+     4373.9,
+     2567.9
+    ],
+    [
+     4376.7,
+     2573.4
+    ],
+    [
+     4377.8,
+     2582.7
+    ],
+    [
+     4379.8,
+     2589.7
+    ],
+    [
+     4379.9,
+     2593.9
+    ],
+    [
+     4381.8,
+     2602.7
+    ],
+    [
+     4385.8,
+     2611.7
+    ],
+    [
+     4385.3,
+     2622.5
+    ],
+    [
+     4385.4,
+     2629.3
+    ],
+    [
+     4379.4,
+     2641
+    ],
+    [
+     4386.2,
+     2659.1
+    ],
+    [
+     4386.5,
+     2673.1
+    ],
+    [
+     4382.9,
+     2690.9
+    ],
+    [
+     4391.8,
+     2699.1
+    ],
+    [
+     4408.9,
+     2746.5
+    ],
+    [
+     4471.7,
+     2827.1
+    ],
+    [
+     4545,
+     2857.7
+    ],
+    [
+     4589.9,
+     2848.7
+    ],
+    [
+     4660.8,
+     2831
+    ],
+    [
+     4734.4,
+     2773.7
+    ],
+    [
+     4802.2,
+     2659.4
+    ],
+    [
+     4743.1,
+     2577.6
+    ],
+    [
+     4735.7,
+     2551.8
+    ],
+    [
+     4632,
+     2570.8
+    ],
+    [
+     4540,
+     2557
+    ],
+    [
+     4516.7,
+     2556.1
+    ],
+    [
+     4501.8,
+     2567.1
+    ],
+    [
+     4496.4,
+     2580.5
+    ],
+    [
+     4493,
+     2583.8
+    ],
+    [
+     4485.5,
+     2591.4
+    ],
+    [
+     4475.9,
+     2592.1
+    ],
+    [
+     4462.4,
+     2587.3
+    ],
+    [
+     4458.7,
+     2575.9
+    ],
+    [
+     4442.6,
+     2565.2
+    ],
+    [
+     4429.3,
+     2557.8
+    ],
+    [
+     4409.3,
+     2555.6
+    ],
+    [
+     4396.8,
+     2547.5
+    ],
+    [
+     4384.8,
+     2547.5
+    ],
+    [
+     4378.5,
+     2543.9
+    ]
+   ],
+   "bbox": [
+    4369.1,
+    2542.6,
+    4802.2,
+    2857.7
+   ]
+  },
+  {
+   "id1": 3,
+   "name": "苍风高地",
+   "points": [
+    [
+     4337.1,
+     2662
+    ],
+    [
+     4321.7,
+     2662
+    ],
+    [
+     4304.7,
+     2671
+    ],
+    [
+     4292.1,
+     2676.7
+    ],
+    [
+     4282.8,
+     2679.4
+    ],
+    [
+     4264.6,
+     2683.2
+    ],
+    [
+     4245.9,
+     2689.4
+    ],
+    [
+     4227.6,
+     2696.5
+    ],
+    [
+     4207.3,
+     2696.7
+    ],
+    [
+     4188.7,
+     2703.6
+    ],
+    [
+     4159.6,
+     2686.5
+    ],
+    [
+     4142.3,
+     2680.5
+    ],
+    [
+     4135.4,
+     2666.9
+    ],
+    [
+     4133.8,
+     2654.3
+    ],
+    [
+     4122.6,
+     2632.6
+    ],
+    [
+     4116.7,
+     2622.9
+    ],
+    [
+     4117.9,
+     2612
+    ],
+    [
+     4121.3,
+     2603.5
+    ],
+    [
+     4137.9,
+     2601.1
+    ],
+    [
+     4141,
+     2592.2
+    ],
+    [
+     4141.5,
+     2583.1
+    ],
+    [
+     4115.7,
+     2546.2
+    ],
+    [
+     4129.9,
+     2522.7
+    ],
+    [
+     4123.6,
+     2497.6
+    ],
+    [
+     4116.4,
+     2486.4
+    ],
+    [
+     4119,
+     2470.1
+    ],
+    [
+     4133.4,
+     2464.2
+    ],
+    [
+     4152.9,
+     2457.3
+    ],
+    [
+     4168.8,
+     2456.2
+    ],
+    [
+     4186.3,
+     2456.7
+    ],
+    [
+     4197.6,
+     2457.9
+    ],
+    [
+     4203.8,
+     2460.2
+    ],
+    [
+     4206.1,
+     2469.6
+    ],
+    [
+     4209.9,
+     2476.7
+    ],
+    [
+     4216.5,
+     2483.1
+    ],
+    [
+     4220.9,
+     2489.8
+    ],
+    [
+     4224.4,
+     2496.7
+    ],
+    [
+     4229,
+     2503.6
+    ],
+    [
+     4233.1,
+     2511.8
+    ],
+    [
+     4243.8,
+     2511.3
+    ],
+    [
+     4252.1,
+     2515.3
+    ],
+    [
+     4260.2,
+     2521.2
+    ],
+    [
+     4264.5,
+     2528.6
+    ],
+    [
+     4266.9,
+     2533.8
+    ],
+    [
+     4270.7,
+     2539.9
+    ],
+    [
+     4275.8,
+     2542.6
+    ],
+    [
+     4285.2,
+     2548.2
+    ],
+    [
+     4294.3,
+     2552.1
+    ],
+    [
+     4304.2,
+     2552.9
+    ],
+    [
+     4314.3,
+     2553.6
+    ],
+    [
+     4323.8,
+     2552.7
+    ],
+    [
+     4335.4,
+     2549.6
+    ],
+    [
+     4344.4,
+     2546
+    ],
+    [
+     4354.4,
+     2545.3
+    ],
+    [
+     4369.1,
+     2542.6
+    ],
+    [
+     4372.1,
+     2552.7
+    ],
+    [
+     4375.6,
+     2560.2
+    ],
+    [
+     4373.9,
+     2567.9
+    ],
+    [
+     4376.7,
+     2573.4
+    ],
+    [
+     4377.8,
+     2582.7
+    ],
+    [
+     4379.8,
+     2589.7
+    ],
+    [
+     4379.9,
+     2593.9
+    ],
+    [
+     4381.8,
+     2602.7
+    ],
+    [
+     4385.8,
+     2611.7
+    ],
+    [
+     4385.3,
+     2622.5
+    ],
+    [
+     4385.4,
+     2629.3
+    ],
+    [
+     4379.4,
+     2641
+    ],
+    [
+     4386.2,
+     2659.1
+    ],
+    [
+     4386.5,
+     2673.1
+    ],
+    [
+     4382.9,
+     2690.9
+    ],
+    [
+     4358,
+     2680.2
+    ]
+   ],
+   "bbox": [
+    4115.7,
+    2456.2,
+    4386.5,
+    2703.6
+   ]
+  },
+  {
+   "id1": 4,
+   "name": "明冠山地",
+   "points": [
+    [
+     4137.9,
+     2601.1
+    ],
+    [
+     4141,
+     2592.2
+    ],
+    [
+     4141.5,
+     2583.1
+    ],
+    [
+     4115.7,
+     2546.2
+    ],
+    [
+     4129.9,
+     2522.7
+    ],
+    [
+     4123.6,
+     2497.6
+    ],
+    [
+     4116.4,
+     2486.4
+    ],
+    [
+     4119,
+     2470.1
+    ],
+    [
+     4133.4,
+     2464.2
+    ],
+    [
+     4152.9,
+     2457.3
+    ],
+    [
+     4168.8,
+     2456.2
+    ],
+    [
+     4186.3,
+     2456.7
+    ],
+    [
+     4197.6,
+     2457.9
+    ],
+    [
+     4203.8,
+     2460.2
+    ],
+    [
+     4207,
+     2455.7
+    ],
+    [
+     4207.1,
+     2450.5
+    ],
+    [
+     4217.5,
+     2433.7
+    ],
+    [
+     4223.4,
+     2430.9
+    ],
+    [
+     4228.8,
+     2415.4
+    ],
+    [
+     4237.5,
+     2408.9
+    ],
+    [
+     4238.5,
+     2407.7
+    ],
+    [
+     4238.1,
+     2406.1
+    ],
+    [
+     4238,
+     2400.9
+    ],
+    [
+     4251.9,
+     2389.4
+    ],
+    [
+     4204.8,
+     2360.7
+    ],
+    [
+     4200.2,
+     2354.5
+    ],
+    [
+     4189.3,
+     2339.4
+    ],
+    [
+     4181.7,
+     2325.4
+    ],
+    [
+     4154,
+     2333.3
+    ],
+    [
+     4144.6,
+     2330.3
+    ],
+    [
+     4128.3,
+     2324.1
+    ],
+    [
+     4123.1,
+     2320.8
+    ],
+    [
+     4118.6,
+     2317.1
+    ],
+    [
+     4112.2,
+     2313.2
+    ],
+    [
+     4102.8,
+     2306.5
+    ],
+    [
+     4081.1,
+     2301.7
+    ],
+    [
+     4067.6,
+     2294.6
+    ],
+    [
+     3995.9,
+     2293.8
+    ],
+    [
+     3933.8,
+     2335.8
+    ],
+    [
+     3921.9,
+     2407.3
+    ],
+    [
+     3933.8,
+     2466
+    ],
+    [
+     3975.7,
+     2512
+    ],
+    [
+     4024.8,
+     2545.6
+    ],
+    [
+     4035.2,
+     2561.4
+    ],
+    [
+     4052.1,
+     2583.5
+    ],
+    [
+     4121.3,
+     2603.5
+    ]
+   ],
+   "bbox": [
+    3921.9,
+    2293.8,
+    4251.9,
+    2603.5
+   ]
+  },
+  {
+   "id1": 5,
+   "name": "碧水原",
+   "points": [
+    [
+     4184.5,
+     2755.7
+    ],
+    [
+     4173.2,
+     2778.1
+    ],
+    [
+     4169.7,
+     2791.7
+    ],
+    [
+     4149.3,
+     2797.6
+    ],
+    [
+     4129.3,
+     2800.8
+    ],
+    [
+     4109.1,
+     2780.1
+    ],
+    [
+     4075.1,
+     2784.9
+    ],
+    [
+     4066.4,
+     2809.2
+    ],
+    [
+     4066.5,
+     2818.8
+    ],
+    [
+     4064.4,
+     2843.8
+    ],
+    [
+     4053.5,
+     2846.3
+    ],
+    [
+     4041.9,
+     2849.7
+    ],
+    [
+     4030.2,
+     2869.6
+    ],
+    [
+     4005.5,
+     2872.5
+    ],
+    [
+     3972.9,
+     2876.3
+    ],
+    [
+     3970.4,
+     2865.2
+    ],
+    [
+     3969.3,
+     2853.9
+    ],
+    [
+     3965.2,
+     2842.9
+    ],
+    [
+     3954,
+     2831.9
+    ],
+    [
+     3930.5,
+     2805.5
+    ],
+    [
+     3913.1,
+     2783.3
+    ],
+    [
+     3897.2,
+     2760.4
+    ],
+    [
+     3884.7,
+     2752.5
+    ],
+    [
+     3872.3,
+     2751.1
+    ],
+    [
+     3855.9,
+     2747.9
+    ],
+    [
+     3841.2,
+     2743.6
+    ],
+    [
+     3815.8,
+     2728.1
+    ],
+    [
+     3785.6,
+     2726.7
+    ],
+    [
+     3775.3,
+     2740.8
+    ],
+    [
+     3762.1,
+     2741.7
+    ],
+    [
+     3746.5,
+     2731.1
+    ],
+    [
+     3734.7,
+     2713.3
+    ],
+    [
+     3729.2,
+     2700.9
+    ],
+    [
+     3719.1,
+     2691.7
+    ],
+    [
+     3729,
+     2676.7
+    ],
+    [
+     3756.5,
+     2648.8
+    ],
+    [
+     3760.2,
+     2647.8
+    ],
+    [
+     3762.8,
+     2647.6
+    ],
+    [
+     3765.7,
+     2647.8
+    ],
+    [
+     3768.3,
+     2646.2
+    ],
+    [
+     3771.2,
+     2647.3
+    ],
+    [
+     3773.1,
+     2647.1
+    ],
+    [
+     3774.7,
+     2645.9
+    ],
+    [
+     3778,
+     2645.9
+    ],
+    [
+     3780.4,
+     2645.3
+    ],
+    [
+     3782.5,
+     2646.4
+    ],
+    [
+     3785.9,
+     2646.1
+    ],
+    [
+     3789.6,
+     2647.8
+    ],
+    [
+     3794.5,
+     2651.4
+    ],
+    [
+     3798.4,
+     2653.3
+    ],
+    [
+     3802.2,
+     2654.4
+    ],
+    [
+     3806,
+     2657.3
+    ],
+    [
+     3810.2,
+     2658.1
+    ],
+    [
+     3815,
+     2658.1
+    ],
+    [
+     3817.7,
+     2657.2
+    ],
+    [
+     3820.6,
+     2655.3
+    ],
+    [
+     3823.8,
+     2652.6
+    ],
+    [
+     3826.5,
+     2650.9
+    ],
+    [
+     3828.6,
+     2647.9
+    ],
+    [
+     3831.7,
+     2646.2
+    ],
+    [
+     3836.6,
+     2644.5
+    ],
+    [
+     3832.2,
+     2633.9
+    ],
+    [
+     3846.8,
+     2541
+    ],
+    [
+     3883.2,
+     2521.9
+    ],
+    [
+     3907.1,
+     2513
+    ],
+    [
+     4035.2,
+     2561.4
+    ],
+    [
+     4052.1,
+     2583.5
+    ],
+    [
+     4121.3,
+     2603.5
+    ],
+    [
+     4117.9,
+     2612
+    ],
+    [
+     4116.7,
+     2622.9
+    ],
+    [
+     4122.6,
+     2632.6
+    ],
+    [
+     4133.8,
+     2654.3
+    ],
+    [
+     4135.4,
+     2666.9
+    ],
+    [
+     4142.3,
+     2680.5
+    ],
+    [
+     4159.6,
+     2686.5
+    ],
+    [
+     4188.7,
+     2703.6
+    ],
+    [
+     4169.9,
+     2717.3
+    ],
+    [
+     4173,
+     2729.3
+    ]
+   ],
+   "bbox": [
+    3719.1,
+    2513,
+    4188.7,
+    2876.3
+   ]
+  },
+  {
+   "id1": 6,
+   "name": "珉林",
+   "points": [
+    [
+     3880.2,
+     3053.7
+    ],
+    [
+     3875,
+     3039
+    ],
+    [
+     3878.2,
+     3023
+    ],
+    [
+     3886.2,
+     3006.3
+    ],
+    [
+     3897.7,
+     2998.1
+    ],
+    [
+     3909,
+     2994.1
+    ],
+    [
+     3930.3,
+     2995.7
+    ],
+    [
+     3944.5,
+     3001.6
+    ],
+    [
+     3955.1,
+     3002.2
+    ],
+    [
+     3960.7,
+     2994.2
+    ],
+    [
+     3967.7,
+     2972
+    ],
+    [
+     3957,
+     2960.7
+    ],
+    [
+     3960.4,
+     2943.2
+    ],
+    [
+     3953,
+     2914.6
+    ],
+    [
+     3972.9,
+     2876.3
+    ],
+    [
+     3970.4,
+     2865.2
+    ],
+    [
+     3969.3,
+     2853.9
+    ],
+    [
+     3965.2,
+     2842.9
+    ],
+    [
+     3954,
+     2831.9
+    ],
+    [
+     3930.5,
+     2805.5
+    ],
+    [
+     3913.1,
+     2783.3
+    ],
+    [
+     3897.2,
+     2760.4
+    ],
+    [
+     3884.7,
+     2752.5
+    ],
+    [
+     3872.3,
+     2751.1
+    ],
+    [
+     3855.9,
+     2747.9
+    ],
+    [
+     3841.2,
+     2743.6
+    ],
+    [
+     3815.8,
+     2728.1
+    ],
+    [
+     3785.6,
+     2726.7
+    ],
+    [
+     3775.3,
+     2740.8
+    ],
+    [
+     3762.1,
+     2741.7
+    ],
+    [
+     3746.5,
+     2731.1
+    ],
+    [
+     3734.7,
+     2713.3
+    ],
+    [
+     3729.2,
+     2700.9
+    ],
+    [
+     3719.1,
+     2691.7
+    ],
+    [
+     3714.9,
+     2698.1
+    ],
+    [
+     3700.1,
+     2733.2
+    ],
+    [
+     3693.1,
+     2742.3
+    ],
+    [
+     3685.3,
+     2748.4
+    ],
+    [
+     3680.1,
+     2758.7
+    ],
+    [
+     3679.5,
+     2759.8
+    ],
+    [
+     3678.4,
+     2762.6
+    ],
+    [
+     3671.4,
+     2779.6
+    ],
+    [
+     3667.1,
+     2793.5
+    ],
+    [
+     3651.8,
+     2807
+    ],
+    [
+     3638.2,
+     2825.3
+    ],
+    [
+     3628.8,
+     2833.7
+    ],
+    [
+     3618.3,
+     2852.2
+    ],
+    [
+     3608.6,
+     2859.2
+    ],
+    [
+     3590.3,
+     2879.3
+    ],
+    [
+     3586.8,
+     2910.9
+    ],
+    [
+     3558.4,
+     2924.6
+    ],
+    [
+     3589.8,
+     2994.3
+    ],
+    [
+     3597.9,
+     3093.9
+    ],
+    [
+     3573.1,
+     3127.2
+    ],
+    [
+     3607.4,
+     3168.2
+    ],
+    [
+     3624.8,
+     3159.2
+    ],
+    [
+     3642.8,
+     3146
+    ],
+    [
+     3664.5,
+     3134.3
+    ],
+    [
+     3676.3,
+     3122.9
+    ],
+    [
+     3702.6,
+     3100.3
+    ],
+    [
+     3703.2,
+     3080.5
+    ],
+    [
+     3719,
+     3079.3
+    ],
+    [
+     3731.6,
+     3081.2
+    ],
+    [
+     3761.4,
+     3097
+    ],
+    [
+     3790.5,
+     3097.4
+    ],
+    [
+     3806.1,
+     3102.6
+    ],
+    [
+     3810.4,
+     3115.5
+    ],
+    [
+     3828,
+     3124.7
+    ],
+    [
+     3838.3,
+     3119
+    ],
+    [
+     3843.4,
+     3107.7
+    ],
+    [
+     3840.8,
+     3091.6
+    ],
+    [
+     3843.5,
+     3079.7
+    ],
+    [
+     3852.9,
+     3061.1
+    ]
+   ],
+   "bbox": [
+    3558.4,
+    2691.7,
+    3972.9,
+    3168.2
+   ]
+  },
+  {
+   "id1": 7,
+   "name": "云来海",
+   "points": [
+    [
+     4424.6,
+     2972.5
+    ],
+    [
+     4354.7,
+     2964.1
+    ],
+    [
+     4282.3,
+     2928.3
+    ],
+    [
+     4256.9,
+     2963.6
+    ],
+    [
+     4195.5,
+     3007.1
+    ],
+    [
+     4168,
+     3014.8
+    ],
+    [
+     4068.1,
+     3028.4
+    ],
+    [
+     4030.4,
+     3055.2
+    ],
+    [
+     4023.1,
+     3055.5
+    ],
+    [
+     3996,
+     3059.5
+    ],
+    [
+     3986.2,
+     3078.8
+    ],
+    [
+     3975.8,
+     3084.7
+    ],
+    [
+     3932.1,
+     3081.5
+    ],
+    [
+     3922.1,
+     3122.9
+    ],
+    [
+     3918.5,
+     3150.3
+    ],
+    [
+     3916.4,
+     3168.9
+    ],
+    [
+     3917.2,
+     3188.4
+    ],
+    [
+     3917.4,
+     3208.9
+    ],
+    [
+     3922,
+     3251.1
+    ],
+    [
+     3934.3,
+     3281.4
+    ],
+    [
+     3949.6,
+     3305.3
+    ],
+    [
+     3965,
+     3319.8
+    ],
+    [
+     3964.1,
+     3337.6
+    ],
+    [
+     4023.5,
+     3358.9
+    ],
+    [
+     4066.4,
+     3360
+    ],
+    [
+     4093.1,
+     3357.2
+    ],
+    [
+     4136.9,
+     3366.1
+    ],
+    [
+     4157.4,
+     3373.1
+    ],
+    [
+     4226.1,
+     3369.1
+    ],
+    [
+     4294.3,
+     3341.1
+    ],
+    [
+     4337.3,
+     3300.7
+    ],
+    [
+     4418.2,
+     3204.9
+    ],
+    [
+     4461.7,
+     3154.6
+    ],
+    [
+     4460.1,
+     3106.4
+    ],
+    [
+     4457,
+     3067.5
+    ],
+    [
+     4468.3,
+     3038.7
+    ],
+    [
+     4466.6,
+     2985.6
+    ]
+   ],
+   "bbox": [
+    3916.4,
+    2928.3,
+    4468.3,
+    3373.1
+   ]
+  },
+  {
+   "id1": 8,
+   "name": "璃沙郊",
+   "points": [
+    [
+     3905,
+     3072.2
+    ],
+    [
+     3894.4,
+     3066.3
+    ],
+    [
+     3886.5,
+     3061.8
+    ],
+    [
+     3880.2,
+     3053.7
+    ],
+    [
+     3852.9,
+     3061.1
+    ],
+    [
+     3843.5,
+     3079.7
+    ],
+    [
+     3840.8,
+     3091.6
+    ],
+    [
+     3843.4,
+     3107.7
+    ],
+    [
+     3838.3,
+     3119
+    ],
+    [
+     3828,
+     3124.7
+    ],
+    [
+     3810.4,
+     3115.5
+    ],
+    [
+     3806.1,
+     3102.6
+    ],
+    [
+     3790.5,
+     3097.4
+    ],
+    [
+     3761.4,
+     3097
+    ],
+    [
+     3767.3,
+     3126.3
+    ],
+    [
+     3769.1,
+     3157.9
+    ],
+    [
+     3762,
+     3188.1
+    ],
+    [
+     3739.2,
+     3236
+    ],
+    [
+     3739.1,
+     3254
+    ],
+    [
+     3736.4,
+     3278.9
+    ],
+    [
+     3733.2,
+     3311
+    ],
+    [
+     3749.3,
+     3321
+    ],
+    [
+     3758.4,
+     3332.5
+    ],
+    [
+     3760.6,
+     3338
+    ],
+    [
+     3755.4,
+     3356
+    ],
+    [
+     3766.8,
+     3369.9
+    ],
+    [
+     3804.4,
+     3371
+    ],
+    [
+     3820.5,
+     3363.9
+    ],
+    [
+     3847.2,
+     3356.6
+    ],
+    [
+     3874.8,
+     3358.2
+    ],
+    [
+     3905.2,
+     3352.1
+    ],
+    [
+     3953.1,
+     3349.7
+    ],
+    [
+     3963.8,
+     3336.9
+    ],
+    [
+     3965,
+     3319.8
+    ],
+    [
+     3949.6,
+     3305.3
+    ],
+    [
+     3934.3,
+     3281.4
+    ],
+    [
+     3922,
+     3251.1
+    ],
+    [
+     3917.4,
+     3208.9
+    ],
+    [
+     3917.2,
+     3188.4
+    ],
+    [
+     3916.4,
+     3168.9
+    ],
+    [
+     3918.5,
+     3150.3
+    ],
+    [
+     3922.1,
+     3122.9
+    ],
+    [
+     3932.1,
+     3081.5
+    ],
+    [
+     3920.6,
+     3080.1
+    ],
+    [
+     3912.8,
+     3076.3
+    ]
+   ],
+   "bbox": [
+    3733.2,
+    3053.7,
+    3965,
+    3371
+   ]
+  },
+  {
+   "id1": 9,
+   "name": "琼玑野",
+   "points": [
+    [
+     4005.5,
+     2872.5
+    ],
+    [
+     3972.9,
+     2876.3
+    ],
+    [
+     3953,
+     2914.6
+    ],
+    [
+     3960.4,
+     2943.2
+    ],
+    [
+     3957,
+     2960.7
+    ],
+    [
+     3967.7,
+     2972
+    ],
+    [
+     3960.7,
+     2994.2
+    ],
+    [
+     3955.1,
+     3002.2
+    ],
+    [
+     3944.5,
+     3001.6
+    ],
+    [
+     3930.3,
+     2995.7
+    ],
+    [
+     3909,
+     2994.1
+    ],
+    [
+     3897.7,
+     2998.1
+    ],
+    [
+     3886.2,
+     3006.3
+    ],
+    [
+     3878.2,
+     3023
+    ],
+    [
+     3875,
+     3039
+    ],
+    [
+     3880.2,
+     3053.7
+    ],
+    [
+     3886.5,
+     3061.8
+    ],
+    [
+     3894.4,
+     3066.3
+    ],
+    [
+     3905,
+     3072.2
+    ],
+    [
+     3912.8,
+     3076.3
+    ],
+    [
+     3920.6,
+     3080.1
+    ],
+    [
+     3932.1,
+     3081.5
+    ],
+    [
+     3975.8,
+     3084.7
+    ],
+    [
+     3986.2,
+     3078.8
+    ],
+    [
+     3996,
+     3059.5
+    ],
+    [
+     4023.1,
+     3055.5
+    ],
+    [
+     4030.4,
+     3055.2
+    ],
+    [
+     4068.1,
+     3028.4
+    ],
+    [
+     4168,
+     3014.8
+    ],
+    [
+     4195.5,
+     3007.1
+    ],
+    [
+     4256.9,
+     2963.6
+    ],
+    [
+     4282.3,
+     2928.3
+    ],
+    [
+     4238.4,
+     2905.6
+    ],
+    [
+     4225.7,
+     2891.3
+    ],
+    [
+     4199.2,
+     2873.7
+    ],
+    [
+     4188.8,
+     2855.3
+    ],
+    [
+     4182.1,
+     2838
+    ],
+    [
+     4181.9,
+     2828.8
+    ],
+    [
+     4179.3,
+     2810
+    ],
+    [
+     4173.8,
+     2798.6
+    ],
+    [
+     4169.7,
+     2791.7
+    ],
+    [
+     4149.3,
+     2797.6
+    ],
+    [
+     4129.3,
+     2800.8
+    ],
+    [
+     4109.1,
+     2780.1
+    ],
+    [
+     4075.1,
+     2784.9
+    ],
+    [
+     4066.4,
+     2809.2
+    ],
+    [
+     4066.5,
+     2818.8
+    ],
+    [
+     4064.4,
+     2843.8
+    ],
+    [
+     4053.5,
+     2846.3
+    ],
+    [
+     4041.9,
+     2849.7
+    ],
+    [
+     4030.2,
+     2869.6
+    ]
+   ],
+   "bbox": [
+    3875,
+    2780.1,
+    4282.3,
+    3084.7
+   ]
+  },
+  {
+   "id1": 10,
+   "name": "龙脊雪山",
+   "points": [
+    [
+     4321.7,
+     2662
+    ],
+    [
+     4304.7,
+     2671
+    ],
+    [
+     4292.1,
+     2676.7
+    ],
+    [
+     4282.8,
+     2679.4
+    ],
+    [
+     4264.6,
+     2683.2
+    ],
+    [
+     4245.9,
+     2689.4
+    ],
+    [
+     4227.6,
+     2696.5
+    ],
+    [
+     4207.3,
+     2696.7
+    ],
+    [
+     4188.7,
+     2703.6
+    ],
+    [
+     4169.9,
+     2717.3
+    ],
+    [
+     4173,
+     2729.3
+    ],
+    [
+     4184.5,
+     2755.7
+    ],
+    [
+     4173.2,
+     2778.1
+    ],
+    [
+     4169.7,
+     2791.7
+    ],
+    [
+     4173.8,
+     2798.6
+    ],
+    [
+     4179.3,
+     2810
+    ],
+    [
+     4181.9,
+     2828.8
+    ],
+    [
+     4182.1,
+     2838
+    ],
+    [
+     4188.8,
+     2855.3
+    ],
+    [
+     4199.2,
+     2873.7
+    ],
+    [
+     4225.7,
+     2891.3
+    ],
+    [
+     4238.4,
+     2905.6
+    ],
+    [
+     4282.3,
+     2928.3
+    ],
+    [
+     4354.7,
+     2964.1
+    ],
+    [
+     4424.6,
+     2972.5
+    ],
+    [
+     4466.6,
+     2985.6
+    ],
+    [
+     4545,
+     2857.7
+    ],
+    [
+     4471.7,
+     2827.1
+    ],
+    [
+     4408.9,
+     2746.5
+    ],
+    [
+     4391.8,
+     2699.1
+    ],
+    [
+     4382.9,
+     2690.9
+    ],
+    [
+     4358,
+     2680.2
+    ],
+    [
+     4337.1,
+     2662
+    ]
+   ],
+   "bbox": [
+    4169.7,
+    2662,
+    4545,
+    2985.6
+   ]
+  },
+  {
+   "id1": 11,
+   "name": "鸣神岛",
+   "points": [
+    [
+     5413.6,
+     3460.2
+    ],
+    [
+     5410.3,
+     3583.7
+    ],
+    [
+     5387.3,
+     3926.9
+    ],
+    [
+     5302.5,
+     4019.2
+    ],
+    [
+     5196.2,
+     4025.9
+    ],
+    [
+     5101.3,
+     3997.9
+    ],
+    [
+     5101.5,
+     3864.6
+    ],
+    [
+     5043.8,
+     3840.4
+    ],
+    [
+     4979.8,
+     3815.6
+    ],
+    [
+     4905.2,
+     3714.9
+    ],
+    [
+     4872.7,
+     3655.6
+    ],
+    [
+     4852.8,
+     3645.7
+    ],
+    [
+     4901.4,
+     3507.3
+    ],
+    [
+     4981.1,
+     3444.1
+    ],
+    [
+     5115.2,
+     3409
+    ],
+    [
+     5257.5,
+     3403.2
+    ]
+   ],
+   "bbox": [
+    4852.8,
+    3403.2,
+    5413.6,
+    4025.9
+   ]
+  },
+  {
+   "id1": 12,
+   "name": "神无冢",
+   "points": [
+    [
+     4773.4,
+     3685
+    ],
+    [
+     4820.6,
+     3654.8
+    ],
+    [
+     4852.8,
+     3645.7
+    ],
+    [
+     4872.7,
+     3655.6
+    ],
+    [
+     4905.2,
+     3714.9
+    ],
+    [
+     4979.8,
+     3815.6
+    ],
+    [
+     5043.8,
+     3840.4
+    ],
+    [
+     5101.5,
+     3864.6
+    ],
+    [
+     5101.3,
+     3997.9
+    ],
+    [
+     5022.2,
+     4070.1
+    ],
+    [
+     4923.7,
+     4131.3
+    ],
+    [
+     4845,
+     4136.7
+    ],
+    [
+     4792.8,
+     4127.1
+    ],
+    [
+     4792.8,
+     4079.7
+    ],
+    [
+     4796.8,
+     4025.6
+    ],
+    [
+     4805.9,
+     3990.3
+    ],
+    [
+     4812,
+     3960.9
+    ],
+    [
+     4808.3,
+     3941.1
+    ],
+    [
+     4797.9,
+     3920.9
+    ],
+    [
+     4773,
+     3880
+    ],
+    [
+     4755.1,
+     3842.5
+    ],
+    [
+     4729.6,
+     3805.8
+    ],
+    [
+     4710.4,
+     3775.4
+    ],
+    [
+     4695.9,
+     3743
+    ],
+    [
+     4742.8,
+     3704.4
+    ]
+   ],
+   "bbox": [
+    4695.9,
+    3645.7,
+    5101.5,
+    4136.7
+   ]
+  },
+  {
+   "id1": 13,
+   "name": "八酝岛",
+   "points": [
+    [
+     4424.3,
+     3774.9
+    ],
+    [
+     4455.3,
+     3915.5
+    ],
+    [
+     4486.3,
+     4056.1
+    ],
+    [
+     4556.2,
+     4111.5
+    ],
+    [
+     4629.2,
+     4171.9
+    ],
+    [
+     4730.4,
+     4169
+    ],
+    [
+     4792.8,
+     4127.1
+    ],
+    [
+     4792.8,
+     4079.7
+    ],
+    [
+     4796.8,
+     4025.6
+    ],
+    [
+     4805.9,
+     3990.3
+    ],
+    [
+     4812,
+     3960.9
+    ],
+    [
+     4808.3,
+     3941.1
+    ],
+    [
+     4797.9,
+     3920.9
+    ],
+    [
+     4773,
+     3880
+    ],
+    [
+     4755.1,
+     3842.5
+    ],
+    [
+     4729.6,
+     3805.8
+    ],
+    [
+     4710.4,
+     3775.4
+    ],
+    [
+     4695.9,
+     3743
+    ],
+    [
+     4627.5,
+     3763.5
+    ],
+    [
+     4559.9,
+     3770.1
+    ],
+    [
+     4507.5,
+     3777.9
+    ]
+   ],
+   "bbox": [
+    4424.3,
+    3743,
+    4812,
+    4171.9
+   ]
+  },
+  {
+   "id1": 14,
+   "name": "清籁岛",
+   "points": [
+    [
+     5196.5,
+     4388.1
+    ],
+    [
+     5067.9,
+     4382.5
+    ],
+    [
+     4953.3,
+     4311.4
+    ],
+    [
+     4923.7,
+     4131.3
+    ],
+    [
+     5022.2,
+     4070.1
+    ],
+    [
+     5101.3,
+     3997.9
+    ],
+    [
+     5196.2,
+     4025.9
+    ],
+    [
+     5302.5,
+     4019.2
+    ],
+    [
+     5364.9,
+     4139.2
+    ],
+    [
+     5364.3,
+     4316.2
+    ]
+   ],
+   "bbox": [
+    4923.7,
+    3997.9,
+    5364.9,
+    4388.1
+   ]
+  },
+  {
+   "id1": 16,
+   "name": null,
+   "points": [
+    [
+     4157.4,
+     3373.1
+    ],
+    [
+     4226.1,
+     3369.1
+    ],
+    [
+     4294.3,
+     3341.1
+    ],
+    [
+     4337.3,
+     3300.7
+    ],
+    [
+     4418.2,
+     3204.9
+    ],
+    [
+     4461.7,
+     3154.6
+    ],
+    [
+     4460.1,
+     3106.4
+    ],
+    [
+     4457,
+     3067.5
+    ],
+    [
+     4468.3,
+     3038.7
+    ],
+    [
+     4466.6,
+     2985.6
+    ],
+    [
+     4545,
+     2857.7
+    ],
+    [
+     4589.9,
+     2848.7
+    ],
+    [
+     4660.8,
+     2831
+    ],
+    [
+     4734.4,
+     2773.7
+    ],
+    [
+     4802.2,
+     2659.4
+    ],
+    [
+     4934.1,
+     2748.3
+    ],
+    [
+     5106,
+     2864
+    ],
+    [
+     5288,
+     3043.8
+    ],
+    [
+     5444.9,
+     3244.3
+    ],
+    [
+     5413.6,
+     3460.2
+    ],
+    [
+     5257.5,
+     3403.2
+    ],
+    [
+     5115.2,
+     3409
+    ],
+    [
+     4981.1,
+     3444.1
+    ],
+    [
+     4901.4,
+     3507.3
+    ],
+    [
+     4852.8,
+     3645.7
+    ],
+    [
+     4820.6,
+     3654.8
+    ],
+    [
+     4773.4,
+     3685
+    ],
+    [
+     4742.8,
+     3704.4
+    ],
+    [
+     4695.9,
+     3743
+    ],
+    [
+     4627.5,
+     3763.5
+    ],
+    [
+     4559.9,
+     3770.1
+    ],
+    [
+     4507.5,
+     3777.9
+    ],
+    [
+     4424.3,
+     3774.9
+    ],
+    [
+     4272.6,
+     3761.4
+    ],
+    [
+     4114.2,
+     3799.7
+    ],
+    [
+     3994.6,
+     3826.4
+    ],
+    [
+     3978.4,
+     3651
+    ],
+    [
+     3968.2,
+     3486.3
+    ],
+    [
+     3964.1,
+     3337.6
+    ],
+    [
+     4023.5,
+     3358.9
+    ],
+    [
+     4066.4,
+     3360
+    ],
+    [
+     4093.1,
+     3357.2
+    ],
+    [
+     4136.9,
+     3366.1
+    ]
+   ],
+   "bbox": [
+    3964.1,
+    2659.4,
+    5444.9,
+    3826.4
+   ]
+  },
+  {
+   "id1": 17,
+   "name": "海祇岛",
+   "points": [
+    [
+     3994.6,
+     3826.4
+    ],
+    [
+     4080.5,
+     3918.8
+    ],
+    [
+     4102.1,
+     4075.8
+    ],
+    [
+     4233.2,
+     4172.4
+    ],
+    [
+     4453.1,
+     4202.8
+    ],
+    [
+     4629.2,
+     4171.9
+    ],
+    [
+     4556.2,
+     4111.5
+    ],
+    [
+     4486.3,
+     4056.1
+    ],
+    [
+     4455.3,
+     3915.5
+    ],
+    [
+     4424.3,
+     3774.9
+    ],
+    [
+     4272.6,
+     3761.4
+    ],
+    [
+     4114.2,
+     3799.7
+    ]
+   ],
+   "bbox": [
+    3994.6,
+    3761.4,
+    4629.2,
+    4202.8
+   ]
+  },
+  {
+   "id1": 18,
+   "name": "鹤观",
+   "points": [
+    [
+     4953.3,
+     4311.4
+    ],
+    [
+     4923.7,
+     4131.3
+    ],
+    [
+     4845,
+     4136.7
+    ],
+    [
+     4792.8,
+     4127.1
+    ],
+    [
+     4730.4,
+     4169
+    ],
+    [
+     4629.2,
+     4171.9
+    ],
+    [
+     4453.1,
+     4202.8
+    ],
+    [
+     4474.8,
+     4346.8
+    ],
+    [
+     4542.9,
+     4578.8
+    ],
+    [
+     4658,
+     4774.5
+    ],
+    [
+     4732.2,
+     4824.1
+    ],
+    [
+     4890.8,
+     4807.9
+    ],
+    [
+     4983.1,
+     4698.6
+    ],
+    [
+     5045.3,
+     4566.9
+    ],
+    [
+     5057.3,
+     4474.5
+    ],
+    [
+     5067.9,
+     4382.5
+    ]
+   ],
+   "bbox": [
+    4453.1,
+    4127.1,
+    5067.9,
+    4824.1
+   ]
+  },
+  {
+   "id1": 19,
+   "name": "层岩巨渊",
+   "points": [
+    [
+     3624.8,
+     3159.2
+    ],
+    [
+     3587.1,
+     3178.7
+    ],
+    [
+     3563.9,
+     3215.9
+    ],
+    [
+     3566.6,
+     3265.6
+    ],
+    [
+     3576.9,
+     3303.3
+    ],
+    [
+     3611.7,
+     3343
+    ],
+    [
+     3658.5,
+     3354.7
+    ],
+    [
+     3696,
+     3343.3
+    ],
+    [
+     3719,
+     3321.8
+    ],
+    [
+     3733.2,
+     3311
+    ],
+    [
+     3736.4,
+     3278.9
+    ],
+    [
+     3739.1,
+     3254
+    ],
+    [
+     3739.2,
+     3236
+    ],
+    [
+     3762,
+     3188.1
+    ],
+    [
+     3769.1,
+     3157.9
+    ],
+    [
+     3767.3,
+     3126.3
+    ],
+    [
+     3761.4,
+     3097
+    ],
+    [
+     3731.6,
+     3081.2
+    ],
+    [
+     3719,
+     3079.3
+    ],
+    [
+     3703.2,
+     3080.5
+    ],
+    [
+     3702.6,
+     3100.3
+    ],
+    [
+     3676.3,
+     3122.9
+    ],
+    [
+     3664.5,
+     3134.3
+    ],
+    [
+     3642.8,
+     3146
+    ]
+   ],
+   "bbox": [
+    3563.9,
+    3079.3,
+    3769.1,
+    3354.7
+   ]
+  },
+  {
+   "id1": 20,
+   "name": "护世森",
+   "points": [
+    [
+     3573.1,
+     3127.2
+    ],
+    [
+     3597.9,
+     3093.9
+    ],
+    [
+     3589.8,
+     2994.3
+    ],
+    [
+     3558.4,
+     2924.6
+    ],
+    [
+     3491,
+     2902.8
+    ],
+    [
+     3458.6,
+     2908.6
+    ],
+    [
+     3447.2,
+     2913.8
+    ],
+    [
+     3425.5,
+     2884.2
+    ],
+    [
+     3387.2,
+     2901.5
+    ],
+    [
+     3341.5,
+     2905.1
+    ],
+    [
+     3299.7,
+     2883.2
+    ],
+    [
+     3228.5,
+     2880.9
+    ],
+    [
+     3160.4,
+     2915.2
+    ],
+    [
+     3117.3,
+     2922.2
+    ],
+    [
+     3061.9,
+     2917
+    ],
+    [
+     3014.4,
+     2924.5
+    ],
+    [
+     2985.2,
+     2953.7
+    ],
+    [
+     2988.7,
+     3025.1
+    ],
+    [
+     3043.8,
+     3082.2
+    ],
+    [
+     3078.8,
+     3076.1
+    ],
+    [
+     3140,
+     3073.1
+    ],
+    [
+     3168.7,
+     3083.2
+    ],
+    [
+     3206.6,
+     3063.2
+    ],
+    [
+     3244.1,
+     3060.1
+    ],
+    [
+     3282,
+     3066.2
+    ],
+    [
+     3302.8,
+     3049.1
+    ],
+    [
+     3338.9,
+     3096.4
+    ],
+    [
+     3341.1,
+     3112.7
+    ],
+    [
+     3451.6,
+     3143.1
+    ],
+    [
+     3471.4,
+     3107.6
+    ],
+    [
+     3490.4,
+     3098.2
+    ],
+    [
+     3513.1,
+     3106.2
+    ]
+   ],
+   "bbox": [
+    2985.2,
+    2880.9,
+    3597.9,
+    3143.1
+   ]
+  },
+  {
+   "id1": 21,
+   "name": "阿陀河谷",
+   "points": [
+    [
+     3611.7,
+     3343
+    ],
+    [
+     3651.9,
+     3384.6
+    ],
+    [
+     3591.9,
+     3508.4
+    ],
+    [
+     3517.8,
+     3620.1
+    ],
+    [
+     3479.3,
+     3646.4
+    ],
+    [
+     3453.2,
+     3649.9
+    ],
+    [
+     3381.3,
+     3586.7
+    ],
+    [
+     3340.5,
+     3578.5
+    ],
+    [
+     3338.2,
+     3501
+    ],
+    [
+     3315.2,
+     3469.6
+    ],
+    [
+     3316.6,
+     3409.1
+    ],
+    [
+     3373.9,
+     3330.8
+    ]
+   ],
+   "bbox": [
+    3315.2,
+    3330.8,
+    3651.9,
+    3649.9
+   ]
+  },
+  {
+   "id1": 22,
+   "name": "二净甸",
+   "points": [
+    [
+     3302.8,
+     3049.1
+    ],
+    [
+     3282,
+     3066.2
+    ],
+    [
+     3280.4,
+     3087.7
+    ],
+    [
+     3284.1,
+     3099.3
+    ],
+    [
+     3293.7,
+     3117.7
+    ],
+    [
+     3277.3,
+     3135.4
+    ],
+    [
+     3259,
+     3143.9
+    ],
+    [
+     3240.1,
+     3151.7
+    ],
+    [
+     3231.5,
+     3167.4
+    ],
+    [
+     3217.5,
+     3174.8
+    ],
+    [
+     3197.4,
+     3167.5
+    ],
+    [
+     3187.2,
+     3156.8
+    ],
+    [
+     3173,
+     3151.2
+    ],
+    [
+     3165.5,
+     3121.9
+    ],
+    [
+     3168.7,
+     3083.2
+    ],
+    [
+     3140,
+     3073.1
+    ],
+    [
+     3078.8,
+     3076.1
+    ],
+    [
+     3060.9,
+     3103.4
+    ],
+    [
+     3062.9,
+     3151.4
+    ],
+    [
+     3062.4,
+     3199.4
+    ],
+    [
+     3088.5,
+     3203.8
+    ],
+    [
+     3111.5,
+     3193.9
+    ],
+    [
+     3144,
+     3202
+    ],
+    [
+     3164.2,
+     3208
+    ],
+    [
+     3175.7,
+     3213.2
+    ],
+    [
+     3183.7,
+     3221.2
+    ],
+    [
+     3184.8,
+     3227.8
+    ],
+    [
+     3181,
+     3233.4
+    ],
+    [
+     3172.3,
+     3238.5
+    ],
+    [
+     3167.7,
+     3252.3
+    ],
+    [
+     3184.5,
+     3257.5
+    ],
+    [
+     3227.8,
+     3255.3
+    ],
+    [
+     3265.4,
+     3240.1
+    ],
+    [
+     3283.5,
+     3244.2
+    ],
+    [
+     3310.1,
+     3263.3
+    ],
+    [
+     3348.3,
+     3253.2
+    ],
+    [
+     3328.6,
+     3195.8
+    ],
+    [
+     3341.1,
+     3112.7
+    ],
+    [
+     3338.9,
+     3096.4
+    ]
+   ],
+   "bbox": [
+    3060.9,
+    3049.1,
+    3348.3,
+    3263.3
+   ]
+  },
+  {
+   "id1": 23,
+   "name": "善见地",
+   "points": [
+    [
+     3071.1,
+     3277.8
+    ],
+    [
+     3084.6,
+     3275.3
+    ],
+    [
+     3103.4,
+     3271.3
+    ],
+    [
+     3126.1,
+     3259.7
+    ],
+    [
+     3141.8,
+     3258
+    ],
+    [
+     3155.1,
+     3258
+    ],
+    [
+     3167.7,
+     3252.3
+    ],
+    [
+     3184.5,
+     3257.5
+    ],
+    [
+     3227.8,
+     3255.3
+    ],
+    [
+     3265.4,
+     3240.1
+    ],
+    [
+     3283.5,
+     3244.2
+    ],
+    [
+     3310.1,
+     3263.3
+    ],
+    [
+     3348.3,
+     3253.2
+    ],
+    [
+     3373.9,
+     3330.8
+    ],
+    [
+     3316.6,
+     3409.1
+    ],
+    [
+     3315.2,
+     3469.6
+    ],
+    [
+     3338.2,
+     3501
+    ],
+    [
+     3340.5,
+     3578.5
+    ],
+    [
+     3261.8,
+     3595.2
+    ],
+    [
+     3221.9,
+     3594.3
+    ],
+    [
+     3205.2,
+     3594.2
+    ],
+    [
+     3166.2,
+     3584.1
+    ],
+    [
+     3155.1,
+     3572
+    ],
+    [
+     3150.1,
+     3565.2
+    ],
+    [
+     3142.2,
+     3551.5
+    ],
+    [
+     3133.6,
+     3536
+    ],
+    [
+     3121.8,
+     3528
+    ],
+    [
+     3117.4,
+     3481.8
+    ],
+    [
+     3102.7,
+     3430.7
+    ],
+    [
+     3087,
+     3404.8
+    ],
+    [
+     3081.2,
+     3373.1
+    ]
+   ],
+   "bbox": [
+    3071.1,
+    3240.1,
+    3373.9,
+    3595.2
+   ]
+  },
+  {
+   "id1": 24,
+   "name": "道成林",
+   "points": [
+    [
+     3341.1,
+     3112.7
+    ],
+    [
+     3451.6,
+     3143.1
+    ],
+    [
+     3471.4,
+     3107.6
+    ],
+    [
+     3490.4,
+     3098.2
+    ],
+    [
+     3573.1,
+     3127.2
+    ],
+    [
+     3607.4,
+     3168.2
+    ],
+    [
+     3587.1,
+     3178.7
+    ],
+    [
+     3563.9,
+     3215.9
+    ],
+    [
+     3566.6,
+     3265.6
+    ],
+    [
+     3576.9,
+     3303.3
+    ],
+    [
+     3611.7,
+     3343
+    ],
+    [
+     3373.9,
+     3330.8
+    ],
+    [
+     3348.3,
+     3253.2
+    ],
+    [
+     3328.6,
+     3195.8
+    ]
+   ],
+   "bbox": [
+    3328.6,
+    3098.2,
+    3611.7,
+    3343
+   ]
+  },
+  {
+   "id1": 25,
+   "name": "失落的苗圃",
+   "points": [
+    [
+     3062.4,
+     3199.4
+    ],
+    [
+     3088.5,
+     3203.8
+    ],
+    [
+     3111.5,
+     3193.9
+    ],
+    [
+     3144,
+     3202
+    ],
+    [
+     3164.2,
+     3208
+    ],
+    [
+     3175.7,
+     3213.2
+    ],
+    [
+     3183.7,
+     3221.2
+    ],
+    [
+     3184.8,
+     3227.8
+    ],
+    [
+     3181,
+     3233.4
+    ],
+    [
+     3172.3,
+     3238.5
+    ],
+    [
+     3167.7,
+     3252.3
+    ],
+    [
+     3155.1,
+     3258
+    ],
+    [
+     3141.8,
+     3258
+    ],
+    [
+     3126.1,
+     3259.7
+    ],
+    [
+     3103.4,
+     3271.3
+    ],
+    [
+     3084.6,
+     3275.3
+    ],
+    [
+     3071.1,
+     3277.8
+    ],
+    [
+     3060.8,
+     3259.3
+    ],
+    [
+     3056.6,
+     3221.7
+    ]
+   ],
+   "bbox": [
+    3056.6,
+    3193.9,
+    3184.8,
+    3277.8
+   ]
+  },
+  {
+   "id1": 26,
+   "name": "下风蚀地",
+   "points": [
+    [
+     3087,
+     3404.8
+    ],
+    [
+     3081.2,
+     3373.1
+    ],
+    [
+     3064.1,
+     3397.8
+    ],
+    [
+     3052.8,
+     3395.4
+    ],
+    [
+     3033,
+     3401.6
+    ],
+    [
+     3018.1,
+     3383.9
+    ],
+    [
+     2989.7,
+     3358.5
+    ],
+    [
+     2930.5,
+     3372
+    ],
+    [
+     2906.6,
+     3399
+    ],
+    [
+     2878.3,
+     3412.9
+    ],
+    [
+     2864.1,
+     3429.6
+    ],
+    [
+     2856.9,
+     3437.8
+    ],
+    [
+     2846.8,
+     3457.7
+    ],
+    [
+     2836.5,
+     3477.7
+    ],
+    [
+     2815.4,
+     3481.8
+    ],
+    [
+     2788.8,
+     3496.7
+    ],
+    [
+     2793.5,
+     3504.3
+    ],
+    [
+     2816.4,
+     3526.2
+    ],
+    [
+     2834.5,
+     3573.2
+    ],
+    [
+     2841.3,
+     3577.9
+    ],
+    [
+     2848.4,
+     3586
+    ],
+    [
+     2863.8,
+     3603.9
+    ],
+    [
+     2871.4,
+     3622.4
+    ],
+    [
+     2883.5,
+     3661
+    ],
+    [
+     2903,
+     3676.3
+    ],
+    [
+     2935.2,
+     3700.6
+    ],
+    [
+     2945.3,
+     3705.5
+    ],
+    [
+     2959,
+     3698.4
+    ],
+    [
+     2980.6,
+     3717.3
+    ],
+    [
+     2986,
+     3728.2
+    ],
+    [
+     3003.5,
+     3731.3
+    ],
+    [
+     3012.3,
+     3734.2
+    ],
+    [
+     3021.9,
+     3729.3
+    ],
+    [
+     3049.2,
+     3737.6
+    ],
+    [
+     3057.9,
+     3761.6
+    ],
+    [
+     3086.5,
+     3769
+    ],
+    [
+     3107.9,
+     3758.3
+    ],
+    [
+     3120.8,
+     3743.2
+    ],
+    [
+     3114,
+     3719.9
+    ],
+    [
+     3139.7,
+     3707.4
+    ],
+    [
+     3152.9,
+     3690.6
+    ],
+    [
+     3141.6,
+     3667.2
+    ],
+    [
+     3133.6,
+     3624.7
+    ],
+    [
+     3135.7,
+     3602.7
+    ],
+    [
+     3166.2,
+     3584.1
+    ],
+    [
+     3155.1,
+     3572
+    ],
+    [
+     3150.1,
+     3565.2
+    ],
+    [
+     3142.2,
+     3551.5
+    ],
+    [
+     3133.6,
+     3536
+    ],
+    [
+     3121.8,
+     3528
+    ],
+    [
+     3117.4,
+     3481.8
+    ],
+    [
+     3102.7,
+     3430.7
+    ]
+   ],
+   "bbox": [
+    2788.8,
+    3358.5,
+    3166.2,
+    3769
+   ]
+  },
+  {
+   "id1": 27,
+   "name": "列柱沙原",
+   "points": [
+    [
+     2788.8,
+     3496.7
+    ],
+    [
+     2766.4,
+     3511.4
+    ],
+    [
+     2734.8,
+     3516
+    ],
+    [
+     2671.6,
+     3507
+    ],
+    [
+     2656,
+     3516.6
+    ],
+    [
+     2646.3,
+     3523.9
+    ],
+    [
+     2633.7,
+     3527.4
+    ],
+    [
+     2614.9,
+     3525.7
+    ],
+    [
+     2583.5,
+     3549.9
+    ],
+    [
+     2579.9,
+     3564.7
+    ],
+    [
+     2574.9,
+     3607.6
+    ],
+    [
+     2575.6,
+     3663.8
+    ],
+    [
+     2561.7,
+     3706.6
+    ],
+    [
+     2591.6,
+     3760.5
+    ],
+    [
+     2579.8,
+     3773.6
+    ],
+    [
+     2595.2,
+     3845.6
+    ],
+    [
+     2680.8,
+     3838.8
+    ],
+    [
+     2806.2,
+     3831.2
+    ],
+    [
+     2810.3,
+     3813.7
+    ],
+    [
+     2830.7,
+     3811.4
+    ],
+    [
+     2840.7,
+     3804.9
+    ],
+    [
+     2843.8,
+     3797.1
+    ],
+    [
+     2857.9,
+     3773.4
+    ],
+    [
+     2870.4,
+     3739.7
+    ],
+    [
+     2881.1,
+     3727.3
+    ],
+    [
+     2891.1,
+     3726.8
+    ],
+    [
+     2901.6,
+     3718.1
+    ],
+    [
+     2935.2,
+     3700.6
+    ],
+    [
+     2903,
+     3676.3
+    ],
+    [
+     2883.5,
+     3661
+    ],
+    [
+     2871.4,
+     3622.4
+    ],
+    [
+     2863.8,
+     3603.9
+    ],
+    [
+     2848.4,
+     3586
+    ],
+    [
+     2841.3,
+     3577.9
+    ],
+    [
+     2834.5,
+     3573.2
+    ],
+    [
+     2816.4,
+     3526.2
+    ],
+    [
+     2793.5,
+     3504.3
+    ]
+   ],
+   "bbox": [
+    2561.7,
+    3496.7,
+    2935.2,
+    3845.6
+   ]
+  },
+  {
+   "id1": 28,
+   "name": "上风蚀地",
+   "points": [
+    [
+     2901.6,
+     3718.1
+    ],
+    [
+     2891.1,
+     3726.8
+    ],
+    [
+     2881.1,
+     3727.3
+    ],
+    [
+     2870.4,
+     3739.7
+    ],
+    [
+     2857.9,
+     3773.4
+    ],
+    [
+     2843.8,
+     3797.1
+    ],
+    [
+     2840.7,
+     3804.9
+    ],
+    [
+     2830.7,
+     3811.4
+    ],
+    [
+     2810.3,
+     3813.7
+    ],
+    [
+     2806.2,
+     3831.2
+    ],
+    [
+     2820.3,
+     3835.4
+    ],
+    [
+     2843.1,
+     3844.8
+    ],
+    [
+     2862.9,
+     3862
+    ],
+    [
+     2875.7,
+     3890.5
+    ],
+    [
+     2887.3,
+     3899.7
+    ],
+    [
+     2894.1,
+     3912.5
+    ],
+    [
+     2887.9,
+     3927.1
+    ],
+    [
+     2896.4,
+     3947.5
+    ],
+    [
+     2904.8,
+     3961.9
+    ],
+    [
+     2935.6,
+     3969.8
+    ],
+    [
+     2960.5,
+     3944.9
+    ],
+    [
+     2973.9,
+     3927.1
+    ],
+    [
+     2991.2,
+     3898
+    ],
+    [
+     3022.4,
+     3896.5
+    ],
+    [
+     3042.4,
+     3881.3
+    ],
+    [
+     3076.9,
+     3823.5
+    ],
+    [
+     3091.2,
+     3789.6
+    ],
+    [
+     3086.5,
+     3769
+    ],
+    [
+     3057.9,
+     3761.6
+    ],
+    [
+     3049.2,
+     3737.6
+    ],
+    [
+     3021.9,
+     3729.3
+    ],
+    [
+     3012.3,
+     3734.2
+    ],
+    [
+     3003.5,
+     3731.3
+    ],
+    [
+     2986,
+     3728.2
+    ],
+    [
+     2980.6,
+     3717.3
+    ],
+    [
+     2959,
+     3698.4
+    ],
+    [
+     2945.3,
+     3705.5
+    ],
+    [
+     2935.2,
+     3700.6
+    ]
+   ],
+   "bbox": [
+    2806.2,
+    3698.4,
+    3091.2,
+    3969.8
+   ]
+  },
+  {
+   "id1": 29,
+   "name": "桓那兰那",
+   "points": [
+    [
+     3168.7,
+     3083.2
+    ],
+    [
+     3165.5,
+     3121.9
+    ],
+    [
+     3173,
+     3151.2
+    ],
+    [
+     3187.2,
+     3156.8
+    ],
+    [
+     3197.4,
+     3167.5
+    ],
+    [
+     3217.5,
+     3174.8
+    ],
+    [
+     3231.5,
+     3167.4
+    ],
+    [
+     3240.1,
+     3151.7
+    ],
+    [
+     3259,
+     3143.9
+    ],
+    [
+     3277.3,
+     3135.4
+    ],
+    [
+     3293.7,
+     3117.7
+    ],
+    [
+     3284.1,
+     3099.3
+    ],
+    [
+     3280.4,
+     3087.7
+    ],
+    [
+     3282,
+     3066.2
+    ],
+    [
+     3244.1,
+     3060.1
+    ],
+    [
+     3206.6,
+     3063.2
+    ]
+   ],
+   "bbox": [
+    3165.5,
+    3060.1,
+    3293.7,
+    3174.8
+   ]
+  },
+  {
+   "id1": 30,
+   "name": "荒石苍漠",
+   "points": [
+    [
+     2459.1,
+     2816.6
+    ],
+    [
+     2419.7,
+     2789.8
+    ],
+    [
+     2379.9,
+     2801
+    ],
+    [
+     2363.6,
+     2809.4
+    ],
+    [
+     2356,
+     2828.6
+    ],
+    [
+     2345,
+     2842.5
+    ],
+    [
+     2347.4,
+     2851.6
+    ],
+    [
+     2374.2,
+     2857.8
+    ],
+    [
+     2381.4,
+     2860.8
+    ],
+    [
+     2385.3,
+     2866.2
+    ],
+    [
+     2383,
+     2868.4
+    ],
+    [
+     2378.8,
+     2872.1
+    ],
+    [
+     2376.3,
+     2880.2
+    ],
+    [
+     2381.3,
+     2889.4
+    ],
+    [
+     2382.4,
+     2898.4
+    ],
+    [
+     2374.8,
+     2904.3
+    ],
+    [
+     2362,
+     2908.8
+    ],
+    [
+     2357.9,
+     2923.6
+    ],
+    [
+     2354,
+     2929.6
+    ],
+    [
+     2351.4,
+     2933.6
+    ],
+    [
+     2349.2,
+     2937
+    ],
+    [
+     2338.7,
+     2938.7
+    ],
+    [
+     2334.9,
+     2950.3
+    ],
+    [
+     2333.1,
+     2961.9
+    ],
+    [
+     2327,
+     2976.2
+    ],
+    [
+     2333.3,
+     2992.7
+    ],
+    [
+     2332,
+     3005.8
+    ],
+    [
+     2337.3,
+     3014.3
+    ],
+    [
+     2344.6,
+     3024.2
+    ],
+    [
+     2353.7,
+     3026.3
+    ],
+    [
+     2363.9,
+     3032.3
+    ],
+    [
+     2372.2,
+     3040.8
+    ],
+    [
+     2385.3,
+     3041.6
+    ],
+    [
+     2402.4,
+     3046
+    ],
+    [
+     2412.7,
+     3046.6
+    ],
+    [
+     2431.6,
+     3051
+    ],
+    [
+     2447.6,
+     3049.3
+    ],
+    [
+     2464.1,
+     3059.7
+    ],
+    [
+     2473.6,
+     3076.2
+    ],
+    [
+     2493.1,
+     3090
+    ],
+    [
+     2515.5,
+     3093.9
+    ],
+    [
+     2525.5,
+     3117
+    ],
+    [
+     2524.3,
+     3127.6
+    ],
+    [
+     2530.6,
+     3139.9
+    ],
+    [
+     2551.2,
+     3153.5
+    ],
+    [
+     2564.8,
+     3166.5
+    ],
+    [
+     2577.1,
+     3175.7
+    ],
+    [
+     2585.5,
+     3179
+    ],
+    [
+     2593.3,
+     3193.8
+    ],
+    [
+     2598.2,
+     3186.5
+    ],
+    [
+     2605.3,
+     3175.4
+    ],
+    [
+     2638.2,
+     3150.2
+    ],
+    [
+     2640.4,
+     3115.1
+    ],
+    [
+     2659.8,
+     3081.3
+    ],
+    [
+     2696.7,
+     3066.5
+    ],
+    [
+     2697.4,
+     3056.1
+    ],
+    [
+     2683.7,
+     3056.5
+    ],
+    [
+     2688.9,
+     3044.5
+    ],
+    [
+     2608.9,
+     3028
+    ],
+    [
+     2587,
+     2980.3
+    ],
+    [
+     2550.2,
+     2935.8
+    ],
+    [
+     2502,
+     2909.3
+    ],
+    [
+     2491.6,
+     2864
+    ]
+   ],
+   "bbox": [
+    2327,
+    2789.8,
+    2697.4,
+    3193.8
+   ]
+  },
+  {
+   "id1": 31,
+   "name": "浮罗囿",
+   "points": [
+    [
+     2688.9,
+     3044.5
+    ],
+    [
+     2608.9,
+     3028
+    ],
+    [
+     2587,
+     2980.3
+    ],
+    [
+     2550.2,
+     2935.8
+    ],
+    [
+     2502,
+     2909.3
+    ],
+    [
+     2491.6,
+     2864
+    ],
+    [
+     2459.1,
+     2816.6
+    ],
+    [
+     2419.7,
+     2789.8
+    ],
+    [
+     2379.9,
+     2801
+    ],
+    [
+     2385.5,
+     2781.5
+    ],
+    [
+     2394.1,
+     2779.3
+    ],
+    [
+     2401.6,
+     2778.7
+    ],
+    [
+     2404.4,
+     2771.2
+    ],
+    [
+     2398.4,
+     2765
+    ],
+    [
+     2397.4,
+     2748.9
+    ],
+    [
+     2405.7,
+     2744.9
+    ],
+    [
+     2418.1,
+     2720.8
+    ],
+    [
+     2454.6,
+     2717.9
+    ],
+    [
+     2496.7,
+     2701.4
+    ],
+    [
+     2572.2,
+     2651.8
+    ],
+    [
+     2606.9,
+     2625.9
+    ],
+    [
+     2635.7,
+     2620.8
+    ],
+    [
+     2669,
+     2629.8
+    ],
+    [
+     2724.6,
+     2656.7
+    ],
+    [
+     2772.9,
+     2675.9
+    ],
+    [
+     2801.2,
+     2728.9
+    ],
+    [
+     2822.9,
+     2759.2
+    ],
+    [
+     2849,
+     2802.1
+    ],
+    [
+     2879.9,
+     2826
+    ],
+    [
+     2912.7,
+     2851.3
+    ],
+    [
+     2927.7,
+     2881.5
+    ],
+    [
+     2928.3,
+     2928.4
+    ],
+    [
+     2950.5,
+     2946.3
+    ],
+    [
+     2985.2,
+     2953.7
+    ],
+    [
+     2988.7,
+     3025.1
+    ],
+    [
+     3043.8,
+     3082.2
+    ],
+    [
+     2961.6,
+     3096.5
+    ],
+    [
+     2846.5,
+     3068.9
+    ],
+    [
+     2733.8,
+     3067.1
+    ],
+    [
+     2696.7,
+     3066.5
+    ],
+    [
+     2697.4,
+     3056.1
+    ],
+    [
+     2683.7,
+     3056.5
+    ]
+   ],
+   "bbox": [
+    2379.9,
+    2620.8,
+    3043.8,
+    3096.5
+   ]
+  },
+  {
+   "id1": 32,
+   "name": "千壑沙地",
+   "points": [
+    [
+     2734.8,
+     3516
+    ],
+    [
+     2671.6,
+     3507
+    ],
+    [
+     2656,
+     3516.6
+    ],
+    [
+     2646.3,
+     3523.9
+    ],
+    [
+     2633.7,
+     3527.4
+    ],
+    [
+     2614.9,
+     3525.7
+    ],
+    [
+     2583.5,
+     3549.9
+    ],
+    [
+     2560,
+     3503.9
+    ],
+    [
+     2538.3,
+     3476.5
+    ],
+    [
+     2495.5,
+     3420.8
+    ],
+    [
+     2494.1,
+     3375.8
+    ],
+    [
+     2509.2,
+     3352
+    ],
+    [
+     2526,
+     3314.8
+    ],
+    [
+     2550.2,
+     3285.3
+    ],
+    [
+     2557.8,
+     3266
+    ],
+    [
+     2561.4,
+     3244.6
+    ],
+    [
+     2605.3,
+     3175.4
+    ],
+    [
+     2638.2,
+     3150.2
+    ],
+    [
+     2640.4,
+     3115.1
+    ],
+    [
+     2659.8,
+     3081.3
+    ],
+    [
+     2696.7,
+     3066.5
+    ],
+    [
+     2846.5,
+     3068.9
+    ],
+    [
+     2961.6,
+     3096.5
+    ],
+    [
+     3078.8,
+     3076.1
+    ],
+    [
+     3060.9,
+     3103.4
+    ],
+    [
+     3062.9,
+     3151.4
+    ],
+    [
+     3062.7,
+     3173.3
+    ],
+    [
+     3062.4,
+     3199.4
+    ],
+    [
+     3056.6,
+     3221.7
+    ],
+    [
+     3060.8,
+     3259.3
+    ],
+    [
+     3071.1,
+     3277.8
+    ],
+    [
+     3074.5,
+     3309.3
+    ],
+    [
+     3081.2,
+     3373.1
+    ],
+    [
+     3064.1,
+     3397.8
+    ],
+    [
+     3052.8,
+     3395.4
+    ],
+    [
+     3033,
+     3401.6
+    ],
+    [
+     3018.1,
+     3383.9
+    ],
+    [
+     2989.7,
+     3358.5
+    ],
+    [
+     2930.5,
+     3372
+    ],
+    [
+     2906.6,
+     3399
+    ],
+    [
+     2878.3,
+     3412.9
+    ],
+    [
+     2866.8,
+     3426.4
+    ],
+    [
+     2856.9,
+     3437.8
+    ],
+    [
+     2836.5,
+     3477.7
+    ],
+    [
+     2815.4,
+     3481.8
+    ],
+    [
+     2788.8,
+     3496.7
+    ],
+    [
+     2766.4,
+     3511.4
+    ]
+   ],
+   "bbox": [
+    2494.1,
+    3066.5,
+    3081.2,
+    3549.9
+   ]
+  },
+  {
+   "id1": 33,
+   "name": "白露区",
+   "points": [
+    [
+     2724.6,
+     2656.7
+    ],
+    [
+     2772.9,
+     2675.9
+    ],
+    [
+     2801.2,
+     2728.9
+    ],
+    [
+     2822.9,
+     2759.2
+    ],
+    [
+     2949.3,
+     2654.4
+    ],
+    [
+     2984.5,
+     2621.6
+    ],
+    [
+     3016.7,
+     2601.8
+    ],
+    [
+     3070.8,
+     2527.4
+    ],
+    [
+     3071.1,
+     2489.5
+    ],
+    [
+     3086.3,
+     2460.6
+    ],
+    [
+     3077.7,
+     2422.2
+    ],
+    [
+     3086.2,
+     2405.5
+    ],
+    [
+     3098.3,
+     2377.5
+    ],
+    [
+     3103.2,
+     2357.8
+    ],
+    [
+     3103.3,
+     2336.3
+    ],
+    [
+     3045,
+     2336
+    ],
+    [
+     3013,
+     2348
+    ],
+    [
+     2998.5,
+     2364.8
+    ],
+    [
+     2993.4,
+     2375.1
+    ],
+    [
+     2980.2,
+     2404.5
+    ],
+    [
+     2974.8,
+     2432.5
+    ],
+    [
+     2973.9,
+     2450.6
+    ],
+    [
+     2986.5,
+     2472.4
+    ],
+    [
+     2987.1,
+     2485.4
+    ],
+    [
+     2975.3,
+     2499.3
+    ],
+    [
+     2974.1,
+     2519.3
+    ],
+    [
+     2978.7,
+     2535.2
+    ],
+    [
+     2959,
+     2544
+    ],
+    [
+     2913.9,
+     2551
+    ],
+    [
+     2892.5,
+     2560.5
+    ],
+    [
+     2823.6,
+     2563.5
+    ]
+   ],
+   "bbox": [
+    2724.6,
+    2336,
+    3103.3,
+    2759.2
+   ]
+  },
+  {
+   "id1": 34,
+   "name": "苍晶区",
+   "points": [
+    [
+     2823.6,
+     2563.5
+    ],
+    [
+     2892.5,
+     2560.5
+    ],
+    [
+     2913.9,
+     2551
+    ],
+    [
+     2959,
+     2544
+    ],
+    [
+     2978.7,
+     2535.2
+    ],
+    [
+     2974.1,
+     2519.3
+    ],
+    [
+     2975.3,
+     2499.3
+    ],
+    [
+     2987.1,
+     2485.4
+    ],
+    [
+     2986.5,
+     2472.4
+    ],
+    [
+     2973.9,
+     2450.6
+    ],
+    [
+     2974.8,
+     2432.5
+    ],
+    [
+     2980.2,
+     2404.5
+    ],
+    [
+     2993.4,
+     2375.1
+    ],
+    [
+     2961,
+     2353.6
+    ],
+    [
+     2952.2,
+     2311.8
+    ],
+    [
+     2927.1,
+     2314.3
+    ],
+    [
+     2892.9,
+     2299.2
+    ],
+    [
+     2878.1,
+     2277.6
+    ],
+    [
+     2836.6,
+     2260.2
+    ],
+    [
+     2801.2,
+     2185.1
+    ],
+    [
+     2802.3,
+     2163.3
+    ],
+    [
+     2752.6,
+     2195.5
+    ],
+    [
+     2745.1,
+     2236.1
+    ],
+    [
+     2757.9,
+     2271
+    ],
+    [
+     2739.9,
+     2335.8
+    ],
+    [
+     2741.5,
+     2417.4
+    ],
+    [
+     2758,
+     2450.9
+    ],
+    [
+     2792.3,
+     2465.9
+    ],
+    [
+     2805.2,
+     2475.4
+    ],
+    [
+     2813.8,
+     2496
+    ],
+    [
+     2796.1,
+     2518.5
+    ]
+   ],
+   "bbox": [
+    2739.9,
+    2163.3,
+    2993.4,
+    2563.5
+   ]
+  },
+  {
+   "id1": 35,
+   "name": "枫丹廷区",
+   "points": [
+    [
+     2836.6,
+     2260.2
+    ],
+    [
+     2801.2,
+     2185.1
+    ],
+    [
+     2805,
+     2110.6
+    ],
+    [
+     2812.6,
+     2072.4
+    ],
+    [
+     2833.9,
+     2054.7
+    ],
+    [
+     2899.4,
+     2024.3
+    ],
+    [
+     2948.1,
+     2048.3
+    ],
+    [
+     3063.2,
+     2034.4
+    ],
+    [
+     3104.4,
+     2054.4
+    ],
+    [
+     3147.5,
+     2071.6
+    ],
+    [
+     3152.4,
+     2103.7
+    ],
+    [
+     3165.9,
+     2118.8
+    ],
+    [
+     3190.1,
+     2123.9
+    ],
+    [
+     3208.4,
+     2145.5
+    ],
+    [
+     3220.3,
+     2176.1
+    ],
+    [
+     3215,
+     2192.4
+    ],
+    [
+     3205.7,
+     2207.2
+    ],
+    [
+     3208.7,
+     2232.2
+    ],
+    [
+     3153.2,
+     2290.7
+    ],
+    [
+     3113.6,
+     2317.1
+    ],
+    [
+     3108.2,
+     2336.2
+    ],
+    [
+     3103.3,
+     2336.3
+    ],
+    [
+     3044.9,
+     2336
+    ],
+    [
+     3013,
+     2348
+    ],
+    [
+     2998.5,
+     2364.8
+    ],
+    [
+     2993.4,
+     2375.1
+    ],
+    [
+     2961,
+     2353.6
+    ],
+    [
+     2952.2,
+     2311.8
+    ],
+    [
+     2927.1,
+     2314.3
+    ],
+    [
+     2892.9,
+     2299.2
+    ],
+    [
+     2878.1,
+     2277.6
+    ]
+   ],
+   "bbox": [
+    2801.2,
+    2024.3,
+    3220.3,
+    2375.1
+   ]
+  },
+  {
+   "id1": 36,
+   "name": "黎翡区",
+   "points": [
+    [
+     2812.6,
+     2072.4
+    ],
+    [
+     2802.5,
+     1955.3
+    ],
+    [
+     2773.1,
+     1925
+    ],
+    [
+     2762.2,
+     1892.5
+    ],
+    [
+     2799.4,
+     1873.4
+    ],
+    [
+     2806.6,
+     1831
+    ],
+    [
+     2857.8,
+     1808.3
+    ],
+    [
+     2879.1,
+     1822.1
+    ],
+    [
+     2892.4,
+     1821.9
+    ],
+    [
+     2892.6,
+     1822.7
+    ],
+    [
+     2891.5,
+     1825
+    ],
+    [
+     2893.2,
+     1830.9
+    ],
+    [
+     2890.1,
+     1837.5
+    ],
+    [
+     2888.2,
+     1842.8
+    ],
+    [
+     2889.2,
+     1845.2
+    ],
+    [
+     2891.7,
+     1847.8
+    ],
+    [
+     2898.8,
+     1851.3
+    ],
+    [
+     2900.9,
+     1851.7
+    ],
+    [
+     2904.5,
+     1852.2
+    ],
+    [
+     2908.1,
+     1852.7
+    ],
+    [
+     2912,
+     1852.9
+    ],
+    [
+     2918.3,
+     1853.2
+    ],
+    [
+     2924,
+     1851.4
+    ],
+    [
+     2933.4,
+     1855.2
+    ],
+    [
+     2940.9,
+     1858.8
+    ],
+    [
+     2944.1,
+     1869.6
+    ],
+    [
+     2940.6,
+     1875.9
+    ],
+    [
+     2942.8,
+     1879.5
+    ],
+    [
+     2955.6,
+     1891.4
+    ],
+    [
+     2957.6,
+     1900
+    ],
+    [
+     2964.3,
+     1908.2
+    ],
+    [
+     2971.1,
+     1908.6
+    ],
+    [
+     2988.8,
+     1918
+    ],
+    [
+     2997.4,
+     1927.4
+    ],
+    [
+     3001.3,
+     1951.3
+    ],
+    [
+     3010.7,
+     1970.8
+    ],
+    [
+     3009.1,
+     1995.7
+    ],
+    [
+     3011.2,
+     2014.6
+    ],
+    [
+     3020.3,
+     2024.2
+    ],
+    [
+     3025.7,
+     2038.9
+    ],
+    [
+     2948.1,
+     2048.3
+    ],
+    [
+     2899.4,
+     2024.3
+    ],
+    [
+     2833.9,
+     2054.7
+    ]
+   ],
+   "bbox": [
+    2762.2,
+    1808.3,
+    3025.7,
+    2072.4
+   ]
+  },
+  {
+   "id1": 37,
+   "name": "枫丹动能工程科学研究院区",
+   "points": [
+    [
+     2892.4,
+     1821.9
+    ],
+    [
+     2908.4,
+     1822.7
+    ],
+    [
+     2947.2,
+     1788.2
+    ],
+    [
+     3016.7,
+     1769.1
+    ],
+    [
+     3156,
+     1790.1
+    ],
+    [
+     3210.7,
+     1826.6
+    ],
+    [
+     3224.4,
+     1870.2
+    ],
+    [
+     3223,
+     1936.2
+    ],
+    [
+     3213.9,
+     1956.8
+    ],
+    [
+     3223.3,
+     1980.3
+    ],
+    [
+     3240.6,
+     1992.5
+    ],
+    [
+     3243,
+     2017.5
+    ],
+    [
+     3228.1,
+     2026.4
+    ],
+    [
+     3150,
+     2024.6
+    ],
+    [
+     3121.8,
+     2057.3
+    ],
+    [
+     3114.8,
+     2058.6
+    ],
+    [
+     3104.4,
+     2054.4
+    ],
+    [
+     3063.2,
+     2034.4
+    ],
+    [
+     3025.7,
+     2038.9
+    ],
+    [
+     3020.3,
+     2024.2
+    ],
+    [
+     3011.2,
+     2014.6
+    ],
+    [
+     3009.1,
+     1995.7
+    ],
+    [
+     3010.7,
+     1970.8
+    ],
+    [
+     3001.3,
+     1951.3
+    ],
+    [
+     2997.4,
+     1927.4
+    ],
+    [
+     2988.8,
+     1918
+    ],
+    [
+     2971.1,
+     1908.6
+    ],
+    [
+     2964.3,
+     1908.2
+    ],
+    [
+     2957.6,
+     1900
+    ],
+    [
+     2955.6,
+     1891.4
+    ],
+    [
+     2942.8,
+     1879.5
+    ],
+    [
+     2940.6,
+     1875.9
+    ],
+    [
+     2944.1,
+     1869.6
+    ],
+    [
+     2940.9,
+     1858.8
+    ],
+    [
+     2933.4,
+     1855.2
+    ],
+    [
+     2924,
+     1851.4
+    ],
+    [
+     2918.3,
+     1853.2
+    ],
+    [
+     2912,
+     1852.9
+    ],
+    [
+     2908.1,
+     1852.7
+    ],
+    [
+     2904.5,
+     1852.2
+    ],
+    [
+     2900.9,
+     1851.7
+    ],
+    [
+     2898.8,
+     1851.3
+    ],
+    [
+     2891.7,
+     1847.8
+    ],
+    [
+     2889.2,
+     1845.2
+    ],
+    [
+     2888.2,
+     1842.8
+    ],
+    [
+     2890.1,
+     1837.5
+    ],
+    [
+     2893.2,
+     1830.9
+    ],
+    [
+     2891.5,
+     1825
+    ],
+    [
+     2892.6,
+     1822.7
+    ]
+   ],
+   "bbox": [
+    2888.2,
+    1769.1,
+    3243,
+    2058.6
+   ]
+  },
+  {
+   "id1": 38,
+   "name": "伊黎耶林区",
+   "points": [
+    [
+     3261.6,
+     1998.1
+    ],
+    [
+     3285.5,
+     2002.9
+    ],
+    [
+     3302.7,
+     2022.9
+    ],
+    [
+     3299.6,
+     2042.1
+    ],
+    [
+     3303.8,
+     2050.1
+    ],
+    [
+     3307.9,
+     2058.2
+    ],
+    [
+     3318.5,
+     2056.6
+    ],
+    [
+     3326.5,
+     2061.4
+    ],
+    [
+     3330,
+     2072.3
+    ],
+    [
+     3331.2,
+     2075.9
+    ],
+    [
+     3342.8,
+     2084.2
+    ],
+    [
+     3349.7,
+     2094.7
+    ],
+    [
+     3358.9,
+     2099.9
+    ],
+    [
+     3376.2,
+     2094.3
+    ],
+    [
+     3379,
+     2093.6
+    ],
+    [
+     3397.1,
+     2088.8
+    ],
+    [
+     3413.8,
+     2090.4
+    ],
+    [
+     3433.2,
+     2100.4
+    ],
+    [
+     3445.3,
+     2118.6
+    ],
+    [
+     3445.1,
+     2138.7
+    ],
+    [
+     3437.4,
+     2174.7
+    ],
+    [
+     3425.1,
+     2207.5
+    ],
+    [
+     3412,
+     2226.8
+    ],
+    [
+     3417.7,
+     2238.6
+    ],
+    [
+     3421.3,
+     2256.1
+    ],
+    [
+     3423,
+     2275.7
+    ],
+    [
+     3417.8,
+     2296.9
+    ],
+    [
+     3407.2,
+     2307.6
+    ],
+    [
+     3409,
+     2334.6
+    ],
+    [
+     3332,
+     2299.6
+    ],
+    [
+     3292.4,
+     2291.3
+    ],
+    [
+     3253.9,
+     2289
+    ],
+    [
+     3230.4,
+     2299.8
+    ],
+    [
+     3168.5,
+     2274.6
+    ],
+    [
+     3208.7,
+     2232.2
+    ],
+    [
+     3205.7,
+     2207.2
+    ],
+    [
+     3215,
+     2192.4
+    ],
+    [
+     3220.3,
+     2176.1
+    ],
+    [
+     3208.4,
+     2145.5
+    ],
+    [
+     3190.1,
+     2123.9
+    ],
+    [
+     3165.9,
+     2118.8
+    ],
+    [
+     3152.4,
+     2103.7
+    ],
+    [
+     3147.5,
+     2071.6
+    ],
+    [
+     3115,
+     2058.7
+    ],
+    [
+     3121.8,
+     2057.3
+    ],
+    [
+     3150,
+     2024.6
+    ],
+    [
+     3228.1,
+     2026.4
+    ],
+    [
+     3243,
+     2017.5
+    ],
+    [
+     3240.6,
+     1992.5
+    ]
+   ],
+   "bbox": [
+    3115,
+    1992.5,
+    3445.3,
+    2334.6
+   ]
+  },
+  {
+   "id1": 39,
+   "name": "莫尔泰区",
+   "points": [
+    [
+     3153.2,
+     2290.7
+    ],
+    [
+     3113.6,
+     2317.1
+    ],
+    [
+     3108.2,
+     2336.2
+    ],
+    [
+     3103.3,
+     2336.3
+    ],
+    [
+     3103.2,
+     2357.8
+    ],
+    [
+     3098.3,
+     2377.5
+    ],
+    [
+     3086.2,
+     2405.5
+    ],
+    [
+     3077.7,
+     2422.2
+    ],
+    [
+     3086.3,
+     2460.6
+    ],
+    [
+     3071.1,
+     2489.5
+    ],
+    [
+     3071.1,
+     2517.9
+    ],
+    [
+     3088.9,
+     2508.5
+    ],
+    [
+     3110.9,
+     2501.8
+    ],
+    [
+     3129.1,
+     2502
+    ],
+    [
+     3150.4,
+     2516.6
+    ],
+    [
+     3191.8,
+     2528.1
+    ],
+    [
+     3205.4,
+     2528.3
+    ],
+    [
+     3216,
+     2528.4
+    ],
+    [
+     3242.1,
+     2521.8
+    ],
+    [
+     3275.6,
+     2504.8
+    ],
+    [
+     3286.3,
+     2497.4
+    ],
+    [
+     3305.5,
+     2488.7
+    ],
+    [
+     3324.4,
+     2483.1
+    ],
+    [
+     3333.7,
+     2472
+    ],
+    [
+     3346,
+     2464.3
+    ],
+    [
+     3364,
+     2455.3
+    ],
+    [
+     3373.4,
+     2437.6
+    ],
+    [
+     3369.6,
+     2416.2
+    ],
+    [
+     3381.9,
+     2397.8
+    ],
+    [
+     3386.7,
+     2370.6
+    ],
+    [
+     3391.5,
+     2349.9
+    ],
+    [
+     3409,
+     2334.6
+    ],
+    [
+     3332,
+     2299.6
+    ],
+    [
+     3292.4,
+     2291.3
+    ],
+    [
+     3253.9,
+     2289
+    ],
+    [
+     3230.4,
+     2299.8
+    ],
+    [
+     3168.5,
+     2274.6
+    ]
+   ],
+   "bbox": [
+    3071.1,
+    2274.6,
+    3409,
+    2528.4
+   ]
+  },
+  {
+   "id1": 40,
+   "name": "沉玉谷·上谷",
+   "points": [
+    [
+     3832.2,
+     2633.9
+    ],
+    [
+     3836.6,
+     2644.5
+    ],
+    [
+     3831.7,
+     2646.2
+    ],
+    [
+     3828.6,
+     2647.9
+    ],
+    [
+     3826.5,
+     2650.9
+    ],
+    [
+     3823.8,
+     2652.6
+    ],
+    [
+     3820.6,
+     2655.3
+    ],
+    [
+     3817.7,
+     2657.2
+    ],
+    [
+     3815,
+     2658.1
+    ],
+    [
+     3810.2,
+     2658.1
+    ],
+    [
+     3806,
+     2657.3
+    ],
+    [
+     3802.2,
+     2654.4
+    ],
+    [
+     3798.4,
+     2653.3
+    ],
+    [
+     3794.5,
+     2651.4
+    ],
+    [
+     3789.6,
+     2647.8
+    ],
+    [
+     3785.9,
+     2646.1
+    ],
+    [
+     3767.6,
+     2614.9
+    ],
+    [
+     3727.3,
+     2627.2
+    ],
+    [
+     3685.5,
+     2584.6
+    ],
+    [
+     3635.4,
+     2622.6
+    ],
+    [
+     3590.7,
+     2617.1
+    ],
+    [
+     3541.7,
+     2611.1
+    ],
+    [
+     3504.6,
+     2616.5
+    ],
+    [
+     3474.3,
+     2600.8
+    ],
+    [
+     3465.1,
+     2602.4
+    ],
+    [
+     3437.6,
+     2627.2
+    ],
+    [
+     3423.8,
+     2628.1
+    ],
+    [
+     3403.3,
+     2614.7
+    ],
+    [
+     3379.6,
+     2608.5
+    ],
+    [
+     3361.2,
+     2585.6
+    ],
+    [
+     3353.3,
+     2571
+    ],
+    [
+     3357.2,
+     2531.4
+    ],
+    [
+     3349.3,
+     2505.9
+    ],
+    [
+     3324.4,
+     2483.1
+    ],
+    [
+     3333.7,
+     2472
+    ],
+    [
+     3346,
+     2464.3
+    ],
+    [
+     3364,
+     2455.3
+    ],
+    [
+     3373.4,
+     2437.6
+    ],
+    [
+     3369.6,
+     2416.2
+    ],
+    [
+     3381.9,
+     2397.8
+    ],
+    [
+     3386.7,
+     2370.6
+    ],
+    [
+     3391.5,
+     2349.9
+    ],
+    [
+     3409,
+     2334.6
+    ],
+    [
+     3407.2,
+     2307.6
+    ],
+    [
+     3417.8,
+     2296.9
+    ],
+    [
+     3507.3,
+     2365.1
+    ],
+    [
+     3557.4,
+     2359.3
+    ],
+    [
+     3581.8,
+     2381
+    ],
+    [
+     3591.4,
+     2401.7
+    ],
+    [
+     3618,
+     2410.3
+    ],
+    [
+     3637,
+     2392.2
+    ],
+    [
+     3675,
+     2394.3
+    ],
+    [
+     3697.9,
+     2414.2
+    ],
+    [
+     3714.6,
+     2418.3
+    ],
+    [
+     3739.2,
+     2409.5
+    ],
+    [
+     3772.4,
+     2407.7
+    ],
+    [
+     3805.8,
+     2438.1
+    ],
+    [
+     3818.9,
+     2489.1
+    ],
+    [
+     3846.8,
+     2541
+    ]
+   ],
+   "bbox": [
+    3324.4,
+    2296.9,
+    3846.8,
+    2658.1
+   ]
+  },
+  {
+   "id1": 41,
+   "name": "沉玉谷·南陵",
+   "points": [
+    [
+     3447.3,
+     2696.3
+    ],
+    [
+     3452.5,
+     2704.5
+    ],
+    [
+     3460.8,
+     2705.6
+    ],
+    [
+     3471.6,
+     2705.3
+    ],
+    [
+     3471.3,
+     2708.3
+    ],
+    [
+     3473.9,
+     2711.5
+    ],
+    [
+     3468.8,
+     2722
+    ],
+    [
+     3463.8,
+     2734.5
+    ],
+    [
+     3461.5,
+     2746.3
+    ],
+    [
+     3477.1,
+     2769
+    ],
+    [
+     3472.6,
+     2793.2
+    ],
+    [
+     3445,
+     2807.9
+    ],
+    [
+     3367.5,
+     2804.9
+    ],
+    [
+     3447.2,
+     2913.8
+    ],
+    [
+     3458.6,
+     2908.6
+    ],
+    [
+     3491,
+     2902.8
+    ],
+    [
+     3558.4,
+     2924.6
+    ],
+    [
+     3586.8,
+     2910.9
+    ],
+    [
+     3590.3,
+     2879.3
+    ],
+    [
+     3608.6,
+     2859.2
+    ],
+    [
+     3618.3,
+     2852.2
+    ],
+    [
+     3628.8,
+     2833.7
+    ],
+    [
+     3638.2,
+     2825.3
+    ],
+    [
+     3651.8,
+     2807
+    ],
+    [
+     3667.1,
+     2793.5
+    ],
+    [
+     3671.4,
+     2779.6
+    ],
+    [
+     3678.4,
+     2762.6
+    ],
+    [
+     3679.5,
+     2759.8
+    ],
+    [
+     3680.2,
+     2758.6
+    ],
+    [
+     3685.3,
+     2748.4
+    ],
+    [
+     3693.1,
+     2742.3
+    ],
+    [
+     3700.1,
+     2733.2
+    ],
+    [
+     3714.9,
+     2698.1
+    ],
+    [
+     3729,
+     2676.7
+    ],
+    [
+     3756.5,
+     2648.8
+    ],
+    [
+     3760.2,
+     2647.8
+    ],
+    [
+     3762.8,
+     2647.6
+    ],
+    [
+     3765.7,
+     2647.8
+    ],
+    [
+     3768.3,
+     2646.2
+    ],
+    [
+     3771.2,
+     2647.3
+    ],
+    [
+     3773.1,
+     2647.1
+    ],
+    [
+     3774.7,
+     2645.9
+    ],
+    [
+     3778,
+     2645.9
+    ],
+    [
+     3780.4,
+     2645.3
+    ],
+    [
+     3782.5,
+     2646.4
+    ],
+    [
+     3785.9,
+     2646.1
+    ],
+    [
+     3767.6,
+     2614.9
+    ],
+    [
+     3727.3,
+     2627.2
+    ],
+    [
+     3685.5,
+     2584.6
+    ],
+    [
+     3635.4,
+     2622.6
+    ],
+    [
+     3590.7,
+     2617.1
+    ],
+    [
+     3541.7,
+     2611.1
+    ],
+    [
+     3504.6,
+     2616.5
+    ],
+    [
+     3474.3,
+     2600.8
+    ],
+    [
+     3465.1,
+     2602.4
+    ],
+    [
+     3437.6,
+     2627.2
+    ],
+    [
+     3446.8,
+     2634
+    ],
+    [
+     3449.5,
+     2641.6
+    ],
+    [
+     3441,
+     2649.6
+    ],
+    [
+     3434.4,
+     2666.3
+    ],
+    [
+     3435.8,
+     2680.3
+    ]
+   ],
+   "bbox": [
+    3367.5,
+    2584.6,
+    3785.9,
+    2924.6
+   ]
+  },
+  {
+   "id1": 42,
+   "name": "诺思托伊区",
+   "points": [
+    [
+     3321.1,
+     2605.3
+    ],
+    [
+     3315.5,
+     2657.7
+    ],
+    [
+     3312.7,
+     2750.7
+    ],
+    [
+     3367.5,
+     2804.9
+    ],
+    [
+     3425.5,
+     2884.2
+    ],
+    [
+     3387.2,
+     2901.5
+    ],
+    [
+     3341.5,
+     2905.1
+    ],
+    [
+     3299.7,
+     2883.2
+    ],
+    [
+     3228.5,
+     2880.9
+    ],
+    [
+     3160.4,
+     2915.2
+    ],
+    [
+     3117.3,
+     2922.2
+    ],
+    [
+     3061.9,
+     2917
+    ],
+    [
+     3014.4,
+     2924.5
+    ],
+    [
+     2985.2,
+     2953.7
+    ],
+    [
+     2950.5,
+     2946.3
+    ],
+    [
+     2928.3,
+     2928.4
+    ],
+    [
+     2927.7,
+     2881.5
+    ],
+    [
+     2912.7,
+     2851.3
+    ],
+    [
+     2879.9,
+     2826
+    ],
+    [
+     2849,
+     2802.1
+    ],
+    [
+     2822.9,
+     2759.2
+    ],
+    [
+     2949.3,
+     2654.4
+    ],
+    [
+     2984.5,
+     2621.6
+    ],
+    [
+     3016.7,
+     2601.8
+    ],
+    [
+     3070.8,
+     2527.4
+    ],
+    [
+     3071.1,
+     2517.9
+    ],
+    [
+     3088.9,
+     2508.5
+    ],
+    [
+     3110.9,
+     2501.8
+    ],
+    [
+     3129.1,
+     2502
+    ],
+    [
+     3150.4,
+     2516.6
+    ],
+    [
+     3191.8,
+     2528.1
+    ],
+    [
+     3216,
+     2528.4
+    ],
+    [
+     3242.1,
+     2521.8
+    ],
+    [
+     3275.6,
+     2504.8
+    ],
+    [
+     3286.3,
+     2497.4
+    ],
+    [
+     3305.5,
+     2488.7
+    ],
+    [
+     3324.4,
+     2483.1
+    ],
+    [
+     3349.3,
+     2505.9
+    ],
+    [
+     3357.2,
+     2531.3
+    ],
+    [
+     3353.3,
+     2571
+    ]
+   ],
+   "bbox": [
+    2822.9,
+    2483.1,
+    3425.5,
+    2953.7
+   ]
+  },
+  {
+   "id1": 43,
+   "name": "坚岩隘谷",
+   "points": [
+    [
+     2226.5,
+     3378
+    ],
+    [
+     2191.1,
+     3369.3
+    ],
+    [
+     2118,
+     3366.4
+    ],
+    [
+     2083.8,
+     3369.3
+    ],
+    [
+     2076.8,
+     3374.2
+    ],
+    [
+     2069.2,
+     3374.1
+    ],
+    [
+     2044,
+     3353.9
+    ],
+    [
+     2020.5,
+     3353.6
+    ],
+    [
+     1983.3,
+     3359.9
+    ],
+    [
+     1947.9,
+     3363
+    ],
+    [
+     1939.1,
+     3370.5
+    ],
+    [
+     1917.6,
+     3374.3
+    ],
+    [
+     1932.1,
+     3439.7
+    ],
+    [
+     1941.5,
+     3465
+    ],
+    [
+     1958.5,
+     3497.4
+    ],
+    [
+     1956.6,
+     3523.7
+    ],
+    [
+     1959,
+     3566.4
+    ],
+    [
+     1992.8,
+     3561.3
+    ],
+    [
+     2019.5,
+     3552.1
+    ],
+    [
+     2033.8,
+     3548.9
+    ],
+    [
+     2063.6,
+     3533.1
+    ],
+    [
+     2078.6,
+     3531.9
+    ],
+    [
+     2109.9,
+     3522.6
+    ],
+    [
+     2138.6,
+     3509.7
+    ],
+    [
+     2161.7,
+     3516.6
+    ],
+    [
+     2190.4,
+     3529.6
+    ],
+    [
+     2198.7,
+     3530.8
+    ],
+    [
+     2231,
+     3531.9
+    ],
+    [
+     2233.6,
+     3504.6
+    ],
+    [
+     2238.6,
+     3494.1
+    ],
+    [
+     2277.2,
+     3475.4
+    ],
+    [
+     2363.7,
+     3474
+    ],
+    [
+     2494.2,
+     3493.9
+    ],
+    [
+     2583.5,
+     3549.9
+    ],
+    [
+     2560,
+     3503.9
+    ],
+    [
+     2538.3,
+     3476.5
+    ],
+    [
+     2495.5,
+     3420.8
+    ],
+    [
+     2494.1,
+     3375.8
+    ],
+    [
+     2509.2,
+     3352
+    ],
+    [
+     2526,
+     3314.8
+    ],
+    [
+     2507.6,
+     3324.3
+    ],
+    [
+     2295,
+     3396.7
+    ]
+   ],
+   "bbox": [
+    1917.6,
+    3314.8,
+    2583.5,
+    3566.4
+   ]
+  },
+  {
+   "id1": 44,
+   "name": "万火之瓯",
+   "points": [
+    [
+     1917.6,
+     3374.4
+    ],
+    [
+     1899.4,
+     3370.8
+    ],
+    [
+     1869.6,
+     3361.8
+    ],
+    [
+     1860.7,
+     3363.6
+    ],
+    [
+     1839.7,
+     3374.1
+    ],
+    [
+     1828.8,
+     3387.7
+    ],
+    [
+     1826.2,
+     3396.5
+    ],
+    [
+     1813.2,
+     3410.6
+    ],
+    [
+     1797.9,
+     3429.2
+    ],
+    [
+     1803.8,
+     3453.2
+    ],
+    [
+     1792.3,
+     3473.3
+    ],
+    [
+     1783,
+     3483.5
+    ],
+    [
+     1793.4,
+     3524.5
+    ],
+    [
+     1796.5,
+     3543.1
+    ],
+    [
+     1791.3,
+     3596.9
+    ],
+    [
+     1783.4,
+     3604
+    ],
+    [
+     1785.6,
+     3621.3
+    ],
+    [
+     1791.4,
+     3638.3
+    ],
+    [
+     1861.5,
+     3630.7
+    ],
+    [
+     1906.1,
+     3614.2
+    ],
+    [
+     1913.7,
+     3599.2
+    ],
+    [
+     1945.9,
+     3583.9
+    ],
+    [
+     1959,
+     3566.4
+    ],
+    [
+     1956.6,
+     3523.7
+    ],
+    [
+     1958.5,
+     3497.4
+    ],
+    [
+     1941.5,
+     3465
+    ],
+    [
+     1932.1,
+     3439.7
+    ]
+   ],
+   "bbox": [
+    1783,
+    3361.8,
+    1959,
+    3638.3
+   ]
+  },
+  {
+   "id1": 45,
+   "name": "涌流地",
+   "points": [
+    [
+     2052.4,
+     3792.2
+    ],
+    [
+     2051.7,
+     3821.9
+    ],
+    [
+     1998.6,
+     3852.1
+    ],
+    [
+     1930.8,
+     3874.1
+    ],
+    [
+     1891.4,
+     3858.9
+    ],
+    [
+     1799.8,
+     3828.1
+    ],
+    [
+     1789.9,
+     3804.7
+    ],
+    [
+     1793.7,
+     3787.3
+    ],
+    [
+     1789.9,
+     3760.6
+    ],
+    [
+     1779.7,
+     3746
+    ],
+    [
+     1782.7,
+     3735.6
+    ],
+    [
+     1787.4,
+     3719.8
+    ],
+    [
+     1792.5,
+     3696.4
+    ],
+    [
+     1792.8,
+     3684.5
+    ],
+    [
+     1793.3,
+     3668.8
+    ],
+    [
+     1791.2,
+     3654
+    ],
+    [
+     1791.4,
+     3638.3
+    ],
+    [
+     1861.5,
+     3630.7
+    ],
+    [
+     1906.1,
+     3614.2
+    ],
+    [
+     1936.9,
+     3639.6
+    ],
+    [
+     1952.1,
+     3661.2
+    ],
+    [
+     1965.4,
+     3677.2
+    ],
+    [
+     1982.1,
+     3686.9
+    ],
+    [
+     2011.9,
+     3687.4
+    ],
+    [
+     2027.6,
+     3695.8
+    ],
+    [
+     2036.5,
+     3719.4
+    ],
+    [
+     2038.4,
+     3758.2
+    ]
+   ],
+   "bbox": [
+    1779.7,
+    3614.2,
+    2052.4,
+    3874.1
+   ]
+  },
+  {
+   "id1": 46,
+   "name": "踞石山",
+   "points": [
+    [
+     2231,
+     3531.9
+    ],
+    [
+     2234.6,
+     3620.8
+    ],
+    [
+     2183.8,
+     3692.8
+    ],
+    [
+     2199.7,
+     3751.9
+    ],
+    [
+     2195.4,
+     3791.9
+    ],
+    [
+     2182.9,
+     3808
+    ],
+    [
+     2165.5,
+     3808.9
+    ],
+    [
+     2051.7,
+     3821.9
+    ],
+    [
+     2052.4,
+     3792.2
+    ],
+    [
+     2038.4,
+     3758.2
+    ],
+    [
+     2036.5,
+     3719.4
+    ],
+    [
+     2027.6,
+     3695.8
+    ],
+    [
+     2011.9,
+     3687.4
+    ],
+    [
+     1982.1,
+     3686.9
+    ],
+    [
+     1965.4,
+     3677.2
+    ],
+    [
+     1952.1,
+     3661.2
+    ],
+    [
+     1936.9,
+     3639.6
+    ],
+    [
+     1906.1,
+     3614.2
+    ],
+    [
+     1913.7,
+     3599.2
+    ],
+    [
+     1945.9,
+     3583.9
+    ],
+    [
+     1959,
+     3566.4
+    ],
+    [
+     1992.8,
+     3561.3
+    ],
+    [
+     2019.5,
+     3552.1
+    ],
+    [
+     2033.8,
+     3548.9
+    ],
+    [
+     2063.6,
+     3533.1
+    ],
+    [
+     2078.6,
+     3531.9
+    ],
+    [
+     2109.9,
+     3522.6
+    ],
+    [
+     2138.6,
+     3509.7
+    ],
+    [
+     2161.7,
+     3516.6
+    ],
+    [
+     2190.4,
+     3529.6
+    ],
+    [
+     2198.7,
+     3530.8
+    ]
+   ],
+   "bbox": [
+    1906.1,
+    3509.7,
+    2234.6,
+    3821.9
+   ]
+  },
+  {
+   "id1": 47,
+   "name": "来歆山",
+   "points": [
+    [
+     3353.3,
+     2571
+    ],
+    [
+     3361.2,
+     2585.6
+    ],
+    [
+     3379.6,
+     2608.5
+    ],
+    [
+     3403.3,
+     2614.7
+    ],
+    [
+     3423.8,
+     2628.1
+    ],
+    [
+     3437.6,
+     2627.2
+    ],
+    [
+     3446.8,
+     2634
+    ],
+    [
+     3449.5,
+     2641.6
+    ],
+    [
+     3441,
+     2649.6
+    ],
+    [
+     3434.4,
+     2666.3
+    ],
+    [
+     3435.8,
+     2680.3
+    ],
+    [
+     3447.3,
+     2696.3
+    ],
+    [
+     3452.5,
+     2704.5
+    ],
+    [
+     3460.8,
+     2705.6
+    ],
+    [
+     3471.6,
+     2705.3
+    ],
+    [
+     3471.3,
+     2708.3
+    ],
+    [
+     3473.9,
+     2711.5
+    ],
+    [
+     3468.8,
+     2722
+    ],
+    [
+     3463.8,
+     2734.5
+    ],
+    [
+     3461.5,
+     2746.3
+    ],
+    [
+     3477.1,
+     2769
+    ],
+    [
+     3472.6,
+     2793.2
+    ],
+    [
+     3445,
+     2807.9
+    ],
+    [
+     3367.5,
+     2804.9
+    ],
+    [
+     3312.7,
+     2750.7
+    ],
+    [
+     3315.5,
+     2657.7
+    ],
+    [
+     3321.1,
+     2605.3
+    ]
+   ],
+   "bbox": [
+    3312.7,
+    2571,
+    3477.1,
+    2807.9
+   ]
+  },
+  {
+   "id1": 48,
+   "name": "镜璧山",
+   "points": [
+    [
+     1791.3,
+     3596.9
+    ],
+    [
+     1783.4,
+     3604
+    ],
+    [
+     1781,
+     3603.8
+    ],
+    [
+     1777.8,
+     3603.2
+    ],
+    [
+     1739.7,
+     3592.4
+    ],
+    [
+     1710.1,
+     3590.9
+    ],
+    [
+     1700.4,
+     3584.8
+    ],
+    [
+     1691.2,
+     3577.9
+    ],
+    [
+     1672.5,
+     3584.4
+    ],
+    [
+     1623,
+     3585.6
+    ],
+    [
+     1548.4,
+     3571.6
+    ],
+    [
+     1496.8,
+     3546.6
+    ],
+    [
+     1347.2,
+     3543.3
+    ],
+    [
+     1331.9,
+     3518.6
+    ],
+    [
+     1340.8,
+     3476.2
+    ],
+    [
+     1338.3,
+     3441
+    ],
+    [
+     1368.9,
+     3395.6
+    ],
+    [
+     1377,
+     3366.5
+    ],
+    [
+     1387.5,
+     3328.7
+    ],
+    [
+     1412.6,
+     3327
+    ],
+    [
+     1447,
+     3325.8
+    ],
+    [
+     1482.7,
+     3329.3
+    ],
+    [
+     1531.9,
+     3332.4
+    ],
+    [
+     1534.6,
+     3349.4
+    ],
+    [
+     1548.7,
+     3399.6
+    ],
+    [
+     1623.2,
+     3436.6
+    ],
+    [
+     1646.5,
+     3421.1
+    ],
+    [
+     1654.7,
+     3417.9
+    ],
+    [
+     1662.5,
+     3419.3
+    ],
+    [
+     1673.1,
+     3427.2
+    ],
+    [
+     1690.1,
+     3436.6
+    ],
+    [
+     1722.6,
+     3451.2
+    ],
+    [
+     1739.9,
+     3448.5
+    ],
+    [
+     1745.8,
+     3456.6
+    ],
+    [
+     1756.1,
+     3469.9
+    ],
+    [
+     1770.7,
+     3479.5
+    ],
+    [
+     1783,
+     3483.5
+    ],
+    [
+     1793.4,
+     3524.5
+    ],
+    [
+     1796.5,
+     3543.1
+    ]
+   ],
+   "bbox": [
+    1331.9,
+    3325.8,
+    1796.5,
+    3604
+   ]
+  },
+  {
+   "id1": 49,
+   "name": "奥奇卡纳塔",
+   "points": [
+    [
+     1565.5,
+     3318.5
+    ],
+    [
+     1613.4,
+     3307.4
+    ],
+    [
+     1635.2,
+     3285.9
+    ],
+    [
+     1662,
+     3276
+    ],
+    [
+     1693.6,
+     3271.9
+    ],
+    [
+     1736.2,
+     3243.4
+    ],
+    [
+     1813.1,
+     3260.3
+    ],
+    [
+     1840,
+     3271.4
+    ],
+    [
+     1845.7,
+     3259
+    ],
+    [
+     1867.2,
+     3212.2
+    ],
+    [
+     1896.4,
+     3189.8
+    ],
+    [
+     1937.1,
+     3088.5
+    ],
+    [
+     1847.9,
+     3065.5
+    ],
+    [
+     1805.9,
+     3054.6
+    ],
+    [
+     1793.4,
+     3048.6
+    ],
+    [
+     1757.6,
+     3031.2
+    ],
+    [
+     1712.1,
+     2910.2
+    ],
+    [
+     1563.5,
+     2895.1
+    ],
+    [
+     1521,
+     2835.6
+    ],
+    [
+     1397.3,
+     2825.1
+    ],
+    [
+     1338,
+     2857.2
+    ],
+    [
+     1305.4,
+     2929.7
+    ],
+    [
+     1307.2,
+     3028.3
+    ],
+    [
+     1391.3,
+     3107
+    ],
+    [
+     1422.9,
+     3201.8
+    ],
+    [
+     1387.5,
+     3328.7
+    ],
+    [
+     1412.6,
+     3327
+    ],
+    [
+     1447,
+     3325.8
+    ],
+    [
+     1482.7,
+     3329.3
+    ],
+    [
+     1531.9,
+     3332.4
+    ]
+   ],
+   "bbox": [
+    1305.4,
+    2825.1,
+    1937.1,
+    3332.4
+   ]
+  },
+  {
+   "id1": 51,
+   "name": "安饶之野",
+   "points": [
+    [
+     1279.6,
+     3553.5
+    ],
+    [
+     1240.7,
+     3638.2
+    ],
+    [
+     1215.2,
+     3839.8
+    ],
+    [
+     1155.7,
+     3898.1
+    ],
+    [
+     1055.2,
+     3983.9
+    ],
+    [
+     1064.3,
+     4068.9
+    ],
+    [
+     1129.5,
+     4093.7
+    ],
+    [
+     1223.9,
+     4077.7
+    ],
+    [
+     1267,
+     4087.5
+    ],
+    [
+     1311.8,
+     4119.2
+    ],
+    [
+     1710.7,
+     4036.5
+    ],
+    [
+     1829.1,
+     3838
+    ],
+    [
+     1799.8,
+     3828.1
+    ],
+    [
+     1789.9,
+     3804.7
+    ],
+    [
+     1793.7,
+     3787.3
+    ],
+    [
+     1789.9,
+     3760.6
+    ],
+    [
+     1779.7,
+     3746
+    ],
+    [
+     1782.7,
+     3735.6
+    ],
+    [
+     1787.4,
+     3719.8
+    ],
+    [
+     1790.3,
+     3706.8
+    ],
+    [
+     1792.5,
+     3696.4
+    ],
+    [
+     1792.6,
+     3691
+    ],
+    [
+     1792.8,
+     3684.5
+    ],
+    [
+     1792.8,
+     3682.1
+    ],
+    [
+     1792.9,
+     3681.4
+    ],
+    [
+     1793.3,
+     3668.8
+    ],
+    [
+     1791.2,
+     3653.9
+    ],
+    [
+     1791.4,
+     3638.3
+    ],
+    [
+     1785.6,
+     3621.3
+    ],
+    [
+     1783.4,
+     3604
+    ],
+    [
+     1781,
+     3603.8
+    ],
+    [
+     1777.8,
+     3603.2
+    ],
+    [
+     1739.7,
+     3592.4
+    ],
+    [
+     1710.1,
+     3590.9
+    ],
+    [
+     1700.4,
+     3584.8
+    ],
+    [
+     1691.2,
+     3577.9
+    ],
+    [
+     1672.5,
+     3584.4
+    ],
+    [
+     1623,
+     3585.6
+    ],
+    [
+     1548.4,
+     3571.6
+    ],
+    [
+     1496.8,
+     3546.6
+    ],
+    [
+     1347.2,
+     3543.3
+    ]
+   ],
+   "bbox": [
+    1055.2,
+    3543.3,
+    1829.1,
+    4119.2
+   ]
+  },
+  {
+   "id1": 52,
+   "name": "悠悠度假村",
+   "points": [
+    [
+     905,
+     2933.2
+    ],
+    [
+     840.4,
+     2897.3
+    ],
+    [
+     763.2,
+     2834.3
+    ],
+    [
+     727.5,
+     2752.1
+    ],
+    [
+     693.1,
+     2663.4
+    ],
+    [
+     649.6,
+     2632.4
+    ],
+    [
+     591.6,
+     2621.3
+    ],
+    [
+     518.2,
+     2643.4
+    ],
+    [
+     482.3,
+     2668.9
+    ],
+    [
+     448.2,
+     2675.7
+    ],
+    [
+     414.4,
+     2656.8
+    ],
+    [
+     358.2,
+     2576.3
+    ],
+    [
+     273.9,
+     2551.6
+    ],
+    [
+     186.8,
+     2626.7
+    ],
+    [
+     209.5,
+     2743.7
+    ],
+    [
+     278.8,
+     2808
+    ],
+    [
+     293.2,
+     2865.2
+    ],
+    [
+     261.6,
+     2934.5
+    ],
+    [
+     262,
+     2999.3
+    ],
+    [
+     296.4,
+     3038.6
+    ],
+    [
+     364.6,
+     3032.2
+    ],
+    [
+     415.8,
+     3049.6
+    ],
+    [
+     530.6,
+     3160
+    ],
+    [
+     630.1,
+     3296.8
+    ]
+   ],
+   "bbox": [
+    186.8,
+    2551.6,
+    905,
+    3296.8
+   ]
+  },
+  {
+   "id1": 53,
+   "name": "翘枝崖",
+   "points": [
+    [
+     1531.9,
+     3332.4
+    ],
+    [
+     1534.6,
+     3349.4
+    ],
+    [
+     1548.7,
+     3399.6
+    ],
+    [
+     1623.2,
+     3436.6
+    ],
+    [
+     1646.5,
+     3421.1
+    ],
+    [
+     1654.7,
+     3417.9
+    ],
+    [
+     1662.5,
+     3419.3
+    ],
+    [
+     1673.1,
+     3427.2
+    ],
+    [
+     1690.1,
+     3436.6
+    ],
+    [
+     1722.6,
+     3451.2
+    ],
+    [
+     1739.9,
+     3448.5
+    ],
+    [
+     1745.8,
+     3456.6
+    ],
+    [
+     1756.1,
+     3469.9
+    ],
+    [
+     1770.7,
+     3479.5
+    ],
+    [
+     1783,
+     3483.5
+    ],
+    [
+     1792.3,
+     3473.3
+    ],
+    [
+     1803.8,
+     3453.2
+    ],
+    [
+     1801.5,
+     3444
+    ],
+    [
+     1797.9,
+     3429.2
+    ],
+    [
+     1813.2,
+     3410.6
+    ],
+    [
+     1826.2,
+     3396.5
+    ],
+    [
+     1828.8,
+     3387.7
+    ],
+    [
+     1839.7,
+     3374.1
+    ],
+    [
+     1820.6,
+     3349.4
+    ],
+    [
+     1823.8,
+     3306.6
+    ],
+    [
+     1839.9,
+     3271.5
+    ],
+    [
+     1813.1,
+     3260.3
+    ],
+    [
+     1736.2,
+     3243.4
+    ],
+    [
+     1693.6,
+     3271.9
+    ],
+    [
+     1662,
+     3276
+    ],
+    [
+     1635.2,
+     3285.9
+    ],
+    [
+     1613.4,
+     3307.4
+    ],
+    [
+     1565.5,
+     3318.5
+    ]
+   ],
+   "bbox": [
+    1531.9,
+    3243.4,
+    1839.9,
+    3483.5
+   ]
+  },
+  {
+   "id1": 54,
+   "name": null,
+   "points": [
+    [
+     1028.4,
+     4032.3
+    ],
+    [
+     710.6,
+     3415.8
+    ],
+    [
+     630.1,
+     3296.8
+    ],
+    [
+     905,
+     2933.2
+    ],
+    [
+     984.6,
+     2942.4
+    ],
+    [
+     1081.4,
+     2947.6
+    ],
+    [
+     1177.6,
+     2936.3
+    ],
+    [
+     1268,
+     2903
+    ],
+    [
+     1338,
+     2857.2
+    ],
+    [
+     1305.4,
+     2929.7
+    ],
+    [
+     1307.2,
+     3028.3
+    ],
+    [
+     1391.3,
+     3107
+    ],
+    [
+     1422.9,
+     3201.8
+    ],
+    [
+     1368.9,
+     3395.6
+    ],
+    [
+     1338.3,
+     3441
+    ],
+    [
+     1340.8,
+     3476.2
+    ],
+    [
+     1331.9,
+     3518.6
+    ],
+    [
+     1347.2,
+     3543.3
+    ],
+    [
+     1279.6,
+     3553.5
+    ],
+    [
+     1240.7,
+     3638.2
+    ],
+    [
+     1215.2,
+     3839.8
+    ],
+    [
+     1155.7,
+     3898.1
+    ],
+    [
+     1055.2,
+     3983.9
+    ],
+    [
+     1064.3,
+     4068.9
+    ]
+   ],
+   "bbox": [
+    630.1,
+    2857.2,
+    1422.9,
+    4068.9
+   ]
+  },
+  {
+   "id1": 55,
+   "name": "古兽冰原",
+   "points": [
+    [
+     1892.1,
+     1308.8
+    ],
+    [
+     1857.5,
+     1342.8
+    ],
+    [
+     1843.4,
+     1398.1
+    ],
+    [
+     1813.9,
+     1423
+    ],
+    [
+     1763.4,
+     1456.6
+    ],
+    [
+     1776.4,
+     1457.4
+    ],
+    [
+     1754.6,
+     1488.1
+    ],
+    [
+     1754.3,
+     1528.5
+    ],
+    [
+     1887.4,
+     1440.8
+    ],
+    [
+     1950.8,
+     1337.6
+    ],
+    [
+     1959.7,
+     1323.1
+    ],
+    [
+     2002.3,
+     1282
+    ],
+    [
+     2054.9,
+     1257.2
+    ],
+    [
+     2128.4,
+     1253.5
+    ],
+    [
+     2161.2,
+     1243.1
+    ],
+    [
+     2199,
+     1231
+    ],
+    [
+     2230.3,
+     1211.4
+    ],
+    [
+     2282,
+     1211.7
+    ],
+    [
+     2330.6,
+     1197.5
+    ],
+    [
+     2339.4,
+     1148.4
+    ],
+    [
+     2334,
+     1112.2
+    ],
+    [
+     2318.4,
+     1092.7
+    ],
+    [
+     2317.3,
+     1069.2
+    ],
+    [
+     2299.2,
+     1047.4
+    ],
+    [
+     2286.9,
+     1016.7
+    ],
+    [
+     2286.9,
+     978.6
+    ],
+    [
+     2263.3,
+     946.5
+    ],
+    [
+     2182.8,
+     956.1
+    ],
+    [
+     2164.7,
+     945.5
+    ],
+    [
+     2156.6,
+     926.4
+    ],
+    [
+     2148.2,
+     917.3
+    ],
+    [
+     2129.2,
+     921.5
+    ],
+    [
+     2121.6,
+     929.8
+    ],
+    [
+     2110.9,
+     950.2
+    ],
+    [
+     2098.4,
+     972.3
+    ],
+    [
+     2081.5,
+     974.1
+    ],
+    [
+     2049.2,
+     969.4
+    ],
+    [
+     2020.8,
+     960.6
+    ],
+    [
+     1987.3,
+     931.3
+    ],
+    [
+     1960.7,
+     949.6
+    ],
+    [
+     1939.3,
+     977.8
+    ],
+    [
+     1980.6,
+     987.6
+    ],
+    [
+     1988.2,
+     1016.6
+    ],
+    [
+     1968.3,
+     1067.3
+    ],
+    [
+     1990.8,
+     1115.4
+    ],
+    [
+     1983.7,
+     1170.4
+    ],
+    [
+     1948.7,
+     1238.8
+    ],
+    [
+     1914.5,
+     1281.2
+    ]
+   ],
+   "bbox": [
+    1754.3,
+    917.3,
+    2339.4,
+    1528.5
+   ]
+  },
+  {
+   "id1": 56,
+   "name": "永凝冻土",
+   "points": [
+    [
+     2148.2,
+     917.3
+    ],
+    [
+     2156.6,
+     926.4
+    ],
+    [
+     2164.7,
+     945.5
+    ],
+    [
+     2182.8,
+     956.1
+    ],
+    [
+     2263.4,
+     946.5
+    ],
+    [
+     2314.6,
+     924.4
+    ],
+    [
+     2342.5,
+     871.8
+    ],
+    [
+     2352.7,
+     848.8
+    ],
+    [
+     2378.8,
+     847.5
+    ],
+    [
+     2408.6,
+     870.7
+    ],
+    [
+     2430.2,
+     889.3
+    ],
+    [
+     2419.2,
+     904.9
+    ],
+    [
+     2417.8,
+     917.5
+    ],
+    [
+     2421.7,
+     929.8
+    ],
+    [
+     2432.6,
+     932.9
+    ],
+    [
+     2446.4,
+     934.8
+    ],
+    [
+     2457.7,
+     933.9
+    ],
+    [
+     2466.4,
+     927.8
+    ],
+    [
+     2467.5,
+     921.5
+    ],
+    [
+     2473.3,
+     916.7
+    ],
+    [
+     2485.2,
+     912.8
+    ],
+    [
+     2504,
+     905.7
+    ],
+    [
+     2504,
+     905.7
+    ],
+    [
+     2518.4,
+     878.7
+    ],
+    [
+     2531.2,
+     821.4
+    ],
+    [
+     2540.3,
+     801.1
+    ],
+    [
+     2547.2,
+     785.8
+    ],
+    [
+     2537.7,
+     712.3
+    ],
+    [
+     2534.7,
+     645
+    ],
+    [
+     2540.9,
+     580
+    ],
+    [
+     2573,
+     569.8
+    ],
+    [
+     2543,
+     532
+    ],
+    [
+     2529.9,
+     515.9
+    ],
+    [
+     2482.1,
+     512.4
+    ],
+    [
+     2444.7,
+     529.5
+    ],
+    [
+     2419,
+     467.8
+    ],
+    [
+     2369.7,
+     445
+    ],
+    [
+     2313.6,
+     473.8
+    ],
+    [
+     2279.7,
+     479.7
+    ],
+    [
+     2245.5,
+     482.5
+    ],
+    [
+     2242.4,
+     523.8
+    ],
+    [
+     2240.7,
+     559.7
+    ],
+    [
+     2255.1,
+     578.8
+    ],
+    [
+     2226.3,
+     603.7
+    ],
+    [
+     2205.1,
+     582
+    ],
+    [
+     2167.3,
+     579.5
+    ],
+    [
+     2152.1,
+     620.6
+    ],
+    [
+     2127.5,
+     694.2
+    ],
+    [
+     2090.3,
+     688
+    ],
+    [
+     2057.5,
+     707.5
+    ],
+    [
+     2057.5,
+     707.5
+    ],
+    [
+     2057.5,
+     707.5
+    ],
+    [
+     2109,
+     720.2
+    ],
+    [
+     2129.1,
+     735.2
+    ],
+    [
+     2134.7,
+     746.2
+    ],
+    [
+     2137.5,
+     763.6
+    ],
+    [
+     2133.4,
+     786.7
+    ],
+    [
+     2116.8,
+     807.2
+    ],
+    [
+     2107.4,
+     811.4
+    ],
+    [
+     2107.4,
+     811.4
+    ],
+    [
+     2083.6,
+     818.2
+    ],
+    [
+     2073.2,
+     831.9
+    ],
+    [
+     2061.2,
+     865.6
+    ],
+    [
+     2044.9,
+     870
+    ],
+    [
+     2033.2,
+     871.7
+    ],
+    [
+     2024.6,
+     880
+    ],
+    [
+     2027.3,
+     895.1
+    ],
+    [
+     2019.8,
+     907.7
+    ],
+    [
+     2011.3,
+     914.7
+    ],
+    [
+     1987.3,
+     931.3
+    ],
+    [
+     2020.8,
+     960.6
+    ],
+    [
+     2049.2,
+     969.4
+    ],
+    [
+     2081.5,
+     974.1
+    ],
+    [
+     2098.4,
+     972.3
+    ],
+    [
+     2110.9,
+     950.2
+    ],
+    [
+     2121.6,
+     929.8
+    ],
+    [
+     2129.2,
+     921.5
+    ]
+   ],
+   "bbox": [
+    1987.3,
+    445,
+    2573,
+    974.1
+   ]
+  },
+  {
+   "id1": 57,
+   "name": "霜殛寒峰",
+   "points": [
+    [
+     2547.2,
+     785.8
+    ],
+    [
+     2531.2,
+     821.4
+    ],
+    [
+     2518.4,
+     878.7
+    ],
+    [
+     2504,
+     905.7
+    ],
+    [
+     2485.2,
+     912.8
+    ],
+    [
+     2473.3,
+     916.7
+    ],
+    [
+     2467.5,
+     921.5
+    ],
+    [
+     2466.4,
+     927.8
+    ],
+    [
+     2457.7,
+     933.9
+    ],
+    [
+     2446.4,
+     934.8
+    ],
+    [
+     2432.6,
+     932.9
+    ],
+    [
+     2421.7,
+     929.8
+    ],
+    [
+     2417.8,
+     917.5
+    ],
+    [
+     2419.2,
+     904.9
+    ],
+    [
+     2430.2,
+     889.3
+    ],
+    [
+     2408.6,
+     870.7
+    ],
+    [
+     2378.8,
+     847.5
+    ],
+    [
+     2352.7,
+     848.8
+    ],
+    [
+     2342.5,
+     871.8
+    ],
+    [
+     2314.6,
+     924.4
+    ],
+    [
+     2263.3,
+     946.5
+    ],
+    [
+     2286.9,
+     978.6
+    ],
+    [
+     2286.9,
+     1016.7
+    ],
+    [
+     2299.2,
+     1047.4
+    ],
+    [
+     2317.3,
+     1069.2
+    ],
+    [
+     2318.4,
+     1092.7
+    ],
+    [
+     2334,
+     1112.2
+    ],
+    [
+     2339.4,
+     1148.4
+    ],
+    [
+     2330.6,
+     1197.5
+    ],
+    [
+     2432.3,
+     1200
+    ],
+    [
+     2500.9,
+     1189.6
+    ],
+    [
+     2543.6,
+     1187.3
+    ],
+    [
+     2572.9,
+     1174.9
+    ],
+    [
+     2609.3,
+     1165.5
+    ],
+    [
+     2676.6,
+     1085.6
+    ],
+    [
+     2695.4,
+     1040.5
+    ],
+    [
+     2682.8,
+     965.1
+    ],
+    [
+     2614.4,
+     878.3
+    ],
+    [
+     2619.8,
+     826
+    ],
+    [
+     2599.5,
+     789.4
+    ],
+    [
+     2565.9,
+     776.2
+    ]
+   ],
+   "bbox": [
+    2263.3,
+    776.2,
+    2695.4,
+    1200
+   ]
+  },
+  {
+   "id1": 58,
+   "name": "焰羽谷",
+   "points": [
+    [
+     1880.6,
+     974.7
+    ],
+    [
+     1939.3,
+     977.8
+    ],
+    [
+     1960.7,
+     949.6
+    ],
+    [
+     2011.3,
+     914.7
+    ],
+    [
+     2019.8,
+     907.7
+    ],
+    [
+     2027.3,
+     895.1
+    ],
+    [
+     2024.6,
+     880
+    ],
+    [
+     2033.2,
+     871.7
+    ],
+    [
+     2044.9,
+     870
+    ],
+    [
+     2061.2,
+     865.6
+    ],
+    [
+     2073.2,
+     831.9
+    ],
+    [
+     2083.6,
+     818.2
+    ],
+    [
+     2107.4,
+     811.4
+    ],
+    [
+     2116.8,
+     807.2
+    ],
+    [
+     2133.4,
+     786.7
+    ],
+    [
+     2137.5,
+     763.6
+    ],
+    [
+     2134.7,
+     746.2
+    ],
+    [
+     2129.1,
+     735.2
+    ],
+    [
+     2109,
+     720.2
+    ],
+    [
+     2082.2,
+     713.6
+    ],
+    [
+     2082.2,
+     713.6
+    ],
+    [
+     2082.2,
+     713.6
+    ],
+    [
+     2057.5,
+     707.5
+    ],
+    [
+     2016.5,
+     746.3
+    ],
+    [
+     1938.7,
+     766.1
+    ],
+    [
+     1888.7,
+     796.6
+    ],
+    [
+     1857.1,
+     823.2
+    ],
+    [
+     1826.6,
+     860.1
+    ],
+    [
+     1819.8,
+     907.4
+    ],
+    [
+     1837,
+     949.8
+    ]
+   ],
+   "bbox": [
+    1819.8,
+    707.5,
+    2137.5,
+    977.8
+   ]
+  },
+  {
+   "id1": 59,
+   "name": "白桦雪葬地",
+   "points": [
+    [
+     2534.7,
+     645
+    ],
+    [
+     2540.9,
+     580
+    ],
+    [
+     2573,
+     569.8
+    ],
+    [
+     2597.6,
+     570.2
+    ],
+    [
+     2619.7,
+     573.5
+    ],
+    [
+     2639.3,
+     539.8
+    ],
+    [
+     2640.5,
+     495.1
+    ],
+    [
+     2603.7,
+     434.3
+    ],
+    [
+     2625.8,
+     326.9
+    ],
+    [
+     2721.8,
+     326.6
+    ],
+    [
+     2782.1,
+     382.3
+    ],
+    [
+     2798.1,
+     486.8
+    ],
+    [
+     2805.7,
+     524.5
+    ],
+    [
+     2792.5,
+     571.9
+    ],
+    [
+     2786.7,
+     617
+    ],
+    [
+     2714.3,
+     727.8
+    ],
+    [
+     2699.7,
+     809.5
+    ],
+    [
+     2619.8,
+     826
+    ],
+    [
+     2599.5,
+     789.4
+    ],
+    [
+     2565.9,
+     776.2
+    ],
+    [
+     2547.2,
+     785.8
+    ],
+    [
+     2537.7,
+     712.3
+    ]
+   ],
+   "bbox": [
+    2534.7,
+    326.6,
+    2805.7,
+    826
+   ]
+  },
+  {
+   "id1": 60,
+   "name": "新基捷城",
+   "points": [
+    [
+     2782.1,
+     382.3
+    ],
+    [
+     2798.1,
+     486.8
+    ],
+    [
+     2805.7,
+     524.5
+    ],
+    [
+     2792.5,
+     571.9
+    ],
+    [
+     2786.7,
+     617
+    ],
+    [
+     2714.3,
+     727.8
+    ],
+    [
+     2699.7,
+     809.5
+    ],
+    [
+     2807.5,
+     854.5
+    ],
+    [
+     3016.4,
+     901.6
+    ],
+    [
+     3258.5,
+     1005.8
+    ],
+    [
+     3446.9,
+     1004.2
+    ],
+    [
+     3491.3,
+     887.6
+    ],
+    [
+     3382.9,
+     785.8
+    ],
+    [
+     3302.6,
+     728.9
+    ],
+    [
+     3195.6,
+     720.2
+    ],
+    [
+     3130.3,
+     648.2
+    ],
+    [
+     3052.8,
+     582.7
+    ],
+    [
+     3032.9,
+     518.8
+    ],
+    [
+     3093.6,
+     445.8
+    ],
+    [
+     3143.6,
+     475.4
+    ],
+    [
+     3182.5,
+     443
+    ],
+    [
+     3201.3,
+     372.7
+    ],
+    [
+     3136.9,
+     275.3
+    ],
+    [
+     3011.9,
+     236.2
+    ]
+   ],
+   "bbox": [
+    2699.7,
+    236.2,
+    3491.3,
+    1005.8
+   ]
+  },
+  {
+   "id1": 61,
+   "name": "如翼之峰",
+   "points": [
+    [
+     3032.9,
+     518.8
+    ],
+    [
+     3093.6,
+     445.8
+    ],
+    [
+     3143.6,
+     475.4
+    ],
+    [
+     3182.5,
+     443
+    ],
+    [
+     3201.3,
+     372.7
+    ],
+    [
+     3368.2,
+     321.1
+    ],
+    [
+     3627.1,
+     346.4
+    ],
+    [
+     3773.3,
+     490.3
+    ],
+    [
+     3776.3,
+     756.3
+    ],
+    [
+     3636.1,
+     891.3
+    ],
+    [
+     3491.3,
+     887.6
+    ],
+    [
+     3382.9,
+     785.8
+    ],
+    [
+     3302.6,
+     728.9
+    ],
+    [
+     3195.6,
+     720.2
+    ],
+    [
+     3130.3,
+     648.2
+    ],
+    [
+     3052.8,
+     582.7
+    ]
+   ],
+   "bbox": [
+    3032.9,
+    321.1,
+    3776.3,
+    891.3
+   ]
+  },
+  {
+   "id1": 70,
+   "name": "帕哈岛",
+   "points": [
+    [
+     1378.8,
+     2032.2
+    ],
+    [
+     1409.8,
+     2030.8
+    ],
+    [
+     1527.8,
+     2027.5
+    ],
+    [
+     1763.8,
+     2022.9
+    ],
+    [
+     1797.5,
+     2022.2
+    ],
+    [
+     1817.7,
+     2042.2
+    ],
+    [
+     1839.8,
+     2058.8
+    ],
+    [
+     1863.8,
+     2079.2
+    ],
+    [
+     1897.2,
+     2107.2
+    ],
+    [
+     1961.8,
+     2175.3
+    ],
+    [
+     1966.8,
+     2183.8
+    ],
+    [
+     1958.2,
+     2191.9
+    ],
+    [
+     1953.4,
+     2196.5
+    ],
+    [
+     1947.9,
+     2201.7
+    ],
+    [
+     1940.5,
+     2208.5
+    ],
+    [
+     1926.3,
+     2222
+    ],
+    [
+     1893.4,
+     2253.1
+    ],
+    [
+     1888,
+     2258.3
+    ],
+    [
+     1879.5,
+     2266.3
+    ],
+    [
+     1872.8,
+     2272.7
+    ],
+    [
+     1863.4,
+     2281.6
+    ],
+    [
+     1784,
+     2328.9
+    ],
+    [
+     1694.9,
+     2361.8
+    ],
+    [
+     1679.9,
+     2384.8
+    ],
+    [
+     1641.2,
+     2410.1
+    ],
+    [
+     1549.3,
+     2480.4
+    ],
+    [
+     1495.9,
+     2419.1
+    ],
+    [
+     1380,
+     2430.8
+    ],
+    [
+     1251.3,
+     2474.7
+    ],
+    [
+     1251.4,
+     2430.1
+    ],
+    [
+     1257.2,
+     2375.3
+    ],
+    [
+     1267.7,
+     2307.8
+    ],
+    [
+     1281.1,
+     2242
+    ],
+    [
+     1295.6,
+     2204.7
+    ],
+    [
+     1313,
+     2177.5
+    ],
+    [
+     1326.9,
+     2108.6
+    ],
+    [
+     1346.5,
+     2075.9
+    ]
+   ],
+   "bbox": [
+    1251.3,
+    2022.2,
+    1966.8,
+    2480.4
+   ]
+  },
+  {
+   "id1": 71,
+   "name": "伦波岛",
+   "points": [
+    [
+     1863.4,
+     2281.6
+    ],
+    [
+     1867.8,
+     2277.5
+    ],
+    [
+     1966.8,
+     2183.8
+    ],
+    [
+     2008.7,
+     2254.9
+    ],
+    [
+     2062.5,
+     2361.9
+    ],
+    [
+     2012.4,
+     2506.1
+    ],
+    [
+     1933.5,
+     2607.9
+    ],
+    [
+     1833.1,
+     2630.8
+    ],
+    [
+     1819.3,
+     2711.1
+    ],
+    [
+     1814.6,
+     2738.5
+    ],
+    [
+     1812.1,
+     2750.4
+    ],
+    [
+     1809.4,
+     2761.3
+    ],
+    [
+     1780.6,
+     2876.5
+    ],
+    [
+     1712.1,
+     2910.2
+    ],
+    [
+     1563.5,
+     2895.1
+    ],
+    [
+     1521,
+     2835.6
+    ],
+    [
+     1539.1,
+     2572.7
+    ],
+    [
+     1545.6,
+     2520.5
+    ],
+    [
+     1549.3,
+     2480.4
+    ],
+    [
+     1641.2,
+     2410.1
+    ],
+    [
+     1679.9,
+     2384.8
+    ],
+    [
+     1694.9,
+     2361.8
+    ],
+    [
+     1784,
+     2328.9
+    ]
+   ],
+   "bbox": [
+    1521,
+    2183.8,
+    2062.5,
+    2910.2
+   ]
+  },
+  {
+   "id1": 72,
+   "name": "希汐岛",
+   "points": [
+    [
+     1495.9,
+     2419.1
+    ],
+    [
+     1549.3,
+     2480.4
+    ],
+    [
+     1545.6,
+     2520.5
+    ],
+    [
+     1539.1,
+     2572.7
+    ],
+    [
+     1521,
+     2835.6
+    ],
+    [
+     1397.3,
+     2825.1
+    ],
+    [
+     1338,
+     2857.2
+    ],
+    [
+     1268,
+     2903
+    ],
+    [
+     1297.7,
+     2744.9
+    ],
+    [
+     1271.7,
+     2678.4
+    ],
+    [
+     1264.2,
+     2590.4
+    ],
+    [
+     1251.3,
+     2474.7
+    ],
+    [
+     1380,
+     2430.8
+    ]
+   ],
+   "bbox": [
+    1251.3,
+    2419.1,
+    1549.3,
+    2903
+   ]
+  },
+  {
+   "id1": 73,
+   "name": "虚海望",
+   "points": [
+    [
+     1586.9,
+     1795.5
+    ],
+    [
+     1544.7,
+     1767.4
+    ],
+    [
+     1534.3,
+     1909.9
+    ],
+    [
+     1430.9,
+     2030.2
+    ],
+    [
+     1527.8,
+     2027.5
+    ],
+    [
+     1648.3,
+     2025.2
+    ],
+    [
+     1797.5,
+     2022.2
+    ],
+    [
+     1820.3,
+     2044.1
+    ],
+    [
+     1864.9,
+     1842.4
+    ],
+    [
+     1824.6,
+     1840.7
+    ],
+    [
+     1797.6,
+     1821.4
+    ],
+    [
+     1797.7,
+     1739.7
+    ],
+    [
+     1782.1,
+     1622.1
+    ],
+    [
+     1693.8,
+     1654.9
+    ],
+    [
+     1684.2,
+     1669.8
+    ],
+    [
+     1684.2,
+     1684.8
+    ],
+    [
+     1666.5,
+     1682.6
+    ],
+    [
+     1641,
+     1701.3
+    ],
+    [
+     1638.9,
+     1712.1
+    ],
+    [
+     1659.6,
+     1723
+    ],
+    [
+     1671.6,
+     1726.4
+    ],
+    [
+     1672.9,
+     1738.6
+    ],
+    [
+     1655,
+     1750
+    ],
+    [
+     1671.2,
+     1780.4
+    ]
+   ],
+   "bbox": [
+    1430.9,
+    1622.1,
+    1864.9,
+    2044.1
+   ]
+  },
+  {
+   "id1": 74,
+   "name": "逐浪野",
+   "points": [
+    [
+     1588.1,
+     1794.3
+    ],
+    [
+     1671.2,
+     1780.4
+    ],
+    [
+     1655,
+     1750
+    ],
+    [
+     1672.9,
+     1738.6
+    ],
+    [
+     1671.6,
+     1726.4
+    ],
+    [
+     1659.6,
+     1723
+    ],
+    [
+     1638.9,
+     1712.1
+    ],
+    [
+     1641,
+     1701.3
+    ],
+    [
+     1666.5,
+     1682.6
+    ],
+    [
+     1684.2,
+     1684.8
+    ],
+    [
+     1684.2,
+     1669.8
+    ],
+    [
+     1693.8,
+     1654.9
+    ],
+    [
+     1782.1,
+     1622.1
+    ],
+    [
+     1756.5,
+     1536.2
+    ],
+    [
+     1754.3,
+     1528.5
+    ],
+    [
+     1754.6,
+     1488.1
+    ],
+    [
+     1748.8,
+     1496.3
+    ],
+    [
+     1693.9,
+     1518.9
+    ],
+    [
+     1660.6,
+     1556.5
+    ],
+    [
+     1652.7,
+     1558
+    ],
+    [
+     1639.4,
+     1603.3
+    ],
+    [
+     1626,
+     1620.2
+    ],
+    [
+     1525.7,
+     1574.6
+    ],
+    [
+     1435.9,
+     1613.8
+    ],
+    [
+     1449.5,
+     1708.2
+    ]
+   ],
+   "bbox": [
+    1435.9,
+    1488.1,
+    1782.1,
+    1794.3
+   ]
+  },
+  {
+   "id1": 75,
+   "name": "烟硌山峰",
+   "points": [
+    [
+     1525.7,
+     1574.6
+    ],
+    [
+     1626,
+     1620.2
+    ],
+    [
+     1639.4,
+     1603.3
+    ],
+    [
+     1652.7,
+     1558
+    ],
+    [
+     1660.6,
+     1556.5
+    ],
+    [
+     1693.9,
+     1518.9
+    ],
+    [
+     1748.8,
+     1496.3
+    ],
+    [
+     1776.4,
+     1457.4
+    ],
+    [
+     1724.3,
+     1454
+    ],
+    [
+     1711.6,
+     1453.3
+    ],
+    [
+     1680.1,
+     1454.5
+    ],
+    [
+     1661.7,
+     1451.9
+    ],
+    [
+     1598.5,
+     1441.8
+    ],
+    [
+     1486.3,
+     1435.6
+    ],
+    [
+     1457.3,
+     1438
+    ],
+    [
+     1436.1,
+     1473.7
+    ],
+    [
+     1521.9,
+     1532.1
+    ]
+   ],
+   "bbox": [
+    1436.1,
+    1435.6,
+    1776.4,
+    1620.2
+   ]
+  },
+  {
+   "id1": 76,
+   "name": "杜南纳深坑",
+   "points": [
+    [
+     1997.9,
+     1744.7
+    ],
+    [
+     2034.9,
+     1691.3
+    ],
+    [
+     2044.8,
+     1653.7
+    ],
+    [
+     2038.5,
+     1613.8
+    ],
+    [
+     2010.7,
+     1592.5
+    ],
+    [
+     1974.7,
+     1580
+    ],
+    [
+     1904.6,
+     1572.4
+    ],
+    [
+     1796.4,
+     1554.4
+    ],
+    [
+     1754.3,
+     1528.5
+    ],
+    [
+     1782.1,
+     1622.1
+    ],
+    [
+     1797.7,
+     1739.7
+    ],
+    [
+     1797.6,
+     1821.4
+    ],
+    [
+     1824.6,
+     1840.7
+    ],
+    [
+     1864.9,
+     1842.4
+    ],
+    [
+     1918.6,
+     1788.4
+    ]
+   ],
+   "bbox": [
+    1754.3,
+    1528.5,
+    2044.8,
+    1842.4
+   ]
+  },
+  {
+   "id1": 77,
+   "name": "风息山",
+   "points": [
+    [
+     4081.1,
+     2301.7
+    ],
+    [
+     4102.8,
+     2306.5
+    ],
+    [
+     4112.2,
+     2313.2
+    ],
+    [
+     4118.6,
+     2317.1
+    ],
+    [
+     4123.1,
+     2320.8
+    ],
+    [
+     4128.3,
+     2324.1
+    ],
+    [
+     4144.6,
+     2330.3
+    ],
+    [
+     4154,
+     2333.3
+    ],
+    [
+     4181.7,
+     2325.4
+    ],
+    [
+     4189.3,
+     2339.4
+    ],
+    [
+     4200.2,
+     2354.5
+    ],
+    [
+     4204.8,
+     2360.7
+    ],
+    [
+     4251.9,
+     2389.4
+    ],
+    [
+     4257.5,
+     2390.4
+    ],
+    [
+     4261.2,
+     2391.3
+    ],
+    [
+     4273.6,
+     2388.7
+    ],
+    [
+     4284.2,
+     2384.5
+    ],
+    [
+     4295.9,
+     2378
+    ],
+    [
+     4302.6,
+     2375.5
+    ],
+    [
+     4309.7,
+     2371.8
+    ],
+    [
+     4321,
+     2365.8
+    ],
+    [
+     4328.2,
+     2362.4
+    ],
+    [
+     4330,
+     2361.7
+    ],
+    [
+     4346.4,
+     2355.3
+    ],
+    [
+     4353.9,
+     2350
+    ],
+    [
+     4360,
+     2331.9
+    ],
+    [
+     4356.3,
+     2303.5
+    ],
+    [
+     4331.6,
+     2278.9
+    ],
+    [
+     4325.3,
+     2195.5
+    ],
+    [
+     4323.6,
+     2086.5
+    ],
+    [
+     4290.2,
+     2012.9
+    ],
+    [
+     4173.8,
+     1943.7
+    ],
+    [
+     4115.5,
+     1955.5
+    ],
+    [
+     4093.1,
+     2010.5
+    ],
+    [
+     4069.5,
+     2073.9
+    ],
+    [
+     4081.7,
+     2175.5
+    ],
+    [
+     4045.2,
+     2228.5
+    ],
+    [
+     3995.9,
+     2293.8
+    ],
+    [
+     4067.6,
+     2294.6
+    ]
+   ],
+   "bbox": [
+    3995.9,
+    1943.7,
+    4360,
+    2391.3
+   ]
+  }
+ ],
+ "audit": {
+  "level1Count": 67,
+  "namedCount": 65,
+  "unnamedId1s": [
+   16,
+   54
+  ],
+  "level2PairsInScene": 413,
+  "level2PairsJoined": 426,
+  "textMapKeySetSize": 886217,
+  "tileAudit": {
+   "numericFileCount": 281,
+   "ignoredNonNumeric": 0,
+   "duplicateCoordinates": []
+  },
+  "tilesSelected": 281,
+  "tilesMissingCells": 137,
+  "tilesSourcePngBytes": 264749343
+ }
+}

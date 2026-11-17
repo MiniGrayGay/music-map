@@ -1,6 +1,8 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
 import {setTimeout} from 'node:timers/promises';
+import {readMusicMediaIndex, readMusicMedia} from './wwise-bank.mjs';
 import {VERIFIED_TRACKS, INITIAL_MUSIC_PREVIEWS} from '../src/features/bgm/verifiedTracks.js';
 
 const root = new URL('../', import.meta.url);
@@ -118,6 +120,27 @@ if (alternateIds.size) {
     const candidates = (byEnglishTitle.get(normalize(apple.trackName)) ?? []).filter((track) =>
       track.albumId === albumId && Math.abs(track.duration - apple.trackTimeMillis / 1000) <= 1);
     if (candidates.length === 1) matched.set(id, candidates[0]);
+  }
+}
+const aliases = await readJson('scripts/verified-wem-aliases.json');
+if (aliases.clientVersion === bgm.clientVersion) {
+  const original = await readJson('../../dist/genshin-region-bgm.json');
+  if (original.clientVersion !== bgm.clientVersion || original.musicGraph?.root !== bgm.musicGraph.root
+    || !original.source?.clientAudioRoot) {
+    throw new Error('WEM 相同音源的客户端身份不符');
+  }
+  const ids = [...new Set(aliases.tracks.flatMap(({id, reference}) => [id, reference]))];
+  const mediaIndex = await readMusicMediaIndex(original.source.clientAudioRoot, ids);
+  for (const {id, reference, sha256} of aliases.tracks) {
+    for (const source of [id, reference]) {
+      const digest = createHash('sha256').update(await readMusicMedia(mediaIndex.get(source))).digest('hex');
+      if (digest !== sha256) throw new Error('相同音源指纹已变化：' + source);
+    }
+    const canonical = matched.get(String(reference));
+    if (!canonical) throw new Error('相同音源缺少已匹配的发行曲目：' + reference);
+    const existing = matched.get(String(id));
+    if (existing && existing.id !== canonical.id) throw new Error('相同音源的发行曲目冲突：' + id);
+    matched.set(String(id), canonical);
   }
 }
 if (!matched.size) throw new Error('没有曲目与网易云专辑匹配');
