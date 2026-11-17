@@ -281,16 +281,17 @@ export const fluidBackdropKey = Symbol('fluid-glass-source-canvas');
   filter: saturate(.52);
 }
 
-/* 移动/粗指针降级：不再跑 React/WebGL，用纯 CSS 高光透明玻璃代替。 */
+/* 移动/粗指针降级：不再跑 React/WebGL，用纯 CSS 高光透明玻璃代替。
+   高光略提并带一点冷调，深底播放器按钮上图标保持可读。 */
 .fluid-source-surface--flat::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(120% 90% at 28% 18%, rgb(255 255 255 / .34), rgb(255 255 255 / .08) 52%, transparent 74%),
-    linear-gradient(160deg, rgb(255 255 255 / .18), rgb(255 255 255 / .04) 58%, rgb(255 255 255 / .12));
-  box-shadow: inset 0 1px 1px rgb(255 255 255 / .28);
+    radial-gradient(120% 90% at 28% 18%, rgb(224 244 252 / .42), rgb(255 255 255 / .1) 52%, transparent 74%),
+    linear-gradient(160deg, rgb(236 250 255 / .22), rgb(255 255 255 / .05) 58%, rgb(232 246 252 / .15));
+  box-shadow: inset 0 1px 1px rgb(240 250 255 / .32);
 }
 
 /* 亮背景（海面/白底）下关闭键的深色兜底，保持浅色图标的对比度。 */

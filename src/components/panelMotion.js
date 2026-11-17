@@ -1,11 +1,9 @@
 import {onBeforeUnmount} from 'vue';
 import {AnimationManager, Easing, easing, spring} from '@liquid-dom/layout/animation';
 
-// Use MenuDemo's position springs, with a shorter size spring for the lighter panels.
+// 抽屉只动高度与正文透明度：高度用弹簧，透明度用定时缓动。
 const sizeIn = spring({stiffness: 310, damping: 22, restDelta: .65, restSpeed: 12});
 const sizeOut = easing({duration: .25, ease: Easing.easeOut});
-const positionIn = spring({stiffness: 144, damping: 14, restDelta: .35, restSpeed: 4});
-const positionOut = spring({stiffness: 130, damping: 18, restDelta: .35, restSpeed: 4});
 const contentIn = easing({duration: .3, ease: Easing.easeIn});
 const contentOut = easing({duration: .21, ease: Easing.easeOut});
 const pixels = (value) => `${value}px`;
@@ -40,9 +38,8 @@ function useMotion(name) {
 
     state ??= from;
     const manager = new AnimationManager();
-    const {x, y, visibility, ...size} = to;
+    const {visibility, ...size} = to;
     manager.animate(state, size, opening ? sizeIn : sizeOut);
-    if (x !== undefined) manager.animate(state, {x, y}, opening ? positionIn : positionOut);
     manager.animate(state, {visibility}, opening ? contentIn : contentOut);
     paint(state);
     let previous = performance.now();
@@ -65,7 +62,6 @@ function useMotion(name) {
 }
 
 export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false} = {}) {
-  const {play, stop} = useMotion(name);
   let closingAnimations;
   const stopClosing = () => {
     for (const animation of closingAnimations ?? []) animation.cancel();
@@ -81,6 +77,12 @@ export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false}
       done();
       return;
     }
+    const finish = () => {
+      stopClosing();
+      delete element.dataset.liquidMorph;
+      element.classList.remove(`${name}-enter-active`, `${name}-leave-active`);
+      done();
+    };
     const panel = element.getBoundingClientRect();
     const button = trigger.getBoundingClientRect();
     const content = body.getBoundingClientRect();
@@ -89,21 +91,23 @@ export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false}
     const closed = {x: button.left - panel.left + (button.width - width) / 2,
       y: button.top - panel.top + (button.height - height) / 2, width, height,
       radius: vanish ? 4 : Math.min(height / 2, parseFloat(getComputedStyle(trigger).borderRadius) || 14),
-      visibility: 0};
+      opacity: .8, visibility: 0};
     const opened = {x: 0, y: 0, width: panel.width, height: panel.height,
-      radius: parseFloat(getComputedStyle(element).borderRadius) || 16, visibility: 1};
+      radius: parseFloat(getComputedStyle(element).borderRadius) || 16,
+      opacity: 1, visibility: 1};
     const offsetX = content.left - panel.left;
     const offsetY = content.top - panel.top;
     const glass = element.querySelector(':scope > .liquid-glass');
     const live = glass.getBoundingClientRect();
-    const visibility = Number(getComputedStyle(body).opacity);
+    const glassOpacity = Number(getComputedStyle(glass).opacity);
+    const bodyOpacity = Number(getComputedStyle(body).opacity);
+    // 中断续接：两种方向都从玻璃/正文的实际透明度与当前矩形出发，不重置。
     const resumed = closingAnimations && {
       x: live.left - panel.left, y: live.top - panel.top,
       width: live.width, height: live.height, radius: opened.radius,
-      visibility,
+      opacity: glassOpacity, visibility: bodyOpacity,
     };
     stopClosing();
-    delete element.dataset.liquidNativeClose;
 
     function clip(x, y, w, h, radius) {
       const left = x - offsetX;
@@ -112,68 +116,42 @@ export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false}
       return `inset(${insets.map(pixels).join(' ')} round ${pixels(radius)})`;
     }
 
-    function paint({x, y, width: w, height: h, radius, visibility}) {
-      element.dataset.liquidMorph = '';
-      for (const [key, value] of Object.entries({x, y, width: w, height: h, radius})) {
-        element.style.setProperty(`--panel-morph-${key}`, pixels(value));
-      }
-      body.style.clipPath = clip(x, y, w, h, radius);
-      body.style.opacity = visibility;
-      if (!vanish) body.style.filter = `blur(${pixels((1 - visibility) * 3)})`;
-    }
-
-    function clear() {
-      delete element.dataset.liquidMorph;
-      for (const key of ['x', 'y', 'width', 'height', 'radius']) {
-        element.style.removeProperty(`--panel-morph-${key}`);
-      }
-      body.style.clipPath = body.style.opacity = body.style.filter = '';
-    }
-
-    if (vanish && !opening && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      // Let the compositor carry the actual glass during dismissal, even while the map redraws.
-      stop(true);
-      clear();
-      element.classList.remove(`${name}-enter-active`);
-      element.classList.add(`${name}-leave-active`);
-      element.dataset.liquidNativeClose = '';
-      const state = {...opened, x: live.left - panel.left, y: live.top - panel.top,
-        width: live.width, height: live.height, visibility};
-      const driver = new AnimationManager();
-      driver.animate(state, {x: closed.x, y: closed.y}, positionOut);
-      driver.animate(state, {width: closed.width, height: closed.height, radius: closed.radius}, sizeOut);
-      driver.animate(state, {visibility: 0}, contentOut);
-      const glassFrames = [];
-      const textFrames = [];
-      for (let i = 0; i <= 18; i += 1) {
-        const {x, y, width: w, height: h, radius, visibility} = state;
-        glassFrames.push({transformOrigin: '0 0',
-          transform: `translate(${pixels(x)}, ${pixels(y)}) scale(${w / panel.width}, ${h / panel.height})`,
-          opacity: Math.min(1, (w - closed.width) / 18)});
-        textFrames.push({clipPath: clip(x, y, w, h, radius), opacity: visibility});
-        driver.tick(1000 / 60);
-      }
-      const timing = {duration: 300, fill: 'both'};
-      const flight = glass.animate(glassFrames, timing);
-      closingAnimations = [flight, body.animate(textFrames, timing)];
-      flight.onfinish = () => {
-        stopClosing();
-        delete element.dataset.liquidNativeClose;
-        element.classList.remove(`${name}-leave-active`);
-        done();
-      };
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finish();
       return;
     }
 
-    play(element, opening ? resumed ?? closed : opened, opening ? opened : closed,
-      opening, paint, clear, done);
+    // 开关整体交给合成器：玻璃只做 transform 平移缩放与 opacity，正文只做
+    // clip/opacity 同步，固定几何，避免逐帧布局与逐帧重光栅。桌面与触屏
+    // 同一路径，滤镜全程保持静止态不变，收尾不再切换。
+    element.dataset.liquidMorph = '';
+    element.classList.toggle(`${name}-enter-active`, opening);
+    element.classList.toggle(`${name}-leave-active`, !opening);
+    const from = opening ? resumed ?? closed
+      : {x: live.left - panel.left, y: live.top - panel.top,
+        width: live.width, height: live.height, radius: opened.radius,
+        opacity: glassOpacity, visibility: bodyOpacity};
+    const to = opening ? opened : {...closed, opacity: 0, visibility: 0};
+    const timing = {duration: 290, easing: 'cubic-bezier(0.32, 0.72, 0.25, 1)', fill: 'both'};
+    const glassFrame = ({x, y, width: w, height: h, opacity}) => ({transformOrigin: '0 0',
+      transform: `translate(${pixels(x)}, ${pixels(y)}) scale(${w / panel.width}, ${h / panel.height})`,
+      opacity});
+    const glassFlight = glass.animate([glassFrame(from), glassFrame(to)], timing);
+    const bodyFlight = body.animate([
+      {clipPath: clip(from.x, from.y, from.width, from.height, from.radius), opacity: from.visibility},
+      {clipPath: clip(to.x, to.y, to.width, to.height, to.radius), opacity: to.visibility},
+    ], timing);
+    closingAnimations = [glassFlight, bodyFlight];
+    const batch = closingAnimations;
+    glassFlight.onfinish = () => {
+      if (glassFlight.playState !== 'finished' || closingAnimations !== batch) return;
+      finish();
+    };
   }
 
   return {
     onEnter: (element, done) => morph(element, true, done),
     onLeave: (element, done) => morph(element, false, done),
-    onEnterCancelled: stop,
-    onLeaveCancelled: stop,
   };
 }
 

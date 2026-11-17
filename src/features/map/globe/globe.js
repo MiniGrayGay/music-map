@@ -4,7 +4,7 @@ import {frameZone} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
 import {
-  cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, dot, fullSpan,
+  cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, direction, dot, fullSpan,
   projectAtlas, projectVisibleOutline, surfaceRay, viewAtlasPoints, viewportAngles, wrap,
 } from './projection.js';
 
@@ -428,8 +428,14 @@ export class Globe {
     } else {
       const from = Math.log(this.zoom);
       const to = Math.log(zoom);
-      this.flight = {time: performance.now(), route, duration: 640 + 650 * route.distance / Math.PI,
-        from, to, center, startCenter: this.center ?? this.homeCenter};
+      const travel = route.distance / Math.PI;
+      // 长跳先拉远到有界高度（受 MIN_ZOOM 兜底），短跳几乎不拉高；末段
+      // 仍精确降回调用方（如 frameZone）给定的取景上。
+      const room = Math.max(0, Math.min(from, to) - Math.log(MIN_ZOOM));
+      const retreat = Math.min(room, Math.log(1 + travel * 2.6));
+      this.flight = {time: performance.now(), route, duration: 640 + 650 * travel,
+        from, to, retreat, travel, toLon: lon, toLat: lat,
+        center, startCenter: this.center ?? this.homeCenter};
     }
     this.requestFrame();
   }
@@ -440,6 +446,8 @@ export class Globe {
   }
 
   zoomBy(factor, anchor) {
+    // 飞行中断改由当前真实倍率接管，旧的缩放目标不再继续推进。
+    if (this.flight) this.zoomTarget = this.zoom;
     this.flight = null;
     this.spinAfter = performance.now() + 1700;
     const next = clamp(this.zoomTarget * factor, MIN_ZOOM, MAX_ZOOM);
@@ -489,15 +497,33 @@ export class Globe {
   advance(time, elapsed) {
     const ease = this.reducedMotion.matches ? 1 : 1 - Math.exp(-elapsed / 84);
     if (this.flight) {
-      const {route, duration, from, to, center, startCenter} = this.flight;
+      const {route, duration, from, to, retreat, travel, toLon, toLat, center, startCenter} = this.flight;
       const progress = clamp((time - this.flight.time) / duration, 0, 1);
+      // 长跳真实顺序：开头约 12%（短跳按比例更短）航线几乎不动，高度先以
+      // 平滑缓动爬到回退峰值；随后横移 S 曲线并减速；回退鼓包在减速尾段前
+      // 归零，与末段降回目标 log zoom 重叠，无剪切。头尾导数均为零。
+      const hold = .12 * Math.min(1, travel * 1.6);
       const t = progress * progress * (3 - 2 * progress);
-      [this.lon, this.lat] = route.at(t);
+      const move = clamp((progress - hold) / (1 - hold), 0, 1);
+      [this.lon, this.lat] = route.at(move * move * (3 - 2 * move));
       const base = interpolate(from, to, t);
-      const retreat = Math.sin(Math.PI * t) ** 2
-        * Math.min(route.distance * .62, Math.max(0, base - Math.log(MIN_ZOOM)));
-      this.zoom = Math.exp(base - retreat);
-      this.center = startCenter.map((value, axis) => interpolate(value, (center ?? this.homeCenter)[axis], t));
+      const rise = hold * .5;
+      const bump = Math.sin(Math.PI * clamp((progress - rise) / (.58 - rise), 0, 1)) ** 2;
+      this.zoom = Math.exp(base - retreat * bump);
+      this.center = startCenter.map((value, axis) => interpolate(value, (center ?? this.homeCenter)[axis], move * move * (3 - 2 * move)));
+      // 临近阶段小幅偏航与俯角弧：直接作为名义经纬上的连续偏置写入实际
+      // 坐标（∂front/∂lon = cos(lat)·right、∂front/∂lat = up），头尾归零；
+      // 中断或新跳转天然继承最后真实坐标，视觉倾斜不丢弃。
+      const approach = Math.sin(Math.PI * clamp((progress - .45) / .55, 0, 1)) ** 2 * Math.min(1, travel * 2.2);
+      if (approach > .001) {
+        const toDir = direction(toLon, toLat);
+        const {front, right, up} = cameraBasis(this.lon, this.lat);
+        const forward = Math.max(.2, dot(toDir, front));
+        this.lon = wrap(this.lon + clamp(Math.atan2(dot(toDir, right), forward) * .35, -.16, .16) * approach
+          / Math.max(.35, Math.cos(this.lat)));
+        this.lat = clamp(this.lat + clamp(Math.atan2(dot(toDir, up), forward) * .30, -.12, .12) * approach,
+          -Math.PI / 2, Math.PI / 2);
+      }
       if (progress === 1) {
         this.zoom = this.zoomTarget;
         this.center = center;
@@ -533,11 +559,12 @@ export class Globe {
     } else {
       this.spinTime = null;
     }
-    const {ratio, cx, cy, width, height} = this;
-    const radius = this.radius * this.zoom;
     // 双指事件在一帧内可能连发多次：这里统一聚合应用一次，锚点始终是手势
     // 开始时固定的地图坐标；跨球面/平面混合过渡同样由 cameraAtAnchor 保持。
+    // 消费须在读取 radius/cx/cy 之前，保证同帧取景一致。
     this.applyPinch();
+    const {ratio, cx, cy, width, height} = this;
+    const radius = this.radius * this.zoom;
     const basis = cameraBasis(this.lon, this.lat);
     const moving = Boolean(this.flight || this.velocity || this.pointer?.moved || this.pinch || this.zoom !== this.zoomTarget);
     const settled = this.cameraMoving && !moving;
@@ -751,6 +778,16 @@ export class Globe {
 
   drawRaisedRegion(radius, basis, time) {
     if (!this.selected) return 0;
+    if (this.flight) {
+      // Flights reproject the whole sphere every frame; the outline projection,
+      // shadow fill and WebGL→2D pixel copy of the lifted region would each
+      // invalidate per frame on top of that. Freeze the lift at 0 while the
+      // flight is active — the region re-raises through its natural animation
+      // on the first settled frame.
+      this.raise = 0;
+      this.raiseStarted = null;
+      return 0;
+    }
     const zone = this.selected;
     const {context: ctx, cx, cy} = this;
     const cached = this.elevationGeometry;
@@ -993,6 +1030,8 @@ export class Globe {
         }
       }
       if (!onCanvas || !event.isPrimary || event.button !== 0) return;
+      // 拖动接管飞行：从当前真实倍率继续，旧目标不再自动推进。
+      if (this.flight) this.zoomTarget = this.zoom;
       this.flight = null;
       this.velocity = null;
       this.spinAfter = performance.now() + 2150;
@@ -1083,6 +1122,7 @@ export class Globe {
     canvas.addEventListener('keydown', (event) => {
       const arrows = {ArrowLeft: [-25, 0], ArrowRight: [25, 0], ArrowUp: [0, -25], ArrowDown: [0, 25]};
       if (Object.hasOwn(arrows, event.key)) {
+        if (this.flight) this.zoomTarget = this.zoom;
         this.flight = null;
         this.rotate(...arrows[event.key]);
         this.requestFrame();

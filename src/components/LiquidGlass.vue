@@ -261,6 +261,29 @@ async function buildFilterInput() {
   backdrop-filter: var(--liquid-glass-clear-backdrop, blur(7px) saturate(112%));
 }
 
+/* 触屏端按钮玻璃默认值：清冷透亮。仍是透明玻璃（透光高光，不哑光、
+   不加描边），只把底色压淡、冷青高光略提，饱和与亮度微升保证可读。 */
+@media (max-width: 700px), (pointer: coarse) {
+  .liquid-glass--clear .rdev-warp {
+    -webkit-backdrop-filter: var(--liquid-glass-clear-backdrop,
+      blur(8px) saturate(132%) brightness(1.09));
+    backdrop-filter: var(--liquid-glass-clear-backdrop,
+      blur(8px) saturate(132%) brightness(1.09));
+  }
+
+  .clear-tint {
+    --tint-opacity: clamp(.03, calc(.05 + (1 - var(--light)) * .24), .1);
+    background:
+      linear-gradient(to bottom, rgb(203 241 251 / calc(.08 * var(--light))), transparent 3px),
+      linear-gradient(to top, rgb(180 230 244 / calc(.15 + (var(--light) - 1) * .07)),
+        rgb(180 230 244 / .15) 1.5px,
+        transparent 2.5px),
+      linear-gradient(180deg, rgb(192 236 249 / .12),
+        rgb(177 229 243 / .045) 27%, transparent 70%, rgb(160 219 233 / .03))
+        var(--liquid-glass-tint, rgb(10 33 45 / var(--tint-opacity)));
+  }
+}
+
 .liquid-glass--clear .rdev-pane {
   box-shadow: 0 6px 18px rgb(3 22 29 / .13);
 }

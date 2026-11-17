@@ -557,6 +557,15 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-card);
 }
 
+/* 触屏端弹层玻璃提亮：更低不透明度的冷调底 + 略正亮度，清亮不发闷，
+   也降低逐帧 backdrop 重光栅成本。桌面保持原深底。 */
+@media (max-width: 700px), (pointer: coarse) {
+  .panel {
+    --liquid-glass-tint: rgb(11 32 42 / .34);
+    --liquid-glass-clear-backdrop: blur(14px) saturate(126%) brightness(1.06);
+  }
+}
+
 .search {
   box-sizing: border-box;
   min-height: 44px;
@@ -664,6 +673,12 @@ onBeforeUnmount(() => {
     --pane-limit: var(--floor-rail-limit);
     --floor-mask-start: #000;
     --floor-mask-end: #000;
+  }
+
+  /* 楼层竖条玻璃同步提亮为冷调清底（与弹层一致）。 */
+  .floors {
+    --liquid-glass-tint: rgb(11 32 42 / .26);
+    --liquid-glass-clear-backdrop: blur(12px) saturate(126%) brightness(1.06);
   }
 
   .floor-count {

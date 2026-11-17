@@ -88,20 +88,14 @@ body {
 }
 
 .map-glass > :not(.liquid-glass) { position: relative; z-index: 1; }
-[data-liquid-morph] > .liquid-glass.glass-surface {
-  inset: auto;
-  top: var(--panel-morph-y);
-  left: var(--panel-morph-x);
-  width: var(--panel-morph-width);
-  height: var(--panel-morph-height);
-  border-radius: var(--panel-morph-radius);
+/* 触屏端常关位移滤镜：静止时若开启，动画结束滤镜恢复会造成边缘瞬间
+   跳色；且逐帧重光栅成本高。常关保证动画首尾与静止态同一光学底。
+   桌面全程 SVG 折射，不受影响。 */
+@media (max-width: 700px), (pointer: coarse) {
+  :is(.map-glass, .music-player) .rdev-warp {
+    filter: none !important;
+  }
 }
-[data-liquid-morph][inert] { pointer-events: none; }
-:is([data-liquid-morph], [data-liquid-native-close]) > .liquid-glass > .rdev-pane > .rdev-warp,
-.music-player:has([data-liquid-drawer]) > .liquid-glass > .rdev-pane > .rdev-warp {
-  filter: none !important;
-}
-[data-liquid-native-close] > .liquid-glass { will-change: transform; }
 .map-glass:where(:not(:has(> .liquid-glass--clear)))::after {
   content: '';
   position: absolute;

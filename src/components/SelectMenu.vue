@@ -372,5 +372,11 @@ watch(open, (value) => {
   .select-popup.glassed {
     padding: 6px;
   }
+
+  /* 弹层玻璃触屏端提亮：冷调清底 + 略正亮度，与分层弹层一致。 */
+  .select-popup.glassed {
+    --liquid-glass-tint: rgb(11 32 42 / .34);
+    --liquid-glass-clear-backdrop: blur(14px) saturate(126%) brightness(1.06);
+  }
 }
 </style>
