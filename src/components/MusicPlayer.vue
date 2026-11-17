@@ -499,10 +499,6 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div class="phase-control">
-        <SegmentedChoice label="昼夜" :choices="dayNightChoices" :value="phase" @select="phase = $event" />
-      </div>
-
       <div v-if="failure" class="media-error">
         <span class="playback-status" role="status">{{ failure }}</span>
         <button type="button" class="text-button" aria-label="重试播放" @click="retry">重试</button>
@@ -510,6 +506,9 @@ onBeforeUnmount(() => {
 
       <RevealPanel :open="detailsOpen" liquid class="details-reveal">
         <div :id="`${uid}-details`" ref="detailsBody" class="player-details player-drawer scroll-viewport">
+          <div class="phase-control">
+            <SegmentedChoice label="昼夜" :choices="dayNightChoices" :value="phase" @select="phase = $event" />
+          </div>
           <SegmentedChoice
             v-for="condition in browseMusic.conditions"
             :key="condition.id"
