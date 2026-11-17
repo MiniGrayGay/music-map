@@ -289,7 +289,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
              :data-relief-zone="reliefZone.key"
              :data-relief-open="reliefOpen"
              :aria-hidden="!reliefOpen">
-        <LiquidGlass />
+        <LiquidGlass @ready="surfaceRef?.refreshRelief?.()" />
         <div class="relief-content">
           <ReliefPreview :zone="reliefZone" :active="reliefOpen" @aspect="reliefAspect = $event"
                          @empty="emptyReliefKey = $event" @unavailable="reliefUnavailable = true" />
@@ -346,25 +346,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   position: absolute;
   border-radius: var(--radius-card);
   pointer-events: none;
-  --relief-start-left: var(--relief-lead-start, 28%);
-  --relief-start-top: 0%;
-  --relief-start-width: var(--relief-lead-span, 44%);
-  --relief-start-height: 12px;
-}
-
-.relief-dock:is([data-relief-edge='left'], [data-relief-edge='right']) {
-  --relief-start-left: 0%;
-  --relief-start-top: var(--relief-lead-start, 28%);
-  --relief-start-width: 12px;
-  --relief-start-height: var(--relief-lead-span, 44%);
-}
-
-.relief-dock[data-relief-edge='right'] {
-  --relief-start-left: calc(100% - 12px);
-}
-
-.relief-dock[data-relief-edge='bottom'] {
-  --relief-start-top: calc(100% - 12px);
+  transition-property: none;
 }
 
 .relief-dock:not([data-relief-placed]), .relief-dock[data-relief-open='false'] {
@@ -375,34 +357,16 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   block-size: 100%;
   border-radius: inherit;
   overflow: clip;
+  opacity: var(--relief-content-opacity, 0);
+  transition-property: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .relief-dock[data-relief-open='true'] > :deep(.liquid-glass) {
-    inset-inline-end: auto;
-    inline-size: 100%;
-    block-size: 100%;
-    animation: relief-glass-open 360ms var(--ease-glass-in) both;
-  }
-
-  .relief-dock[data-relief-open='true'] .relief-content {
-    animation: ui-fade-in 240ms ease-out 255ms both;
-  }
-}
-
-@keyframes relief-glass-open {
-  from {
-    inset-inline-start: var(--relief-start-left);
-    inset-block-start: var(--relief-start-top);
-    inline-size: var(--relief-start-width);
-    block-size: var(--relief-start-height);
-    border-radius: 6px;
-  }
-  to {
-    inset-inline-start: 0;
-    inset-block-start: 0;
-    border-radius: var(--radius-card);
-  }
+.relief-dock > :deep(.liquid-glass) {
+  inset: var(--relief-glass-top, 0) auto auto var(--relief-glass-left, 0);
+  inline-size: var(--relief-glass-width, 0px);
+  block-size: var(--relief-glass-height, 0px);
+  border-radius: var(--relief-glass-radius, var(--radius-card));
+  transition-property: none;
 }
 
 .music-unavailable {

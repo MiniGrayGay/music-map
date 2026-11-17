@@ -15,6 +15,8 @@ const sourceRim = computed(() => props.rim && !clear.value);
 const refraction = computed(() => lens.value ? .18 : sourceRim.value ? 1 : .52);
 const filterId = useId();
 const map = ref(null);
+const ready = ref(!props.displacement);
+const emit = defineEmits(['ready']);
 const glass = ref(null);
 const water = shallowRef(null);
 const firefox = navigator.userAgent.toLowerCase().includes('firefox');
@@ -97,7 +99,13 @@ defineExpose({reactAt});
 
 onMounted(async () => {
   reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  if (props.displacement) map.value = await getFilterInput();
+  try {
+    if (props.displacement) map.value = await getFilterInput();
+  } catch (error) {
+    console.warn('玻璃折射加载失败，继续使用背景模糊', error);
+  }
+  ready.value = true;
+  emit('ready');
 });
 onBeforeUnmount(() => cancelAnimationFrame(frame));
 </script>
@@ -167,7 +175,7 @@ async function buildFilterInput() {
 
 <template>
   <div ref="glass" class="liquid-glass glass-surface"
-       :class="{'is-ready': map || !displacement, 'rimless': !sourceRim,
+       :class="{'is-ready': ready, 'rimless': !sourceRim,
          'liquid-glass--clear': clear, 'liquid-glass--lens': lens}"
        :style="clear ? {'--liquid-glass-light': light} : undefined" aria-hidden="true">
     <svg v-if="displacement" class="filter-definitions">

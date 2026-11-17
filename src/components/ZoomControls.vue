@@ -67,18 +67,13 @@ function reactToControl(event) {
 
 <style scoped>
 .zoom-controls {
+  --zoom-button-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 6px;
   border-radius: var(--radius-card);
-}
-
-/* 放大和缩小为一组，复位与其留出间距。 */
-.pair,
-.reset,
-.smoothing {
-  border-radius: var(--radius-control);
+  overflow: clip;
 }
 
 .pair {
@@ -95,6 +90,7 @@ function reactToControl(event) {
 
 @media (min-width: 701px) and (min-height: 560px) and (pointer: fine) {
   .zoom-controls {
+    --zoom-button-radius: 16px;
     gap: 0;
     padding: 1px 0;
     border-radius: 20px;
@@ -122,16 +118,13 @@ button {
   height: 44px;
   padding: 0;
   border: 0;
+  border-radius: var(--zoom-button-radius);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 120ms ease, color 120ms ease, transform 150ms var(--ease-glass-in);
-}
-
-.pair button {
-  border-radius: var(--radius-control);
 }
 
 button:hover:not(:disabled) {

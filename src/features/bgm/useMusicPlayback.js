@@ -178,6 +178,7 @@ function readSettings(preview) {
 export function useMusicPlayback({track, zone, preview, advance, systemVolume, toyFollow}) {
   const initial = readSettings(preview);
   const audio = ref(null);
+  const progressInput = ref(null);
   const volume = ref(initial.volume);
   const muted = ref(initial.muted);
   const repeatMode = ref(initial.repeatMode);
@@ -229,14 +230,15 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   }
   let playRequest = 0;
   let requestStartedAt = Number.NaN;
+  let progressFrame = 0;
   let session;
   const sessionActions = {
     play: () => play(),
     pause: () => pause(),
     previoustrack: () => { if (!toyFollow.prompt.value) advance(-1); },
     nexttrack: () => { if (!toyFollow.prompt.value) advance(1); },
-    seekbackward: ({seekOffset = 10}) => seek(elapsed.value - seekOffset),
-    seekforward: ({seekOffset = 10}) => seek(elapsed.value + seekOffset),
+    seekbackward: ({seekOffset = 10}) => seek((audio.value?.currentTime ?? 0) - seekOffset),
+    seekforward: ({seekOffset = 10}) => seek((audio.value?.currentTime ?? 0) + seekOffset),
     seekto: ({seekTime}) => seek(seekTime),
   };
 
@@ -246,12 +248,53 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     node.muted = systemVolume.value ? false : muted.value;
   }
 
+  function paintProgress(position) {
+    const input = progressInput.value;
+    if (!input) return;
+    const end = duration.value;
+    const value = Math.min(end, Math.max(0, position));
+    input.valueAsNumber = value;
+    input.style.setProperty('--range-fill', end ? `${value / end * 100}%` : '0%');
+  }
+
+  function stopProgress() {
+    if (progressFrame) cancelAnimationFrame(progressFrame);
+    progressFrame = 0;
+  }
+
+  function scheduleProgress() {
+    const node = audio.value;
+    if (!progressFrame && node && playing.value && !node.paused && !node.seeking
+      && !node.ended && node.readyState >= 3 && !document.hidden) {
+      progressFrame = requestAnimationFrame(() => {
+        progressFrame = 0;
+        // Only the range needs a frame-by-frame update. Media events update the text.
+        if (node !== audio.value || document.hidden || !playing.value || node.paused || node.seeking) return;
+        paintProgress(node.currentTime);
+        scheduleProgress();
+      });
+    }
+  }
+
+  function syncPosition(node) {
+    elapsed.value = node.currentTime;
+    paintProgress(node.currentTime);
+  }
+
+  function onVisibilityChange() {
+    if (document.hidden) stopProgress();
+    else {
+      if (audio.value?.readyState) syncPosition(audio.value);
+      scheduleProgress();
+    }
+  }
+
   function readPosition(event) {
     const node = event.currentTarget;
-    if (node.readyState === 0) return;
+    if (node !== audio.value || node.readyState === 0) return;
     toyFollow.trackProgress(node);
     mediaDuration.value = Number.isFinite(node.duration) ? node.duration : 0;
-    elapsed.value = node.currentTime;
+    syncPosition(node);
   }
 
   async function start(node) {
@@ -296,6 +339,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     playing.value = true;
     pending.value = false;
     failure.value = '';
+    scheduleProgress();
   }
 
   function onPause(event) {
@@ -303,11 +347,21 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     if (node.paused) {
       toyFollow.trackProgress(node, true);
       playing.value = false;
+      stopProgress();
+      if (node.readyState) syncPosition(node);
     }
   }
 
   function onSeeking(event) {
-    toyFollow.savePosition(event.currentTarget);
+    const node = event.currentTarget;
+    stopProgress();
+    toyFollow.savePosition(node);
+    syncPosition(node);
+  }
+
+  function onSeeked(event) {
+    syncPosition(event.currentTarget);
+    scheduleProgress();
   }
 
   function onError(event) {
@@ -316,6 +370,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     // 只处理当前 audio 节点与当前选曲的错误：不用 raw/currentSrc 比较（浏览器可能已重定向
     // 或旧节点同 URL），以「节点与曲目仍一致 + 固定数组的下一项存在」判定可兜底。
     if (node !== audio.value || activeUrl !== track.value?.url || !activeSources[fallbackStage]) return;
+    stopProgress();
     const nextUrl = activeSources[fallbackStage + 1] ?? null;
     if (nextUrl) {
       fallbackStage += 1;
@@ -354,6 +409,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     if (node.error) {
       elapsed.value = 0;
       mediaDuration.value = 0;
+      paintProgress(0);
       // 手动重播视为新尝试：回固定数组第 0 项重走完整主备链路。
       if (fallbackStage > 0) {
         fallbackStage = 0;
@@ -370,7 +426,10 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     playRequest += 1;
     playing.value = false;
     pending.value = false;
-    audio.value?.pause();
+    stopProgress();
+    const node = audio.value;
+    node?.pause();
+    if (node?.readyState) syncPosition(node);
   }
 
   function seek(seconds) {
@@ -378,12 +437,14 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     if (!node || !mediaDuration.value || !Number.isFinite(seconds)) return;
     node.currentTime = Math.min(mediaDuration.value, Math.max(0, seconds));
     toyFollow.savePosition(node);
-    elapsed.value = node.currentTime;
+    syncPosition(node);
   }
 
   function onEnded(event) {
     const node = event.currentTarget;
     if (!node.ended) return;
+    stopProgress();
+    syncPosition(node);
     toyFollow.trackProgress(node, true);
     playing.value = false;
     pending.value = false;
@@ -418,8 +479,10 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     activeUrl = url;
     activeSources = [];
     playRequest += 1;
+    stopProgress();
     elapsed.value = 0;
     mediaDuration.value = 0;
+    paintProgress(0);
     playing.value = false;
     pending.value = false;
     failure.value = '';
@@ -466,6 +529,8 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     }
   }, {flush: 'post'});
 
+  watch([progressInput, duration], () => paintProgress(elapsed.value), {flush: 'post'});
+
   watch([volume, muted, repeatMode], () => {
     if (audio.value) applySettings(audio.value);
     if (preview) return;
@@ -493,6 +558,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   }
 
   onMounted(() => {
+    document.addEventListener('visibilitychange', onVisibilityChange);
     if (preview || !('mediaSession' in navigator)) return;
     session = navigator.mediaSession;
     session.playbackState = playing.value ? 'playing' : 'paused';
@@ -512,6 +578,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   });
 
   onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     pause();
     const node = audio.value;
     if (node) {
@@ -534,8 +601,8 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   });
 
   return {
-    audio, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
+    audio, progressInput, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
     copyFailureReport,
-    play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onEnded, onError,
+    play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onSeeked, onEnded, onError, stopProgress,
   };
 }

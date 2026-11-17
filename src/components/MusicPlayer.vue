@@ -71,9 +71,9 @@ const browseMatchesPlayback = computed(() => browseMusic.value.conditions.length
 const toyFollow = useToyFollow(props.preview);
 const {prompt: followAuthor} = toyFollow;
 const {
-  audio, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
+  audio, progressInput, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
   copyFailureReport,
-  play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onEnded, onError,
+  play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onSeeked, onEnded, onError, stopProgress,
 } = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume, toyFollow});
 
 function dismissFollowPrompt() {
@@ -131,9 +131,7 @@ watch(failure, showFailureToast, {flush: 'post'});
 // 换曲后不再保留旧通知。
 watch(track, closeFailureToast, {flush: 'post'});
 
-const progressStyle = computed(() => ({
-  '--range-fill': duration.value ? `${Math.min(1, elapsed.value / duration.value) * 100}%` : '0%',
-}));
+const elapsedLabel = computed(() => timeLabel(elapsed.value));
 const volumeStyle = computed(() => ({'--range-fill': `${volume.value * 100}%`}));
 
 watch(() => zone.value.key, () => {
@@ -274,6 +272,14 @@ function timeLabel(seconds) {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
+function seekWithArrow(event) {
+  const steps = {ArrowLeft: -.25, ArrowDown: -.25, ArrowRight: .25, ArrowUp: .25};
+  const step = steps[event.key];
+  if (step === undefined) return;
+  event.preventDefault();
+  seek(event.currentTarget.valueAsNumber + step);
+}
+
 function setVolume(event) {
   volume.value = event.target.valueAsNumber;
   muted.value = volume.value === 0;
@@ -411,19 +417,20 @@ onBeforeUnmount(() => {
       </header>
 
       <div class="seek-row">
-        <span aria-hidden="true">{{ timeLabel(elapsed) }}</span>
+        <span aria-hidden="true">{{ elapsedLabel }}</span>
         <input
+          ref="progressInput"
           class="player-range progress"
           type="range"
           min="0"
           :max="duration || 1"
-          step="0.25"
-          :value="elapsed"
-          :style="progressStyle"
+          step="any"
+          value="0"
           :disabled="!mediaDuration || !!failure"
           aria-label="播放进度"
-          :aria-valuetext="`${timeLabel(elapsed)} / ${timeLabel(duration)}`"
+          :aria-valuetext="`${elapsedLabel} / ${timeLabel(duration)}`"
           @input="seek($event.target.valueAsNumber)"
+          @keydown="seekWithArrow"
         >
         <span aria-hidden="true">{{ duration ? timeLabel(duration) : '–:–' }}</span>
       </div>
@@ -620,8 +627,10 @@ onBeforeUnmount(() => {
       @durationchange="readPosition"
       @timeupdate="readPosition"
       @playing="onPlaying"
+      @waiting="stopProgress"
       @pause="onPause"
       @seeking="onSeeking"
+      @seeked="onSeeked"
       @ended="onEnded"
       @error="onError"
     />
@@ -843,6 +852,7 @@ onBeforeUnmount(() => {
 }
 
 .player-range {
+  --range-fill: 0%;
   appearance: none;
   display: block;
   width: 100%;

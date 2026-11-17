@@ -216,19 +216,21 @@ function markers(world) {
   });
 }
 
-function locate(marker) {
+function locate(marker, reframe = true) {
   const renderer = globe;
   if (!marker || !renderer?.world) return false;
   renderer.select(marker);
   emit('zone-focus', marker.zone);
-  void nextTick(() => {
-    if (globe === renderer && renderer.selected === marker) renderer.frameSelection();
-  });
+  if (reframe) {
+    void nextTick(() => {
+      if (globe === renderer && renderer.selected?.zone.key === marker.zone.key) renderer.frameSelection();
+    });
+  }
   return true;
 }
 
 function select(marker) {
-  if (!locate(marker)) return;
+  if (!locate(marker, globe?.selected?.zone.key !== marker?.zone.key)) return;
   query.value = '';
   dismissSearch();
   emit('zone-activate', marker.zone);
@@ -363,6 +365,7 @@ onBeforeUnmount(() => {
 });
 defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 / 1.22),
   resetView, clearSelection,
+  refreshRelief: () => globe?.requestFrame(),
   viewportRect: () => globe?.viewportRect(props.mapData.canvas),
   focusZone: () => canvas.value?.focus({preventScroll: true}), jumpToZone,
 });

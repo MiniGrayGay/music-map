@@ -435,11 +435,12 @@ export class Globe {
   get orbitHomeAngle() { return this.cx > this.radius * 1.51 ? 2.58 : -.82; }
 
   select(zone) {
-    if (zone !== this.selected) {
+    if (zone?.zone.key !== this.selected?.zone.key) {
       this.hideReliefCard();
       this.raise = 0;
       this.raiseStarted = null;
       this.reliefLeadStarted = null;
+      this.reliefOpeningAt = null;
       this.reliefEdge = null;
       this.reliefRevealed = false;
     }
@@ -973,6 +974,10 @@ export class Globe {
 
   drawReliefLeads(rings, lift, time) {
     if (this.raise < .5) return;
+    if (!this.reliefRevealed && this.cameraMoving) {
+      this.reliefLeadStarted = null;
+      return;
+    }
     const key = this.selected.zone.key;
     const relief = this.reliefTarget?.(key);
     if (!relief) {
@@ -1031,17 +1036,7 @@ export class Globe {
     }
     const leadStart = Math.min(first.along, second.along) - panelStart;
     const leadSpan = Math.abs(first.along - second.along);
-    this.reliefDock = target;
     this.reliefEdge = edge;
-    target.dataset.reliefPlaced = '';
-    target.dataset.reliefEdge = edge;
-    // Keep the surface in the backdrop compositor's untransformed geometry.
-    target.style.left = `${panel.left}px`;
-    target.style.top = `${panel.top}px`;
-    target.style.width = `${panel.width}px`;
-    target.style.height = `${panel.height}px`;
-    target.style.setProperty('--relief-lead-start', `${100 * leadStart / span}%`);
-    target.style.setProperty('--relief-lead-span', `${100 * leadSpan / span}%`);
 
     this.reliefLeadStarted ??= time;
     const progress = this.reducedMotion.matches ? 1 : clamp((time - this.reliefLeadStarted) / 320, 0, 1);
@@ -1064,10 +1059,39 @@ export class Globe {
     ctx.restore();
     if (progress < 1) {
       this.requestFrame();
-    } else if (!this.reliefRevealed) {
+      return;
+    }
+    if (!target.querySelector(':scope > .liquid-glass.is-ready')) return;
+    this.reliefOpeningAt ??= time;
+    const elapsed = this.reducedMotion.matches ? 495 : time - this.reliefOpeningAt;
+    const expanding = clamp(elapsed / 360, 0, 1);
+    const eased = expanding * expanding * (3 - 2 * expanding);
+    const revealDepth = 12;
+    const startX = horizontal ? leadStart : edge === 'right' ? panel.width - revealDepth : 0;
+    const startY = horizontal ? edge === 'bottom' ? panel.height - revealDepth : 0 : leadStart;
+    const startWidth = horizontal ? leadSpan : revealDepth;
+    const startHeight = horizontal ? revealDepth : leadSpan;
+
+    // Write the first glass frame before making the dock visible. Geometry and
+    // content share this clock so the final-size backing cannot paint first.
+    target.style.left = `${panel.left}px`;
+    target.style.top = `${panel.top}px`;
+    target.style.width = `${panel.width}px`;
+    target.style.height = `${panel.height}px`;
+    target.style.setProperty('--relief-glass-left', `${startX * (1 - eased)}px`);
+    target.style.setProperty('--relief-glass-top', `${startY * (1 - eased)}px`);
+    target.style.setProperty('--relief-glass-width', `${interpolate(startWidth, panel.width, eased)}px`);
+    target.style.setProperty('--relief-glass-height', `${interpolate(startHeight, panel.height, eased)}px`);
+    target.style.setProperty('--relief-glass-radius', `calc(6px + (var(--radius-card) - 6px) * ${eased})`);
+    target.style.setProperty('--relief-content-opacity', String(clamp((elapsed - 255) / 240, 0, 1)));
+    this.reliefDock = target;
+    target.dataset.reliefEdge = edge;
+    target.dataset.reliefPlaced = '';
+    if (!this.reliefRevealed) {
       this.reliefRevealed = true;
       this.onReliefReveal?.(key);
     }
+    if (elapsed < 495) this.requestFrame();
   }
 
   hideReliefCard() {
