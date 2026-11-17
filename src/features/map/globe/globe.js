@@ -94,7 +94,7 @@ function initialize(canvas, fragment) {
   gl.deleteShader(material);
   gl.useProgram(program);
   const uniforms = Object.fromEntries(
-    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder'].map(
+    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder', 'motion'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
   );
@@ -142,7 +142,7 @@ function uploadAtlas({gl, texture}, image, wrapLongitude = false) {
 function renderSphere(renderer, canvas, view) {
   const {gl, uniforms} = renderer;
   const {cx, cy, radius, ratio, world, basis, zoom = 1, detailSize = [0, 0],
-    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0]} = view;
+    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0], motion = false} = view;
   const extent = radius * 1.002;
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
   const bottom = Math.max(0, Math.floor(canvas.height - (cy + extent) * ratio));
@@ -173,6 +173,8 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform2fv(uniforms.nativeSize, nativeSize);
   gl.uniform4fv(uniforms.patchRect, patchRect);
   gl.uniform3fv(uniforms.occluder, occluder);
+  // 拖动中让瓦片在缩小区间回落 mip 底图（见 readAtlas），停稳后恢复瓦片高清。
+  gl.uniform1i(uniforms.motion, Number(Boolean(motion)));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.disable(gl.SCISSOR_TEST);
 }
@@ -572,7 +574,7 @@ export class Globe {
       renderSphere(this, this.canvas, {
         cx, cy, ratio: rasterRatio, radius, world: this.world, basis,
         zoom: this.zoom, detailSize: this.tiles.size, nativeSize: this.nativeTiles.size,
-        patchRect: this.patchInAtlas(),
+        patchRect: this.patchInAtlas(), motion: moving,
       });
       this.sphereState = pose;
       // The player captures and refracts this raster. Refresh at a settled pose,
