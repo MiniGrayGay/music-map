@@ -3,6 +3,7 @@ import {drawGlobeBoundaries} from './boundaries.js';
 import {frameZone, placeReliefCard} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
+import {retireReliefDock} from '../reliefDockMotion.js';
 import {
   cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, direction, dot, fullSpan,
   projectAtlas, projectVisibleOutline, surfaceRay, viewAtlasPoints, viewportAngles, wrap,
@@ -471,6 +472,7 @@ export class Globe {
       this.reliefRevealed = false;
     }
     this.selected = zone;
+    this.reliefSuppressed = false;
     this.lockTime = performance.now();
     this.requestFrame();
   }
@@ -479,7 +481,7 @@ export class Globe {
     if (!this.selected || !this.radius) return;
     const {width, height, radius} = this;
     this.flyTo(...frameZone(this.world, this.selected, {width, height, radius,
-      obstacles: this.labelObstacles(), minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM}));
+      obstacles: this.labelObstacles(), minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM}), true);
   }
 
   viewportRect(canvas) {
@@ -514,7 +516,12 @@ export class Globe {
     };
   }
 
-  flyTo(lon, lat, zoom, center = null) {
+  flyTo(lon, lat, zoom, center = null, revealSelection = false) {
+    this.hideReliefCard();
+    this.reliefLeadStarted = null;
+    this.reliefOpeningAt = null;
+    this.reliefRevealed = false;
+    this.reliefSuppressed = !revealSelection;
     this.velocity = null;
     this.flight = null;
     this.spinAfter = performance.now() + 3100;
@@ -1000,7 +1007,7 @@ export class Globe {
   }
 
   drawReliefLeads(rings, lift, time) {
-    if (this.raise < .5) return;
+    if (this.reliefSuppressed || this.raise < .5) return;
     if (!this.reliefRevealed && this.cameraMoving) {
       this.reliefLeadStarted = null;
       return;
@@ -1012,6 +1019,7 @@ export class Globe {
       return;
     }
     const {target, aspect} = relief;
+    if (target.hasAttribute('data-relief-closing')) return;
 
     const {left, top} = this.canvas.getBoundingClientRect();
     const points = rings.flatMap(({outline}) => outline).filter(([x, y]) =>
@@ -1028,11 +1036,16 @@ export class Globe {
       zone.top = Math.min(zone.top, y - lift);
       zone.bottom = Math.max(zone.bottom, y - lift);
     }
-    const controls = this.labelObstacles().map(rect => ({
+    const obstacles = this.labelObstacles();
+    for (const label of this.labelFor.values()) {
+      if (label.isConnected) obstacles.push(label.getBoundingClientRect());
+    }
+    const controls = obstacles.map(rect => ({
       left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
     }));
-    const height = clamp(this.height * .29, 184, 300);
-    const width = clamp(height * aspect, 222, Math.min(450, this.width * .38));
+    const spanOnScreen = Math.max(zone.right - zone.left, zone.bottom - zone.top);
+    const height = clamp(96 + spanOnScreen * .28, 112, Math.min(224, this.height * .24));
+    const width = clamp(height * aspect, 120, Math.min(310, this.width * .27));
     const panel = placeReliefCard(zone, {width, height}, this, controls, this.reliefEdge);
     if (!panel) {
       this.hideReliefCard();
@@ -1123,8 +1136,9 @@ export class Globe {
 
   hideReliefCard() {
     if (!this.reliefDock) return;
-    delete this.reliefDock.dataset.reliefPlaced;
+    const retiring = retireReliefDock(this.reliefDock);
     this.reliefDock = null;
+    if (retiring) void retiring.then(() => this.requestFrame());
   }
 
   drawLock(time, x, y) {

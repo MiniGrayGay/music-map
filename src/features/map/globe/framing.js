@@ -3,6 +3,10 @@ import {atlasAngles, cameraBasis, clamp, outlineDepth, projectAtlas, projectVisi
 export function placeReliefCard(zone, card, viewport, obstacles, previousEdge) {
   const margin = 16;
   const gap = clamp(Math.min(zone.right - zone.left, zone.bottom - zone.top) * .17, 28, 52);
+  const compactZone = Math.max(zone.right - zone.left, zone.bottom - zone.top) < 120;
+  const centerX = viewport.width / 2;
+  const centerY = viewport.height / 2;
+  const zoneDistance = Math.hypot((zone.left + zone.right) / 2 - centerX, (zone.top + zone.bottom) / 2 - centerY);
   let best = null;
   for (const scale of [1, .84, .7, .56]) {
     for (const edge of ['left', 'right', 'top', 'bottom']) {
@@ -42,7 +46,9 @@ export function placeReliefCard(zone, card, viewport, obstacles, previousEdge) {
         const bottom = top + height;
         if (obstacles.some(o => left < o.right + 10 && right > o.left - 10
           && top < o.bottom + 10 && bottom > o.top - 10)) continue;
-        const score = Math.abs(along + size / 2 - center)
+        const cardDistance = Math.hypot(left + width / 2 - centerX, top + height / 2 - centerY);
+        const inwardPenalty = compactZone ? Math.max(0, zoneDistance - cardDistance) * .55 : 0;
+        const score = Math.abs(along + size / 2 - center) + inwardPenalty
           + (1 - scale) * 160 + (edge === previousEdge ? 0 : 26);
         if (!best || score < best.score) {
           best = {left, right, top, bottom, width, height, edge, scale, score};

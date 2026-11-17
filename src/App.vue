@@ -14,6 +14,7 @@ import {pushEscapeHandler} from './components/escapeStack.js';
 import {BGM_STATUS, loadRegionBgm} from './features/bgm/bgmStatus.js';
 import {prepareToyFollow, toyFollowCardPreview} from './features/bgm/toyFollow.js';
 import {loadMapData} from './features/map/mapData.js';
+import {retireReliefDock} from './features/map/reliefDockMotion.js';
 import {layerModeActive, loadLayers, reloadLayers} from './features/layers/layerSelection.js';
 import {loadLayerBases, mapLabels} from './features/layers/mapBases.js';
 import {isMobileDevice} from './features/map/isMobileDevice.js';
@@ -72,10 +73,13 @@ const reliefPackLabels = {
   error: '暂时无法加载点云',
 };
 const reliefZone = ref(null);
+const reliefInstance = ref(0);
 const reliefAspect = ref(null);
 const reliefDock = ref(null);
 const reliefOpen = ref(false);
+const reliefExiting = ref(false);
 const emptyReliefKey = ref(null);
+let reliefRequest = 0;
 function preloadToyRelief() {
   if (reliefPackReady || !showRelief.value || !mapData.value?.preloadRelief
     || (reliefPackStatus.value && reliefPackStatus.value.stage !== 'error')) return;
@@ -90,18 +94,36 @@ function preloadToyRelief() {
 }
 watch(showRelief, preloadToyRelief);
 function focusRelief(zone) {
-  if (reliefZone.value?.key !== zone?.key) {
-    reliefAspect.value = null;
-    reliefOpen.value = false;
+  const request = ++reliefRequest;
+  const replacing = reliefZone.value?.key !== zone?.key || reliefExiting.value;
+  const present = () => {
+    if (request !== reliefRequest) return;
+    reliefExiting.value = false;
+    if (replacing) {
+      reliefInstance.value += 1;
+      reliefAspect.value = null;
+      reliefOpen.value = false;
+    }
+    reliefZone.value = zone;
+    emptyReliefKey.value = null;
+  };
+  const retiring = replacing && reliefDock.value && retireReliefDock(reliefDock.value);
+  if (retiring) {
+    // Keep the old WebGL canvas mounted until its visible exit has finished.
+    reliefExiting.value = true;
+    void retiring.then(present);
+  } else {
+    present();
   }
-  reliefZone.value = zone;
-  emptyReliefKey.value = null;
 }
 function revealRelief(key) {
   if (reliefZone.value?.key !== key) return;
   reliefOpen.value = true;
 }
 const updateReliefViewport = () => { showRelief.value = reliefViewportAllows(); };
+watch([showGlobe, showRelief], ([globe, relief]) => {
+  if (!globe || !relief) focusRelief(null);
+}, {flush: 'sync'});
 onMounted(() => {
   desktopRelief.addEventListener('change', updateReliefViewport);
   screen.orientation?.addEventListener?.('change', updateReliefViewport);
@@ -282,8 +304,9 @@ onBeforeUnmount(() => releasePlayerEscape?.());
                   :value="reliefPackStatus.received" :max="reliefPackStatus.total" />
         <button v-if="reliefPackStatus.stage === 'error'" type="button" @click="preloadToyRelief">重试</button>
       </div>
-      <aside v-if="showGlobe && mapName === 'Teyvat' && showRelief && !reliefUnavailable
-               && !reliefPackStatus && reliefZone && reliefZone.key !== emptyReliefKey"
+      <aside v-if="reliefZone && (reliefExiting || (showGlobe && mapName === 'Teyvat' && showRelief
+               && !reliefUnavailable && !reliefPackStatus && reliefZone.key !== emptyReliefKey))"
+             :key="reliefInstance"
              ref="reliefDock"
              class="relief-dock map-glass" aria-label="高程点阵预览"
              :data-relief-zone="reliefZone.key"
@@ -349,7 +372,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   transition-property: none;
 }
 
-.relief-dock:not([data-relief-placed]), .relief-dock[data-relief-open='false'] {
+.relief-dock:not([data-relief-closing]):is(:not([data-relief-placed]), [data-relief-open='false']) {
   visibility: hidden;
 }
 
