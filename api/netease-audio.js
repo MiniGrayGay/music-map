@@ -3,11 +3,7 @@
 // 诊断：并行竞速多个上游取首个成功；全部失败时 502 附带脱敏分层原因（不含完整 URL/签名/响应体）。
 import catalog from '../src/features/bgm/netease-tracks.json' with {type: 'json'};
 
-const upstreamHosts = [
-  'https://music.163.com',
-  'https://interface.music.163.com',
-];
-const upstreamPath = '/api/song/enhance/player/url';
+const outerMediaHosts = ['https://music.163.com', 'https://interface3.music.163.com'];
 const outerMediaPath = (id) => `/song/media/outer/url?id=${id}.mp3`;
 const perRequestTimeoutMs = 2500;
 const totalDeadlineMs = 5500;
@@ -52,14 +48,13 @@ class ResolveFailure extends Error {
 }
 
 // JSON 元数据上游。resolve：成功返回 CDN 目标，失败抛 ResolveFailure。
-async function attemptJsonApi(host, id, remainingMs) {
-  const query = new URLSearchParams({br: '128000', ids: `[${id}]`});
+// v1 接口（首选，公司侧实测 music.163.com / interface3.music.163.com 均 200 完整非试听）与老接口共用同一套显式校验。
+async function attemptJsonApi(label, url, id, remainingMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(perRequestTimeoutMs, remainingMs)));
-  const label = host === upstreamHosts[0] ? 'music-json' : 'interface-json';
   let res;
   try {
-    res = await fetch(`${host}${upstreamPath}?${query}`, {
+    res = await fetch(url, {
       signal: controller.signal,
       redirect: 'error',
       headers: {accept: 'application/json'},
@@ -89,25 +84,25 @@ async function attemptJsonApi(host, id, remainingMs) {
 }
 
 // 网易云官方外链端点：服务端以 redirect:manual 请求，接受经 canonical 校验的 30x Location。
-async function attemptOuterMedia(id, remainingMs) {
+async function attemptOuterMedia(label, host, id, remainingMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(0, Math.min(perRequestTimeoutMs, remainingMs)));
   let res;
   try {
-    res = await fetch(`https://music.163.com${outerMediaPath(id)}`, {
+    res = await fetch(`${host}${outerMediaPath(id)}`, {
       signal: controller.signal,
       redirect: 'manual',
       headers: {accept: 'audio/mpeg, */*'},
     });
   } catch (error) {
-    throw new ResolveFailure(`outer:conn-${error?.name === 'AbortError' ? 'timeout' : 'error'}`);
+    throw new ResolveFailure(`${label}:conn-${error?.name === 'AbortError' ? 'timeout' : 'error'}`);
   } finally {
     clearTimeout(timer);
   }
   if (res.status < 300 || res.status >= 400) {
     // 该端点对不可播曲目常返回 200 + HTML，绝不能当成功，也不能把 HTML 透传出去。
     await res.body?.cancel();
-    throw new ResolveFailure(`outer:http-${res.status}`);
+    throw new ResolveFailure(`${label}:http-${res.status}`);
   }
   const location = res.headers.get('location');
   await res.body?.cancel();
@@ -119,7 +114,7 @@ async function attemptOuterMedia(id, remainingMs) {
     throw new ResolveFailure('outer:bad-location');
   }
   const target = canonicalCdnUrl(location);
-  if (!target) throw new ResolveFailure(`outer:redirect-${parsed.hostname}`);
+  if (!target) throw new ResolveFailure(`${label}:redirect-${parsed.hostname}`);
   return target;
 }
 
@@ -128,15 +123,27 @@ async function resolveUpstreamUrl(id) {
   const attempts = [];
   const start = Date.now();
   const makeRemaining = () => totalDeadlineMs - (Date.now() - start);
-  attempts.push(attemptJsonApi(upstreamHosts[0], id, makeRemaining()));
-  attempts.push(attemptJsonApi(upstreamHosts[1], id, makeRemaining()));
-  attempts.push(attemptOuterMedia(id, makeRemaining()));
+  // 首选：v1 接口（level=standard 非试听完整曲目），music.163.com 与 interface3 双路。
+  const v1JsonUrl = (host, id) =>
+    `${host}/api/song/enhance/player/url/v1?${new URLSearchParams({level: 'standard', encodeType: 'mp3', ids: `[${id}]`})}`;
+  attempts.push(attemptJsonApi('music-json', v1JsonUrl('https://music.163.com', id), id, makeRemaining()));
+  attempts.push(attemptJsonApi('interface3-json', v1JsonUrl('https://interface3.music.163.com', id), id, makeRemaining()));
+  attempts.push(attemptOuterMedia('outer', outerMediaHosts[0], id, makeRemaining()));
+  attempts.push(attemptOuterMedia('interface3-outer', outerMediaHosts[1], id, makeRemaining()));
+  // 保留：老接口一路兜底。
+  const legacyQuery = new URLSearchParams({br: '128000', ids: `[${id}]`});
+  attempts.push(attemptJsonApi(
+    'interface-json',
+    `https://interface.music.163.com/api/song/enhance/player/url?${legacyQuery}`,
+    id,
+    makeRemaining(),
+  ));
   try {
     return await Promise.any(attempts);
   } catch (error) {
     if (error instanceof AggregateError) {
       // 顺序与 attempts 一致，拼出可读的分层诊断串，如
-      // "music-json:http-403;interface-json:item-404;outer:redirect-music.163.com"。
+      // "music-json:item-mismatch;interface3-json:http-403;outer:redirect-music.163.com;..."。
       throw new Error(error.errors.map((e) => e?.detail ?? 'unknown').join(';'));
     }
     throw error;
