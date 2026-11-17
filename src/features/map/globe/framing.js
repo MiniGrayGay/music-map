@@ -1,4 +1,57 @@
-import {atlasAngles, cameraBasis, outlineDepth, projectAtlas, projectVisibleOutline} from './projection.js';
+import {atlasAngles, cameraBasis, clamp, outlineDepth, projectAtlas, projectVisibleOutline} from './projection.js';
+
+export function placeReliefCard(zone, card, viewport, obstacles, previousEdge) {
+  const margin = 16;
+  const gap = clamp(Math.min(zone.right - zone.left, zone.bottom - zone.top) * .17, 28, 52);
+  let best = null;
+  for (const scale of [1, .84, .7, .56]) {
+    for (const edge of ['left', 'right', 'top', 'bottom']) {
+      const vertical = edge === 'left' || edge === 'right';
+      const width = card.width * scale;
+      const height = card.height * scale;
+      const fixed = {
+        left: zone.right + gap,
+        right: zone.left - gap - width,
+        top: zone.bottom + gap,
+        bottom: zone.top - gap - height,
+      }[edge];
+      const fixedSize = vertical ? width : height;
+      const fixedLimit = (vertical ? viewport.width : viewport.height) - margin;
+      if (fixed < margin || fixed + fixedSize > fixedLimit) continue;
+
+      const size = vertical ? height : width;
+      const start = vertical ? zone.top : zone.left;
+      const end = vertical ? zone.bottom : zone.right;
+      const center = (start + end) / 2;
+      const limit = (vertical ? viewport.height : viewport.width) - size - margin;
+      if (limit < margin) continue;
+      const positions = [center - size / 2];
+      for (const obstacle of obstacles) {
+        const low = vertical ? obstacle.left : obstacle.top;
+        const high = vertical ? obstacle.right : obstacle.bottom;
+        if (fixed >= high + 10 || fixed + fixedSize <= low - 10) continue;
+        positions.push((vertical ? obstacle.top : obstacle.left) - size - 10,
+          (vertical ? obstacle.bottom : obstacle.right) + 10);
+      }
+      for (const position of positions) {
+        const along = clamp(position, margin, limit);
+        if (along + size < start - gap || along > end + gap) continue;
+        const left = vertical ? fixed : along;
+        const top = vertical ? along : fixed;
+        const right = left + width;
+        const bottom = top + height;
+        if (obstacles.some(o => left < o.right + 10 && right > o.left - 10
+          && top < o.bottom + 10 && bottom > o.top - 10)) continue;
+        const score = Math.abs(along + size / 2 - center)
+          + (1 - scale) * 160 + (edge === previousEdge ? 0 : 26);
+        if (!best || score < best.score) {
+          best = {left, right, top, bottom, width, height, edge, scale, score};
+        }
+      }
+    }
+  }
+  return best;
+}
 
 function unobstructedFrame(width, height, obstacles) {
   const margin = 16;

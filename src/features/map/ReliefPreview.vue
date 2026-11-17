@@ -3,18 +3,22 @@ import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {loadReliefPoints} from './reliefData.js';
 import {mountReliefPreview} from './reliefPreview.js';
 
-const props = defineProps({zone: {type: Object, required: true}});
+const props = defineProps({
+  zone: {type: Object, required: true},
+  active: {type: Boolean, default: true},
+});
 const emit = defineEmits(['unavailable', 'empty', 'aspect']);
 const canvas = ref(null);
 let preview;
 onMounted(() => {
   try {
-    preview = mountReliefPreview(canvas.value);
+    preview = mountReliefPreview(canvas.value, props.active);
   } catch (error) {
     console.warn('高程点阵无法显示', error);
     emit('unavailable');
     return;
   }
+  watch(() => props.active, active => preview.setActive(active));
   watch(() => props.zone.key, async (key, previous, onCleanup) => {
     const controller = new AbortController();
     onCleanup(() => controller.abort());

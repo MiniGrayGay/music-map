@@ -7,10 +7,12 @@ import LayerPicker from './components/LayerPicker.vue';
 import LiquidGlass from './components/LiquidGlass.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
 import SelectMenu from './components/SelectMenu.vue';
+import ToyFollowPrompt from './components/ToyFollowPrompt.vue';
 import ZoomControls from './components/ZoomControls.vue';
 import {useAnchoredPanel} from './components/panelMotion.js';
 import {pushEscapeHandler} from './components/escapeStack.js';
 import {BGM_STATUS, loadRegionBgm} from './features/bgm/bgmStatus.js';
+import {prepareToyFollow, toyFollowCardPreview} from './features/bgm/toyFollow.js';
 import {loadMapData} from './features/map/mapData.js';
 import {layerModeActive, loadLayers, reloadLayers} from './features/layers/layerSelection.js';
 import {loadLayerBases, mapLabels} from './features/layers/mapBases.js';
@@ -22,6 +24,7 @@ const ReliefPreview = defineAsyncComponent(() => import('./features/map/ReliefPr
 const MapSurface = defineAsyncComponent(() => import('./features/map/MapSurface.vue'));
 
 const mapData = ref(null);
+const followCardPreview = ref(import.meta.env.DEV ? toyFollowCardPreview() : null);
 const baseMaps = ref({});
 const mapName = ref('Teyvat');
 const activeMap = computed(() => mapName.value === 'Teyvat'
@@ -69,6 +72,8 @@ const reliefPackLabels = {
 };
 const reliefZone = ref(null);
 const reliefAspect = ref(null);
+const reliefDock = ref(null);
+const reliefOpen = ref(false);
 const emptyReliefKey = ref(null);
 function preloadToyRelief() {
   if (reliefPackReady || !showRelief.value || !mapData.value?.preloadRelief
@@ -84,9 +89,16 @@ function preloadToyRelief() {
 }
 watch(showRelief, preloadToyRelief);
 function focusRelief(zone) {
-  if (reliefZone.value?.key !== zone?.key) reliefAspect.value = null;
+  if (reliefZone.value?.key !== zone?.key) {
+    reliefAspect.value = null;
+    reliefOpen.value = false;
+  }
   reliefZone.value = zone;
   emptyReliefKey.value = null;
+}
+function revealRelief(key) {
+  if (reliefZone.value?.key !== key) return;
+  reliefOpen.value = true;
 }
 const updateReliefViewport = () => { showRelief.value = reliefViewportAllows(); };
 onMounted(() => {
@@ -131,6 +143,7 @@ async function loadMusic() {
 
 async function initialize() {
   loadError.value = null;
+  void prepareToyFollow();
   try {
     mapData.value = await loadMapData();
     preloadToyRelief();
@@ -263,12 +276,15 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         :active-zone="activeZone"
         :available-maps="mapOptions"
         :search-host="mapToolbar"
+        :relief-target="reliefDock"
+        :relief-ready="reliefAspect != null"
         :mobile-device="mobileDevice"
         :smooth-boundaries="smoothBoundaries"
         @canvas-frame="receiveBackdrop"
         @view="(state) => Object.assign(view, state)"
         @zone-activate="activeZone = $event"
         @zone-focus="focusRelief"
+        @relief-reveal="revealRelief"
         @select-map="selectMap"
         @unavailable="globeError = $event"
       />
@@ -281,11 +297,17 @@ onBeforeUnmount(() => releasePlayerEscape?.());
       </div>
       <aside v-if="showGlobe && mapName === 'Teyvat' && showRelief && !reliefUnavailable
                && !reliefPackStatus && reliefZone && reliefZone.key !== emptyReliefKey"
+             ref="reliefDock"
              class="relief-dock map-glass" aria-label="高程点阵预览"
+             :data-relief-zone="reliefZone.key"
+             :data-relief-open="reliefOpen"
+             :aria-hidden="!reliefOpen"
              :style="reliefAspect == null ? undefined : {'--relief-aspect': reliefAspect}">
-        <LiquidGlass :rim="false" :displacement="false" />
-        <ReliefPreview :zone="reliefZone" @aspect="reliefAspect = $event"
-                       @empty="emptyReliefKey = $event" @unavailable="reliefUnavailable = true" />
+        <LiquidGlass variant="clear" :displacement="false" />
+        <div class="relief-content">
+          <ReliefPreview :zone="reliefZone" :active="reliefOpen" @aspect="reliefAspect = $event"
+                         @empty="emptyReliefKey = $event" @unavailable="reliefUnavailable = true" />
+        </div>
       </aside>
       <Transition :css="false" v-bind="playerMotion" @after-enter="refreshBackdrop"
                   @after-leave="releaseClosedPlayer">
@@ -297,6 +319,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @close="closePlayer"
         />
       </Transition>
+      <ToyFollowPrompt v-if="followCardPreview" :author="followCardPreview"
+                       @dismiss="followCardPreview = null" />
       <div v-if="!activeZone && bgm.reason && bgm.status !== BGM_STATUS.READY"
            class="music-unavailable" role="status">
         <span>{{ bgm.status === BGM_STATUS.LOADING ? '正在重新加载音乐分区' : '暂时无法加载音乐分区' }}</span>
@@ -316,20 +340,76 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 
 <style scoped>
 .relief-dock {
-  --relief-height: clamp(190px, 32vh, 326px);
-  --relief-width: calc(var(--relief-height) * var(--relief-aspect, 1.45) + 22px);
+  --relief-height: clamp(184px, 29vh, 300px);
+  --relief-width: calc(var(--relief-height) * var(--relief-aspect, 1.45));
   position: absolute;
   z-index: 2;
-  inset-inline-end: var(--map-inline-end, 18px);
-  inset-block-end: 18px;
-  inline-size: calc(2 * clamp(216px, var(--relief-width), min(388px, 38vw)));
+  inset-inline-start: 0;
+  inset-block-start: 0;
+  inline-size: clamp(222px, var(--relief-width), min(450px, 38vw));
   block-size: var(--relief-height);
-  border: 1px solid rgb(135 218 246 / .14);
+  transform-origin: top left;
   border-radius: var(--radius-card);
-  overflow: hidden;
   pointer-events: none;
-  --map-glass-fill: rgb(9 28 45 / .72);
-  background: radial-gradient(ellipse at 55% 85%, rgb(32 89 110 / .2), transparent 72%);
+  --liquid-glass-tint: rgb(8 27 38 / .48);
+  --liquid-glass-clear-backdrop: blur(14px) saturate(115%);
+  --relief-start-left: var(--relief-lead-start, 28%);
+  --relief-start-top: 0%;
+  --relief-start-width: var(--relief-lead-span, 44%);
+  --relief-start-height: 12px;
+}
+
+.relief-dock:is([data-relief-edge='left'], [data-relief-edge='right']) {
+  --relief-start-left: 0%;
+  --relief-start-top: var(--relief-lead-start, 28%);
+  --relief-start-width: 12px;
+  --relief-start-height: var(--relief-lead-span, 44%);
+}
+
+.relief-dock[data-relief-edge='right'] {
+  --relief-start-left: calc(100% - 12px);
+}
+
+.relief-dock[data-relief-edge='bottom'] {
+  --relief-start-top: calc(100% - 12px);
+}
+
+.relief-dock:not([data-relief-placed]), .relief-dock[data-relief-open='false'] {
+  visibility: hidden;
+}
+
+.relief-content {
+  block-size: 100%;
+  border-radius: inherit;
+  overflow: clip;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .relief-dock[data-relief-open='true'] > :deep(.liquid-glass) {
+    inset-inline-end: auto;
+    inline-size: 100%;
+    block-size: 100%;
+    animation: relief-glass-open 360ms var(--ease-glass-in) both;
+  }
+
+  .relief-dock[data-relief-open='true'] .relief-content {
+    animation: ui-fade-in 240ms ease-out 255ms both;
+  }
+}
+
+@keyframes relief-glass-open {
+  from {
+    inset-inline-start: var(--relief-start-left);
+    inset-block-start: var(--relief-start-top);
+    inline-size: var(--relief-start-width);
+    block-size: var(--relief-start-height);
+    border-radius: 6px;
+  }
+  to {
+    inset-inline-start: 0;
+    inset-block-start: 0;
+    border-radius: var(--radius-card);
+  }
 }
 
 .music-unavailable {
@@ -552,7 +632,9 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 }
 
 .map-switcher {
-  flex: 0 0 170px;
+  /* 让工具栏的固有宽度也计入选择器的完整宽度，玻璃和按钮共用同一列。 */
+  flex: none;
+  inline-size: 170px;
 }
 
 /* 地图切换触发器沿用共享选择控件，按左上主控加大命中区。 */
@@ -577,7 +659,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   }
 
   .map-switcher {
-    flex-basis: 112px;
+    inline-size: 112px;
   }
 
   .map-switcher :deep(.select-trigger) {

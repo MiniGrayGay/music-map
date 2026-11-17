@@ -136,43 +136,77 @@ export class DetailTiles {
   }
 
   uploadTile(key, image) {
-    let slot = this.slots.size;
-    if (slot >= this.capacity) {
-      const expired = [...this.slots.keys()].find((other) => !this.visible.has(other));
+    let expired;
+    let slot = 0;
+    if (this.slots.size >= this.capacity) {
+      expired = [...this.slots.keys()].find((other) => !this.visible.has(other));
       if (expired === undefined) return;
       slot = this.slots.get(expired);
+    } else {
+      const used = new Set(this.slots.values());
+      while (used.has(slot)) slot += 1;
+    }
+    try {
+      this.writeTile(slot, image);
+    } catch (error) {
+      this.gl.activeTexture(this.gl.TEXTURE0);
+      if (expired !== undefined) {
+        this.slots.delete(expired);
+        this.lookup[expired] = 0;
+        this.uploadLookup();
+        this.invalidate();
+      }
+      throw error;
+    }
+    if (expired !== undefined) {
       this.slots.delete(expired);
       this.lookup[expired] = 0;
     }
-    const {gl, textures} = this;
-    gl.activeTexture(gl.TEXTURE0 + textures.atlasUnit);
-    gl.bindTexture(gl.TEXTURE_2D_ARRAY, textures.atlas);
-    if (!this.allocated) {
-      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, MIP_LEVELS, gl.RGBA8, TILE, TILE, this.capacity);
-      this.allocated = true;
-    }
-    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, slot, TILE, TILE, 1, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    this.updateMipmaps(slot);
     this.slots.set(key, slot);
     this.lookup[key] = slot + 1;
     this.uploadLookup();
     this.invalidate();
   }
 
-  updateMipmaps(slot) {
+  writeTile(slot, image) {
     const {gl, textures} = this;
-    this.mipRead ??= gl.createFramebuffer();
-    this.mipDraw ??= gl.createFramebuffer();
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.mipRead);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.mipDraw);
-
-    // 逐级缩小刚上传的一张瓦片，其它数组层沿用原来的 mip。
-    for (let level = 1, size = TILE; level < MIP_LEVELS; level += 1, size /= 2) {
-      gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, textures.atlas, level - 1, slot);
-      gl.framebufferTextureLayer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, textures.atlas, level, slot);
-      gl.blitFramebuffer(0, 0, size, size, 0, 0, size / 2, size / 2, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+    gl.activeTexture(gl.TEXTURE0 + textures.atlasUnit);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, textures.atlas);
+    if (!this.allocated) {
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, MIP_LEVELS, gl.RGBA8, TILE, TILE, this.capacity);
+      // The map also uploads base textures on this context. A queued error
+      // from one of those uploads must not trigger another immutable allocation.
+      if (gl.getError() !== gl.NO_ERROR
+        && !gl.getTexParameter(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_IMMUTABLE_FORMAT)) {
+        throw new Error('Cannot allocate tile texture array');
+      }
+      this.allocated = true;
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // Generate each tile's mip chain in a 2D staging texture. The read
+    // framebuffer never attaches the texture array being written.
+    if (!this.stagingTexture) {
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, MIP_LEVELS, gl.RGBA8, TILE, TILE);
+      if (gl.getError() !== gl.NO_ERROR
+        && !gl.getTexParameter(gl.TEXTURE_2D, gl.TEXTURE_IMMUTABLE_FORMAT)) {
+        gl.deleteTexture(texture);
+        throw new Error('Cannot allocate tile staging texture');
+      }
+      this.stagingTexture = texture;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.stagingTexture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    this.stagingRead ??= gl.createFramebuffer();
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.stagingRead);
+    for (let level = 0, size = TILE; level < MIP_LEVELS; level += 1, size /= 2) {
+      gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D, this.stagingTexture, level);
+      gl.copyTexSubImage3D(gl.TEXTURE_2D_ARRAY, level, 0, 0, slot, 0, 0, size, size);
+    }
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    if (gl.getError() !== gl.NO_ERROR) throw new Error('Cannot upload complete tile mip chain');
   }
 
   uploadLookup() {

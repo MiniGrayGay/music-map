@@ -91,22 +91,21 @@ export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false}
     const closed = {x: button.left - panel.left + (button.width - width) / 2,
       y: button.top - panel.top + (button.height - height) / 2, width, height,
       radius: vanish ? 4 : Math.min(height / 2, parseFloat(getComputedStyle(trigger).borderRadius) || 14),
-      opacity: .8, visibility: 0};
+      visibility: 0};
     const opened = {x: 0, y: 0, width: panel.width, height: panel.height,
       radius: parseFloat(getComputedStyle(element).borderRadius) || 16,
-      opacity: 1, visibility: 1};
+      visibility: 1};
     const offsetX = content.left - panel.left;
     const offsetY = content.top - panel.top;
     const glass = element.querySelector(':scope > .liquid-glass');
     const live = glass.getBoundingClientRect();
-    const glassOpacity = Number(getComputedStyle(glass).opacity);
-    const bodyOpacity = Number(getComputedStyle(body).opacity);
-    // 中断续接：两种方向都从玻璃/正文的实际透明度与当前矩形出发，不重置。
-    const resumed = closingAnimations && {
+    const current = {
       x: live.left - panel.left, y: live.top - panel.top,
-      width: live.width, height: live.height, radius: opened.radius,
-      opacity: glassOpacity, visibility: bodyOpacity,
+      width: live.width, height: live.height,
+      radius: parseFloat(getComputedStyle(glass).borderRadius) || opened.radius,
+      visibility: Number(getComputedStyle(body).opacity),
     };
+    const interrupted = Boolean(closingAnimations);
     stopClosing();
 
     function clip(x, y, w, h, radius) {
@@ -121,27 +120,28 @@ export function useAnchoredPanel(anchor, {name = 'liquid-panel', vanish = false}
       return;
     }
 
-    // 开关整体交给合成器：玻璃只做 transform 平移缩放与 opacity，正文只做
-    // clip/opacity 同步，固定几何，避免逐帧布局与逐帧重光栅。桌面与触屏
-    // 同一路径，滤镜全程保持静止态不变，收尾不再切换。
+    // 玻璃始终直接采样地图。透明度动画只作用于正文，避免创建背板根而隔断采样。
     element.dataset.liquidMorph = '';
     element.classList.toggle(`${name}-enter-active`, opening);
     element.classList.toggle(`${name}-leave-active`, !opening);
-    const from = opening ? resumed ?? closed
-      : {x: live.left - panel.left, y: live.top - panel.top,
-        width: live.width, height: live.height, radius: opened.radius,
-        opacity: glassOpacity, visibility: bodyOpacity};
-    const to = opening ? opened : {...closed, opacity: 0, visibility: 0};
+    const from = opening && !interrupted ? closed : current;
+    const to = opening ? opened : closed;
     const timing = {duration: 290, easing: 'cubic-bezier(0.32, 0.72, 0.25, 1)', fill: 'both'};
-    const glassFrame = ({x, y, width: w, height: h, opacity}) => ({transformOrigin: '0 0',
-      transform: `translate(${pixels(x)}, ${pixels(y)}) scale(${w / panel.width}, ${h / panel.height})`,
-      opacity});
+    const glassFrame = ({x, y, width: w, height: h, radius}) => ({
+      left: pixels(x), top: pixels(y), width: pixels(w), height: pixels(h), borderRadius: pixels(radius),
+    });
     const glassFlight = glass.animate([glassFrame(from), glassFrame(to)], timing);
     const bodyFlight = body.animate([
-      {clipPath: clip(from.x, from.y, from.width, from.height, from.radius), opacity: from.visibility},
-      {clipPath: clip(to.x, to.y, to.width, to.height, to.radius), opacity: to.visibility},
+      {clipPath: clip(from.x, from.y, from.width, from.height, from.radius)},
+      {clipPath: clip(to.x, to.y, to.width, to.height, to.radius)},
     ], timing);
-    closingAnimations = [glassFlight, bodyFlight];
+    // Bring in the labels once the glass is wide enough to display them.
+    const contentTiming = opening
+      ? {duration: 160, delay: 130, easing: 'ease-out', fill: 'both'}
+      : {duration: 105, easing: 'ease-out', fill: 'both'};
+    const contentFlight = body.animate([{opacity: from.visibility}, {opacity: to.visibility}],
+      contentTiming);
+    closingAnimations = [glassFlight, bodyFlight, contentFlight];
     const batch = closingAnimations;
     glassFlight.onfinish = () => {
       if (glassFlight.playState !== 'finished' || closingAnimations !== batch) return;

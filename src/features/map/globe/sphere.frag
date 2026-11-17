@@ -32,13 +32,16 @@ const float PI = 3.14159265359;
 
 vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
   // 按当前像素覆盖的纹素范围，从已加载瓦片的 mip 层采样。
+  vec4 native = vec4(0.);
   if (u_nativeSize.x > 0.) {
     vec2 p = clamp(uv * u_nativeSize, vec2(.5), u_nativeSize - .5);
     ivec2 tile = ivec2(floor(p / 512.));
     float layer = texelFetch(u_nativeMap, tile, 0).r * 255. - 1.;
     if (layer >= -.01) {
       vec2 local = clamp(p - vec2(tile) * 512., .5, 511.5) / 512.;
-      return textureGrad(u_nativeAtlas, vec3(local, round(layer)), dx * (u_nativeSize / 512.), dy * (u_nativeSize / 512.)).rgb;
+      native = textureGrad(u_nativeAtlas, vec3(local, round(layer)),
+        dx * (u_nativeSize / 512.), dy * (u_nativeSize / 512.));
+      if (native.a >= .999) return native.rgb;
     }
   }
   vec3 base = textureGrad(u_atlas, clamp(uv, 0., 1.), dx, dy).rgb;
@@ -48,10 +51,12 @@ vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
     float layer = texelFetch(u_detailMap, tile, 0).r * 255. - 1.;
     if (layer >= -.01) {
       vec2 local = clamp(pixelPos - vec2(tile) * 512., .5, 511.5) / 512.;
-      return textureGrad(u_detailAtlas, vec3(local, round(layer)), dx * (u_detailSize / 512.), dy * (u_detailSize / 512.)).rgb;
+      vec4 detail = textureGrad(u_detailAtlas, vec3(local, round(layer)),
+        dx * (u_detailSize / 512.), dy * (u_detailSize / 512.));
+      base = mix(base, detail.rgb, detail.a);
     }
   }
-  return base;
+  return mix(base, native.rgb, native.a);
 }
 
 vec3 applyGroundPatch(vec3 base, vec2 uv, vec2 dx, vec2 dy) {

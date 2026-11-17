@@ -146,7 +146,7 @@ function footprintData(rings, center, span, floor) {
   return new Float32Array(lines);
 }
 
-export function mountReliefPreview(canvas) {
+export function mountReliefPreview(canvas, active = true) {
   // The dots have shader-based coverage, so the transparent dock needs no MSAA resolve.
   const gl = canvas.getContext('webgl2', {alpha: true, depth: true, premultipliedAlpha: true, antialias: false});
   if (!gl) throw new Error('WebGL 2 不可用');
@@ -180,7 +180,7 @@ export function mountReliefPreview(canvas) {
   let fit;
   let normalizedSpacing = null;
   const schedule = () => {
-    if (!frame && !document.hidden && !gl.isContextLost()) frame = requestAnimationFrame(draw);
+    if (active && !frame && !document.hidden && !gl.isContextLost()) frame = requestAnimationFrame(draw);
   };
 
   function draw(now) {
@@ -257,6 +257,15 @@ export function mountReliefPreview(canvas) {
   document.addEventListener('visibilitychange', onVisibility);
   motion.addEventListener('change', onMotionChange);
   return {
+    setActive(value) {
+      active = value;
+      lastDraw = null;
+      if (active) schedule();
+      else {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+    },
     setPoints(source, rings = [], spacing = null) {
       if (source) {
         const fitted = fitPoints(source, rings);

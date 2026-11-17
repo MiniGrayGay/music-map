@@ -18,10 +18,14 @@ const props = defineProps({
   activeZone: {type: Object, default: null},
   availableMaps: {type: Array, required: true},
   searchHost: {type: HTMLElement, default: null},
+  reliefTarget: {type: HTMLElement, default: null},
+  reliefReady: {type: Boolean, default: false},
   mobileDevice: {type: Boolean, default: false},
   smoothBoundaries: {type: Boolean, default: true},
 });
-const emit = defineEmits(['view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame']);
+const emit = defineEmits([
+  'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame', 'relief-reveal',
+]);
 const atlas = import.meta.glob('./globe/atlas/*', {eager: true, query: '?url', import: 'default'});
 const chart = {
   Teyvat: {home: [.43, -.16], span: [4.03, 2.43], sea: [21, 60, 76], oceanRelief: true},
@@ -303,6 +307,14 @@ async function showWorld() {
 
 watch([() => props.mapName, zones], showWorld);
 watch(() => props.smoothBoundaries, (enabled) => globe?.setBoundarySmoothing(enabled));
+watch(() => props.reliefReady, () => globe?.requestFrame(), {flush: 'post'});
+watch(() => props.reliefTarget, (target, _, onCleanup) => {
+  globe?.requestFrame();
+  if (!target) return;
+  const observer = new ResizeObserver(() => globe?.requestFrame());
+  observer.observe(target);
+  onCleanup(() => observer.disconnect());
+}, {flush: 'post'});
 watch(() => props.activeZone, (zone) => {
   globe?.setPlaying(Boolean(zone));
   if (!zone && globe?.selected) clearSelection();
@@ -313,9 +325,22 @@ onMounted(() => {
       lunarLayer: lunarLayer.value,
       signals: signals.value, stars: stars.value, labels: labels.value, fragment,
       onFrame: (element) => emit('canvas-frame', element),
-      labelObstacles: () => Array.from(document.querySelectorAll(
-        '.app-controls, .map-toolbar-row, .layer-picker .panel[data-panel-open], .globe-search, .music-player:not([inert]), .relief-dock',
-      ), (element) => element.getBoundingClientRect()),
+      onReliefReveal: key => emit('relief-reveal', key),
+      reliefTarget(key) {
+        const target = props.reliefTarget;
+        return props.reliefReady && target?.dataset.reliefZone === String(key) ? target : null;
+      },
+      labelObstacles(includeRelief = false) {
+        const overlays = document.querySelectorAll(
+          '.app-controls, .map-toolbar-row, .layer-picker .panel[data-panel-open], .globe-search, .music-player:not([inert])',
+        );
+        const bounds = Array.from(overlays, element => element.getBoundingClientRect());
+        const relief = props.reliefTarget;
+        if (includeRelief && relief?.hasAttribute('data-relief-placed')) {
+          bounds.push(relief.getBoundingClientRect());
+        }
+        return bounds.filter(rect => rect.width > 0 && rect.height > 0);
+      },
       onSelect: select, onView(canZoomIn, canZoomOut, magnified) {
         const key = [installedMap, canZoomIn, canZoomOut, magnified].join(':');
         if (key === lastView) return;

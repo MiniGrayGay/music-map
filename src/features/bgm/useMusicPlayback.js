@@ -255,11 +255,17 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   }
 
   async function start(node) {
+    const attempt = ++playRequest;
+    const followCheck = toyFollow.pendingPromptCheck();
+    if (followCheck) {
+      pending.value = true;
+      await followCheck;
+      if (attempt !== playRequest || !requested.value) return;
+    }
     if (!toyFollow.beforePlay()) {
       pause();
       return;
     }
-    const attempt = ++playRequest;
     pending.value = true;
     failure.value = '';
     try {

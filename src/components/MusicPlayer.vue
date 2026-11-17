@@ -78,8 +78,11 @@ const {
 
 function dismissFollowPrompt() {
   followAuthor.value = null;
-  play();
 }
+
+watch(followAuthor, (next, previous) => {
+  if (!next && previous) play();
+}, {flush: 'sync'});
 
 const repeatLabel = computed(() => repeatMode.value === 'one' ? '单曲循环' : '列表循环');
 

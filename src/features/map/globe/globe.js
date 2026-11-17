@@ -1,6 +1,6 @@
 import {DetailTiles, detailTextures} from './detail-tiles.js';
 import {drawGlobeBoundaries} from './boundaries.js';
-import {frameZone} from './framing.js';
+import {frameZone, placeReliefCard} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
 import {
@@ -26,19 +26,54 @@ function overlaps(a, b, padding = 0) {
 }
 
 function roundElevationRing(points) {
-  return points.flatMap(([x, y], index) => {
+  const outline = [];
+  const sharp = [];
+  const area = points.reduce((sum, [x, y], index) => {
+    const [px, py] = points.at(index - 1);
+    return sum + px * y - py * x;
+  }, 0);
+  const winding = Math.sign(area);
+  for (const [index, point] of points.entries()) {
+    const [x, y] = point;
     const [ax, ay] = points.at(index - 1);
     const [bx, by] = points[(index + 1) % points.length];
     const a = Math.hypot(ax - x, ay - y);
     const b = Math.hypot(bx - x, by - y);
+    if (!a || !b) {
+      outline.push(point);
+      continue;
+    }
+    const ux = (ax - x) / a;
+    const uy = (ay - y) / a;
+    const vx = (bx - x) / b;
+    const vy = (by - y) / b;
+    const angle = ux * vx + uy * vy;
     const trim = Math.min(9, a * .25, b * .25);
-    if (trim < .5 || Math.abs((ax - x) * (by - y) - (ay - y) * (bx - x)) < a * b * .10) return [[x, y]];
-    const before = [x + (ax - x) * trim / a, y + (ay - y) * trim / a];
-    const after = [x + (bx - x) * trim / b, y + (by - y) * trim / b];
-    return [0, .25, .5, .75, 1].map((t) => before.map((value, axis) =>
-      (1 - t) ** 2 * value + 2 * (1 - t) * t * (axis ? y : x) + t * t * after[axis],
-    ));
-  });
+    if (angle < -.995) {
+      outline.push(point);
+      continue;
+    }
+    // Retain fine bends and needle tips. The normal bisects the two edge normals.
+    if (trim < .5 || angle > .5) {
+      outline.push(point);
+      if (winding && angle > -.94 && !sharp.some((corner) =>
+        Math.hypot(x - corner.x, y - corner.y) < 10)) {
+        const tx = vx - ux;
+        const ty = vy - uy;
+        const length = Math.hypot(tx, ty);
+        const nx = length > .01 ? ty / length : vy;
+        const ny = length > .01 ? -tx / length : -vx;
+        sharp.push({x, y, nx: nx * winding, ny: ny * winding});
+      }
+      continue;
+    }
+    for (const t of [0, .25, .5, .75, 1]) {
+      const before = (1 - t) ** 2 * trim;
+      const after = t ** 2 * trim;
+      outline.push([x + before * ux + after * vx, y + before * uy + after * vy]);
+    }
+  }
+  return {outline, sharp};
 }
 
 function sky(canvas, width, height, ratio) {
@@ -179,8 +214,10 @@ function renderSphere(renderer, canvas, view) {
 }
 
 export class Globe {
-  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment, labelObstacles, onSelect, onView, onFrame, onContextLost}) {
-    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels, labelObstacles, onSelect, onView, onFrame, onContextLost});
+  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment,
+    labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost}) {
+    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels,
+      labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost});
     Object.assign(this, initialize(canvas, fragment));
     this.compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
     // 资源紧张时浏览器直接收走上下文：交给上层切换到 2D 平面地图，而不是停在白屏。
@@ -247,9 +284,7 @@ export class Globe {
     this.zones = zones;
     this.boundaryGeometry = null;
     this.boundaryRevealedAt = null;
-    this.selected = null;
-    this.raise = 0;
-    this.raiseStarted = null;
+    this.select(null);
     this.flight = null;
     this.velocity = null;
     [this.lon, this.lat] = world.home;
@@ -401,8 +436,12 @@ export class Globe {
 
   select(zone) {
     if (zone !== this.selected) {
+      this.hideReliefCard();
       this.raise = 0;
       this.raiseStarted = null;
+      this.reliefLeadStarted = null;
+      this.reliefEdge = null;
+      this.reliefRevealed = false;
     }
     this.selected = zone;
     this.lockTime = performance.now();
@@ -746,6 +785,7 @@ export class Globe {
     if (orbit) this.drawOrbit(radius);
     drawGlobeBoundaries(this, time, radius, basis);
     const lift = this.drawRaisedRegion(radius, basis, time);
+    if (!lift) this.hideReliefCard();
     const visible = [];
     for (const region of this.world.regions) {
       const [px, py, depth] = projectAtlas(this.world, basis, this.zoom, region.uv, region.vector);
@@ -816,7 +856,7 @@ export class Globe {
     const top = new Path2D();
     const sides = new Path2D();
     let left = Infinity, right = -Infinity, topY = Infinity, bottom = -Infinity;
-    for (const ring of rings) {
+    for (const {outline: ring} of rings) {
       footprint.moveTo(...ring[0]);
       top.moveTo(ring[0][0], ring[0][1] - lift);
       for (const [index, [x, y]] of ring.entries()) {
@@ -867,7 +907,132 @@ export class Globe {
     ctx.strokeStyle = '#e2f9e7d8';
     ctx.stroke(top);
     ctx.restore();
+    if (this.world.id === 'Teyvat') {
+      this.drawElevationCorners(rings, lift);
+      this.drawReliefLeads(rings, lift, time);
+    }
     return lift;
+  }
+
+  drawElevationCorners(rings, lift) {
+    const {context: ctx} = this;
+    ctx.save();
+    ctx.globalAlpha = this.raise;
+    ctx.strokeStyle = '#f0fbffd6';
+    ctx.fillStyle = '#f0fbff';
+    ctx.lineWidth = .85;
+    for (const {sharp} of rings) {
+      for (const {x, y, nx, ny} of sharp) {
+        const top = y - lift;
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x + nx * 10, top + ny * 10);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, top, 1.45, 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  drawReliefLeads(rings, lift, time) {
+    if (this.raise < .5) return;
+    const key = this.selected.zone.key;
+    const target = this.reliefTarget?.(key);
+    if (!target) {
+      this.hideReliefCard();
+      return;
+    }
+
+    const {left, top} = this.canvas.getBoundingClientRect();
+    const points = rings.flatMap(({outline}) => outline).filter(([x, y]) =>
+      x > 1 && x < this.width - 1 && y - lift > 1 && y - lift < this.height - 1,
+    );
+    if (points.length < 2) {
+      this.hideReliefCard();
+      return;
+    }
+    const zone = {left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity};
+    for (const [x, y] of points) {
+      zone.left = Math.min(zone.left, x);
+      zone.right = Math.max(zone.right, x);
+      zone.top = Math.min(zone.top, y - lift);
+      zone.bottom = Math.max(zone.bottom, y - lift);
+    }
+    const controls = this.labelObstacles().map(rect => ({
+      left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
+    }));
+    const panel = placeReliefCard(zone, {width: target.offsetWidth, height: target.offsetHeight},
+      this, controls, this.reliefEdge);
+    if (!panel) {
+      this.hideReliefCard();
+      return;
+    }
+    const {edge, scale} = panel;
+    const horizontal = edge === 'top' || edge === 'bottom';
+    const start = horizontal ? zone.left : zone.top;
+    const end = horizontal ? zone.right : zone.bottom;
+    const span = horizontal ? panel.width : panel.height;
+    const panelStart = horizontal ? panel.left : panel.top;
+    const edgePosition = {top: panel.top, bottom: panel.bottom, left: panel.left, right: panel.right}[edge];
+    const candidates = points.map(([x, baseY]) => {
+      const y = baseY - lift;
+      const along = clamp(horizontal ? x : y, panelStart + span * .12, panelStart + span * .88);
+      const to = horizontal ? [along, edgePosition] : [edgePosition, along];
+      return {x, y, along, to, distance: Math.hypot(to[0] - x, to[1] - y)};
+    });
+    const closer = (best, candidate) => !best || candidate.distance < best.distance ? candidate : best;
+    const first = candidates.reduce(closer);
+    const separation = Math.min(34, span * .18, (end - start) * .2);
+    const second = candidates.reduce((best, candidate) => candidate !== first
+      && Math.abs(candidate.along - first.along) >= Math.max(4, separation)
+      ? closer(best, candidate) : best, null);
+    if (!second) {
+      this.hideReliefCard();
+      return;
+    }
+    const leadStart = Math.min(first.along, second.along) - panelStart;
+    const leadSpan = Math.abs(first.along - second.along);
+    this.reliefDock = target;
+    this.reliefEdge = edge;
+    target.dataset.reliefPlaced = '';
+    target.dataset.reliefEdge = edge;
+    target.style.transform = `translate(${panel.left}px, ${panel.top}px) scale(${scale})`;
+    target.style.setProperty('--relief-lead-start', `${100 * leadStart / span}%`);
+    target.style.setProperty('--relief-lead-span', `${100 * leadSpan / span}%`);
+
+    this.reliefLeadStarted ??= time;
+    const progress = this.reducedMotion.matches ? 1 : clamp((time - this.reliefLeadStarted) / 320, 0, 1);
+    const reach = 1 - (1 - progress) ** 2;
+    const {context: ctx} = this;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232, 249, 255, 0.68)';
+    ctx.fillStyle = '#f0fbff';
+    ctx.lineWidth = .85;
+    ctx.lineCap = 'round';
+    for (const {x, y, to: [endX, endY]} of [first, second]) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(interpolate(x, endX, reach), interpolate(y, endY, reach));
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+    if (progress < 1) {
+      this.requestFrame();
+    } else if (!this.reliefRevealed) {
+      this.reliefRevealed = true;
+      this.onReliefReveal?.(key);
+    }
+  }
+
+  hideReliefCard() {
+    if (!this.reliefDock) return;
+    delete this.reliefDock.dataset.reliefPlaced;
+    this.reliefDock = null;
   }
 
   drawLock(time, x, y) {
@@ -904,7 +1069,7 @@ export class Globe {
     const priority = ({region, active}) => active ? 3
       : (this.labelFor.get(region) === focus ? 2 : Number(this.labelFor.has(region)));
     const choices = visible.sort((a, b) => priority(b) - priority(a));
-    const placed = choices.length ? this.labelObstacles() : [];
+    const placed = choices.length ? this.labelObstacles(true) : [];
     const retained = new Set();
     const displayed = [];
     for (const item of choices) {
