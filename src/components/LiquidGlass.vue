@@ -9,8 +9,10 @@ const props = defineProps({
   light: {type: Number, default: 1},
 });
 
-const clear = computed(() => props.variant === 'clear');
+const lens = computed(() => props.variant === 'lens');
+const clear = computed(() => lens.value || props.variant === 'clear');
 const sourceRim = computed(() => props.rim && !clear.value);
+const refraction = computed(() => lens.value ? .18 : sourceRim.value ? 1 : .52);
 const filterId = useId();
 const map = ref(null);
 const glass = ref(null);
@@ -165,7 +167,8 @@ async function buildFilterInput() {
 
 <template>
   <div ref="glass" class="liquid-glass glass-surface"
-       :class="{'is-ready': map || !displacement, 'rimless': !sourceRim, 'liquid-glass--clear': clear}"
+       :class="{'is-ready': map || !displacement, 'rimless': !sourceRim,
+         'liquid-glass--clear': clear, 'liquid-glass--lens': lens}"
        :style="clear ? {'--liquid-glass-light': light} : undefined" aria-hidden="true">
     <svg v-if="displacement" class="filter-definitions">
       <defs>
@@ -181,7 +184,7 @@ async function buildFilterInput() {
           </feComponentTransfer>
           <feOffset in="SourceGraphic" dx="0" dy="0" result="CENTER_ORIGINAL" />
           <template v-for="channel in channels" :key="channel.name">
-            <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" :scale="channel.scale * (sourceRim ? 1 : .52)"
+            <feDisplacementMap in="SourceGraphic" in2="DISPLACEMENT_MAP" :scale="channel.scale * refraction"
                                xChannelSelector="R" yChannelSelector="B"
                                :result="channel.name + '_DISPLACED'" />
             <feColorMatrix :in="channel.name + '_DISPLACED'" type="matrix" :values="channel.matrix"
@@ -329,6 +332,37 @@ button:is(:hover, [aria-expanded='true']) > .liquid-glass--clear .clear-tint::af
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   content: '';
+}
+
+.liquid-glass--lens {
+  --liquid-glass-clear-backdrop: blur(2px) saturate(116%);
+}
+
+.liquid-glass--lens .rdev-pane {
+  box-shadow: 0 2px 8px rgb(3 19 24 / .18);
+}
+
+.liquid-glass--lens .clear-tint {
+  background:
+    radial-gradient(ellipse 71% 35% at 24% 1%, rgb(230 249 251 / .21), transparent 78%),
+    radial-gradient(ellipse 67% 47% at 83% 112%, rgb(162 229 240 / .17), transparent 88%);
+}
+
+.liquid-glass--lens .clear-tint::after {
+  background: radial-gradient(ellipse 70% 45% at 31% -2%, rgb(221 247 250 / .21), transparent 83%);
+}
+
+.liquid-glass--lens::after {
+  background: conic-gradient(from -65deg,
+    rgb(237 253 254 / .68), rgb(233 251 254 / .44) 53deg,
+    rgb(180 220 225 / .12) 116deg, rgb(190 238 247 / .42) 198deg,
+    rgb(159 207 215 / .15) 258deg, rgb(178 222 230 / .15) 304deg,
+    rgb(237 253 254 / .68));
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .liquid-glass--lens::after { transition: transform 260ms var(--ease-glass-in); }
+  button:hover:not(:disabled) > .liquid-glass--lens::after { transform: rotate(10deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

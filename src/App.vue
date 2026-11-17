@@ -45,6 +45,7 @@ const playerMotion = useAnchoredPanel(
   {name: 'glass-player', vanish: true},
 );
 const globeError = ref('');
+const mobileDevice = isMobileDevice();
 const showGlobe = computed(() => !layerModeActive.value && !globeError.value);
 const lunarResetLabel = computed(() => {
   if (!showGlobe.value || mapName.value !== 'MoonCanon') return '';
@@ -211,7 +212,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :class="{'app--mobile': mobileDevice}">
     <template v-if="mapData">
       <div ref="mapToolbar" class="map-toolbar">
         <div class="map-toolbar-row">
@@ -227,7 +228,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           <LayerPicker :app-canvas="activeMap.canvas" :viewport-rect="view.viewportRect" />
         </div>
       </div>
-      <div class="app-controls">
+      <div class="app-controls" :class="{'app-controls--globe': showGlobe}">
         <ZoomControls
           :can-zoom-in="view.canZoomIn"
           :can-zoom-out="view.canZoomOut"
@@ -262,6 +263,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         :active-zone="activeZone"
         :available-maps="mapOptions"
         :search-host="mapToolbar"
+        :mobile-device="mobileDevice"
         :smooth-boundaries="smoothBoundaries"
         @canvas-frame="receiveBackdrop"
         @view="(state) => Object.assign(view, state)"
@@ -415,12 +417,18 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
   .app {
-    --mobile-top: max(12px, env(safe-area-inset-top));
-    --mobile-left: max(12px, env(safe-area-inset-left));
-    --mobile-right: max(12px, env(safe-area-inset-right));
-    --mobile-tools-top: calc(var(--mobile-top) + 52px);
+    /* 移动端控件共享外边距、命中尺寸与行距。 */
+    --mobile-edge: 12px;
+    --mobile-top: max(var(--mobile-edge), env(safe-area-inset-top));
+    --mobile-left: max(var(--mobile-edge), env(safe-area-inset-left));
+    --mobile-right: max(var(--mobile-edge), env(safe-area-inset-right));
+    --mobile-control-size: 44px;
+    --mobile-row-gap: var(--space-1);
+    --mobile-tools-top: calc(var(--mobile-top) + var(--mobile-control-size)
+      + var(--mobile-row-gap));
     --mobile-floor-limit: min(22dvh, 148px);
-    --player-top-clearance: calc(var(--mobile-tools-top) + 52px);
+    --player-top-clearance: calc(var(--mobile-tools-top) + var(--mobile-control-size)
+      + var(--mobile-row-gap));
   }
 
   .app-controls {
@@ -445,6 +453,11 @@ onBeforeUnmount(() => releasePlayerEscape?.());
     padding: 0;
   }
 
+  .app-controls :deep(.zoom-controls button) {
+    width: var(--mobile-control-size);
+    height: var(--mobile-control-size);
+  }
+
   .app :deep(.layer-picker .bar) {
     gap: 4px;
     padding: 0;
@@ -453,6 +466,11 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   .app :deep(.layer-picker .mode),
   .app :deep(.layer-picker .group) {
     padding-inline: 8px;
+  }
+
+  /* 左侧模式控件与搜索框共用同源 44px 命中区。 */
+  .app :deep(.layer-picker .mode) {
+    height: var(--mobile-control-size);
   }
 
   .app :deep(.layer-picker .group-scroll) {
@@ -548,9 +566,14 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   .map-toolbar {
     --map-toolbar-left: var(--mobile-left);
     --map-toolbar-right: var(--mobile-right);
-    --map-toolbar-row-height: 44px;
-    --map-toolbar-row-gap: var(--space-1);
+    --map-toolbar-row-height: var(--mobile-control-size);
+    --map-toolbar-row-gap: var(--mobile-row-gap);
     top: var(--mobile-top);
+  }
+
+  .app:not(.app--mobile):has(.globe-surface) .map-toolbar :deep(.globe-search) {
+    max-inline-size: calc(100dvw - var(--mobile-left) - var(--mobile-right)
+      - var(--mobile-control-size) - var(--mobile-row-gap));
   }
 
   .map-switcher {
@@ -558,9 +581,13 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   }
 
   .map-switcher :deep(.select-trigger) {
-    min-height: 44px;
+    min-height: var(--mobile-control-size);
     font-size: 14px;
   }
+}
+
+.app--mobile .app-controls--globe {
+  display: none;
 }
 
 .app-message {

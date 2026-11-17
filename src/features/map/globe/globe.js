@@ -14,6 +14,7 @@ const MIN_ZOOM = .53;
 const MAX_ZOOM = 18;
 const LUNAR_TRANSITION_DURATION = 720;
 const SPIN_RATE = TAU / 165000;
+const teyvatHomeCenter = [.5, .5];
 const orbitMajor = orbitDirection(0);
 const orbitMinor = orbitDirection(Math.PI / 2);
 const orbitRoll = Math.atan2(-orbitMajor[1], orbitMajor[0]);
@@ -270,7 +271,7 @@ export class Globe {
     snapshot.height = this.canvas.height;
     snapshot.getContext('2d').drawImage(this.canvas, 0, 0);
     return {x: this.cx, y: this.cy, radius: this.radius * this.zoom,
-      moon: this.moonLink.hidden ? null : this.moonPose};
+      moon: this.moonPose?.visible ? this.moonPose : null};
   }
 
   stopLunarTransition() {
@@ -380,7 +381,7 @@ export class Globe {
     this.height = height;
     this.ratio = ratio;
     const phone = width <= 650;
-    this.homeCenter = [phone ? .46 : width <= 900 ? .362 : .374, phone ? .305 : .485];
+    this.otherHomeCenter = [phone ? .46 : width <= 900 ? .362 : .374, phone ? .305 : .485];
     this.radius = Math.min(width * (phone ? .428 : .326), height * (phone ? .25 : .368));
     for (const canvas of [this.canvas, this.satellite, this.signals, this.stars]) {
       canvas.width = Math.max(1, Math.round(width * ratio));
@@ -392,6 +393,7 @@ export class Globe {
     this.requestFrame();
   }
 
+  get homeCenter() { return this.world?.id === 'Teyvat' ? teyvatHomeCenter : this.otherHomeCenter; }
   get cx() { return this.width * (this.center ?? this.homeCenter)[0]; }
   get cy() { return this.height * (this.center ?? this.homeCenter)[1]; }
   get magnified() { return Math.max(this.zoom, this.zoomTarget) > 1.01; }
@@ -665,7 +667,7 @@ export class Globe {
   drawSatellite(time, radius, active) {
     this.satellite.hidden = !active;
     if (!active) {
-      this.moonLink.hidden = true;
+      if (this.moonLink) this.moonLink.hidden = true;
       this.orbitTime = null;
       this.moonPose = null;
       return;
@@ -673,7 +675,8 @@ export class Globe {
     if (this.orbitTime !== null && time - this.orbitTime < 32) return;
     if (this.moonRenderer?.gl.isContextLost()) {
       this.satellite.hidden = true;
-      this.moonLink.hidden = true;
+      if (this.moonLink) this.moonLink.hidden = true;
+      this.moonPose = null;
       return;
     }
     this.orbitTime = time;
@@ -683,20 +686,24 @@ export class Globe {
     const {ratio} = this;
     const [cx, cy, depth, radial] = this.orbitPoint(angle, radius);
     const size = this.moonRadius(radius, depth);
-    this.moonPose = {x: cx, y: cy, radius: size};
     const distance = Math.hypot(cx - this.cx, cy - this.cy);
+    const masked = depth > 0 && distance < radius + size * .32;
+    const visible = !masked && cx >= size && cx <= this.width - size * .5
+      && cy >= 55 && cy <= this.height - 68;
+    this.moonPose = {x: cx, y: cy, radius: size, visible};
     renderSphere(this.moonRenderer, this.satellite, {
       cx, cy, ratio, radius: size, world: this.moon,
       basis: lockedMoonBasis(radial),
       occluder: depth > 0 ? [this.cx * ratio, this.satellite.height - this.cy * ratio, radius * ratio] : [0, 0, 0],
     });
-    const masked = depth > 0 && distance < radius + size * .32;
-    this.moonLink.hidden = masked || cx < size || cx > this.width - size * .5 || cy < 55 || cy > this.height - 68;
-    if (!this.moonLink.hidden) {
-      this.lastVisibleMoonAngle = angle;
-      this.moonLink.style.left = cx + 'px';
-      this.moonLink.style.top = cy + 'px';
-      this.moonLink.style.setProperty('--moon-size', Math.max(28, size * 2) + 'px');
+    if (visible) this.lastVisibleMoonAngle = angle;
+    if (this.moonLink) {
+      this.moonLink.hidden = !visible;
+      if (visible) {
+        this.moonLink.style.left = cx + 'px';
+        this.moonLink.style.top = cy + 'px';
+        this.moonLink.style.setProperty('--moon-size', Math.max(28, size * 2) + 'px');
+      }
     }
   }
 

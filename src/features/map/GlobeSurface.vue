@@ -18,6 +18,7 @@ const props = defineProps({
   activeZone: {type: Object, default: null},
   availableMaps: {type: Array, required: true},
   searchHost: {type: HTMLElement, default: null},
+  mobileDevice: {type: Boolean, default: false},
   smoothBoundaries: {type: Boolean, default: true},
 });
 const emit = defineEmits(['view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame']);
@@ -67,6 +68,8 @@ const moonZoneAnchors = computed(() => {
   return anchors;
 });
 const catalog = computed(() => props.availableMaps.flatMap(({value, label}) => {
+  if (props.mobileDevice && value !== props.mapName
+    && (value === 'MoonCanon' || props.mapName === 'MoonCanon')) return [];
   const seen = new Set();
   return musicView(props.bgm, value, [], false).flatMap(({key, name, musicState}) => {
     if (value === 'MoonCanon' && !moonZoneAnchors.value.has(key)) return [];
@@ -354,8 +357,8 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
     <canvas ref="lunarLayer" class="lunar-transition" aria-hidden="true" hidden />
     <canvas ref="signals" aria-hidden="true" />
     <div ref="labels" class="globe-labels" role="group" aria-label="提瓦特地区" />
-    <button ref="moonLink" type="button" class="moon-link" aria-label="进入霜月" title="进入霜月"
-            hidden @click="emit('select-map', 'MoonCanon')" />
+    <button v-if="!mobileDevice" ref="moonLink" type="button" class="moon-link"
+            aria-label="进入霜月" title="进入霜月" hidden @click="emit('select-map', 'MoonCanon')" />
     <p v-if="status" class="globe-status" role="status">{{ status }}</p>
     <Teleport v-if="searchHost" :to="searchHost">
       <form ref="searchForm" class="globe-search"
@@ -435,7 +438,17 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   padding: 0; background: transparent; color: #dbe6f5; cursor: pointer;
 }
 .moon-link:focus-visible { outline: 2px solid #e5eadd; outline-offset: 4px; }
-.globe-status { position: absolute; top: 49%; left: 37%; translate: -50% -50%; color: #e1eddf; margin: 0; }
+.globe-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  inline-size: max-content;
+  max-inline-size: calc(100% - 48px);
+  margin: 0;
+  color: #e1eddf;
+  text-align: center;
+}
 .globe-search { contain: inline-size; margin: 0; }
 .globe-search-field, .globe-results {
   width: 100%; border-radius: var(--radius-control);
@@ -469,7 +482,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   }
 
   .globe-search input {
-    height: 44px;
+    height: var(--mobile-control-size, 44px);
     padding-inline-start: 44px;
     font-size: 16px;
   }

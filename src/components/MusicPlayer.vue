@@ -3,11 +3,13 @@ import {computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef
 import {resolveRegionalQueue} from '../features/bgm/regionalPlaylist.js';
 import {albumForTrack} from '../features/bgm/albumCovers.js';
 import {useMusicPlayback} from '../features/bgm/useMusicPlayback.js';
+import {useToyFollow} from '../features/bgm/toyFollow.js';
 import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
 import LiquidGlass from './LiquidGlass.vue';
 import RevealPanel from './RevealPanel.vue';
 import SegmentedChoice from './SegmentedChoice.vue';
 import {pushEscapeHandler} from './escapeStack.js';
+import ToyFollowPrompt from './ToyFollowPrompt.vue';
 
 const props = defineProps({
   zone: {type: Object, required: true},
@@ -66,11 +68,18 @@ const browseMatchesPlayback = computed(() => browseMusic.value.conditions.length
   && browseMusic.value.conditions.every(({id, value}) =>
     music.value.conditions.some((condition) => condition.id === id && condition.value === value)));
 
+const toyFollow = useToyFollow(props.preview);
+const {prompt: followAuthor} = toyFollow;
 const {
-  audio, volume, muted, repeatMode, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
+  audio, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
   copyFailureReport,
-  play, pause, seek, readPosition, onPause, onPlaying, onEnded, onError,
-} = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume});
+  play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onEnded, onError,
+} = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume, toyFollow});
+
+function dismissFollowPrompt() {
+  followAuthor.value = null;
+  play();
+}
 
 const repeatLabel = computed(() => repeatMode.value === 'one' ? '单曲循环' : '列表循环');
 
@@ -314,8 +323,7 @@ function reactToControl(event) {
   if (systemVolume.value || !(event.target instanceof Element)) return;
   const clicked = event.type === 'click';
   const control = event.target.closest(clicked ? 'button' : 'input[type="range"]');
-  if (!control || control.disabled || control.getAttribute('aria-label') === '关闭播放器') return;
-  if (control === detailsToggle.value || control === volumeToggle.value) return;
+  if (!control || control.disabled || control.matches('.icon-button:not(.play-toggle)')) return;
   glass.value?.reactAt(control, clicked && event.detail ? event : null);
 }
 
@@ -348,7 +356,7 @@ onBeforeUnmount(() => {
 <template>
   <section
     class="music-player"
-    :class="{'music-player--preview': preview, 'music-player--system-volume': systemVolume}"
+    :class="{'music-player--preview': preview}"
     aria-label="区域音乐播放器"
     @pointerdown.stop
     @click.capture="reactToControl"
@@ -395,7 +403,6 @@ onBeforeUnmount(() => {
           title="关闭播放器"
           @click="emit('close')"
         >
-          <FluidSourceSurface :orbit="systemVolume" />
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
         </button>
       </header>
@@ -430,18 +437,19 @@ onBeforeUnmount(() => {
             :aria-controls="volumeOpen ? `${uid}-volume` : undefined"
             @click="volumeOpen = !volumeOpen"
           >
-            <FluidSourceSurface />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 9v6h4l5 4V5L7 9H3Z" />
               <path v-if="muted || volume === 0" d="m16 10 5 5m0-5-5 5" />
               <path v-else d="M16 9a4 4 0 0 1 0 6m2.7-8.6a8 8 0 0 1 0 11.2" />
             </svg>
           </button>
-          <RevealPanel :open="volumeOpen" class="volume-reveal" @shown="focusVolume">
+          <Transition name="volume-float" @after-enter="focusVolume">
             <div
+              v-show="volumeOpen"
               :id="`${uid}-volume`"
               ref="volumePopover"
               class="volume-popover volume-panel"
+              :inert="!volumeOpen"
               role="group"
               aria-label="音量设置"
             >
@@ -470,7 +478,7 @@ onBeforeUnmount(() => {
               >
               <span class="volume-value">{{ Math.round(volume * 100) }}%</span>
             </div>
-          </RevealPanel>
+          </Transition>
         </div>
 
         <div class="playback">
@@ -482,7 +490,6 @@ onBeforeUnmount(() => {
             :disabled="activeIndex === 0"
             @click="advance(-1)"
           >
-            <FluidSourceSurface :orbit="systemVolume" />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 4v16m16-16L8 12l12 8V4Z" />
             </svg>
@@ -495,7 +502,7 @@ onBeforeUnmount(() => {
             :disabled="!track"
             @click="canPause ? pause() : play()"
           >
-            <FluidSourceSurface :orbit="systemVolume" />
+            <LiquidGlass variant="lens" />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path v-if="canPause" d="M9 6v12m6-12v12" stroke-width="2.5" />
               <path v-else d="M9 5.8 19 12 9 18.2V5.8Z" fill="currentColor" stroke="none" />
@@ -509,7 +516,6 @@ onBeforeUnmount(() => {
             :disabled="activeIndex >= tracks.length - 1"
             @click="advance(1)"
           >
-            <FluidSourceSurface :orbit="systemVolume" />
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M20 4v16M4 4l12 8-12 8V4Z" />
             </svg>
@@ -524,7 +530,6 @@ onBeforeUnmount(() => {
           :data-mode="repeatMode"
           @click="toggleRepeat"
         >
-          <FluidSourceSurface :orbit="systemVolume" />
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m16 4 4 3-4 3M4 11v-1a3 3 0 0 1 3-3h13m-12 7-4 3 4 3M20 13v1a3 3 0 0 1-3 3H4" />
             <path v-if="repeatMode === 'one'" data-repeat-one d="M10.25 10.8 12 9.5V15m-1.65 0h3.3" />
@@ -540,7 +545,6 @@ onBeforeUnmount(() => {
           :aria-controls="detailsOpen ? `${uid}-details` : undefined"
           @click="toggleDetails"
         >
-          <FluidSourceSurface :orbit="systemVolume" />
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 5h15M4 10h10M4 15h7m6 1.5V10l4-1" />
             <ellipse cx="15.5" cy="17" rx="1.5" ry="1.1" />
@@ -608,15 +612,17 @@ onBeforeUnmount(() => {
     <audio
       ref="audio"
       preload="metadata"
-      :loop="repeatMode === 'one'"
+      :loop="nativeLoop"
       @loadedmetadata="readPosition"
       @durationchange="readPosition"
       @timeupdate="readPosition"
       @playing="onPlaying"
       @pause="onPause"
+      @seeking="onSeeking"
       @ended="onEnded"
       @error="onError"
     />
+    <ToyFollowPrompt v-if="followAuthor" :author="followAuthor" @dismiss="dismissFollowPrompt" />
   </section>
 </template>
 
@@ -768,12 +774,11 @@ onBeforeUnmount(() => {
   transform: scale(.965);
 }
 
-.music-player button:hover:not(:disabled, :has(.fluid-source-surface)) {
+.music-player button:hover:not(:disabled, .icon-button, :has(.fluid-source-surface)) {
   background-color: var(--player-hover);
 }
 
-.music-player button[aria-pressed="true"],
-.music-player .icon-button[aria-expanded="true"] {
+.music-player button[aria-pressed="true"] {
   background-image: var(--player-selection);
 }
 
@@ -796,6 +801,14 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
   padding: 0;
+}
+
+.music-player .icon-button:not(.play-toggle) {
+  color: var(--player-secondary);
+}
+
+.music-player .icon-button:not(.play-toggle):is(:hover:not(:disabled), [aria-expanded="true"], [data-mode="one"]) {
+  color: var(--player-text);
 }
 
 .icon-button svg {
@@ -887,26 +900,22 @@ onBeforeUnmount(() => {
 }
 
 .volume-control {
-  display: contents;
-}
-
-.volume-control > button {
+  position: relative;
   grid-area: 1 / 1;
   justify-self: start;
-}
-
-.volume-reveal {
-  grid-area: 2 / 1 / 3 / -1;
-  width: min(204px, 100%);
+  z-index: 2;
 }
 
 .volume-popover {
-  position: relative;
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: calc(100% + 10px);
+  translate: 0 -50%;
+  inline-size: 204px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) 37px;
   align-items: center;
   gap: 8px;
-  margin-block-start: 4px;
   padding: 6px 9px;
   border-radius: 18px;
   box-sizing: border-box;
@@ -917,55 +926,16 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .volume-reveal:is(.reveal-enter-active, .reveal-leave-active)
-      .volume-popover > :deep(.liquid-glass) {
-    transform-origin: top left;
-    transition: transform var(--reveal-duration) var(--reveal-easing),
-      border-radius var(--reveal-duration) var(--reveal-easing);
+  .volume-float-enter-active,
+  .volume-float-leave-active {
+    transform-origin: right center;
+    transition: transform 200ms var(--ease-glass-in), opacity 150ms ease;
   }
 
-  .volume-reveal:is(.reveal-enter-from, .reveal-leave-to)
-      .volume-popover > :deep(.liquid-glass) {
-    transform: scale(.2, .86);
-    border-radius: 50%;
-  }
-
-  .volume-reveal:is(.reveal-enter-active, .reveal-leave-active)
-      .volume-popover > :not(.liquid-glass) {
-    transition: opacity 120ms var(--ease-glass-in);
-  }
-
-  .volume-reveal.reveal-enter-active .volume-popover > :not(.liquid-glass) {
-    transition-delay: 100ms;
-  }
-
-  .volume-reveal:is(.reveal-enter-from, .reveal-leave-to)
-      .volume-popover > :not(.liquid-glass) {
+  .volume-float-enter-from,
+  .volume-float-leave-to {
+    transform: translateX(6px) scale(.94);
     opacity: 0;
-  }
-}
-
-@supports (interpolate-size: allow-keywords) {
-  @media (prefers-reduced-motion: no-preference) {
-    .volume-reveal {
-      display: flex;
-      flex-direction: column;
-      block-size: auto;
-      interpolate-size: allow-keywords;
-    }
-
-    .volume-reveal :deep(.reveal-content) {
-      flex: none;
-    }
-
-    .volume-reveal:is(.reveal-enter-active, .reveal-leave-active) {
-      overflow: clip;
-      transition-property: block-size;
-    }
-
-    .volume-reveal:is(.reveal-enter-from, .reveal-leave-to) {
-      block-size: 0;
-    }
   }
 }
 
@@ -1011,7 +981,7 @@ onBeforeUnmount(() => {
   height: 54px;
 }
 
-.play-toggle svg {
+.play-toggle > svg {
   width: 26px;
   height: 26px;
 }
@@ -1020,10 +990,6 @@ onBeforeUnmount(() => {
   grid-area: 1 / 3;
   justify-self: start;
   margin-inline-start: calc(var(--transport-button-size) + var(--transport-gap) * 2);
-}
-
-.repeat-toggle[data-mode="one"] {
-  background-image: var(--player-selection);
 }
 
 .failure-toast {
@@ -1293,10 +1259,6 @@ onBeforeUnmount(() => {
   .track-list button {
     min-height: 44px;
   }
-}
-
-.music-player--system-volume :is(.icon-button[aria-expanded="true"], .repeat-toggle[data-mode="one"]) {
-  background-image: linear-gradient(145deg, rgb(255 255 255 / .22), rgb(255 255 255 / .08));
 }
 
 @media (min-width: 520px) and (orientation: landscape) and (pointer: coarse) and (max-height: 500px) {

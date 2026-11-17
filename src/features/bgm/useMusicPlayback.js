@@ -146,12 +146,13 @@ function readSettings(preview) {
   }
 }
 
-export function useMusicPlayback({track, zone, preview, advance, systemVolume}) {
+export function useMusicPlayback({track, zone, preview, advance, systemVolume, toyFollow}) {
   const initial = readSettings(preview);
   const audio = ref(null);
   const volume = ref(initial.volume);
   const muted = ref(initial.muted);
   const repeatMode = ref(initial.repeatMode);
+  const nativeLoop = computed(() => repeatMode.value === 'one' && !toyFollow.tracking.value);
   const elapsed = ref(0);
   const mediaDuration = ref(0);
   const duration = computed(() => mediaDuration.value || track.value?.duration || 0);
@@ -182,8 +183,8 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   const sessionActions = {
     play: () => play(),
     pause: () => pause(),
-    previoustrack: () => advance(-1),
-    nexttrack: () => advance(1),
+    previoustrack: () => { if (!toyFollow.prompt.value) advance(-1); },
+    nexttrack: () => { if (!toyFollow.prompt.value) advance(1); },
     seekbackward: ({seekOffset = 10}) => seek(elapsed.value - seekOffset),
     seekforward: ({seekOffset = 10}) => seek(elapsed.value + seekOffset),
     seekto: ({seekTime}) => seek(seekTime),
@@ -198,11 +199,16 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   function readPosition(event) {
     const node = event.currentTarget;
     if (node.readyState === 0) return;
+    toyFollow.trackProgress(node);
     mediaDuration.value = Number.isFinite(node.duration) ? node.duration : 0;
     elapsed.value = node.currentTime;
   }
 
   async function start(node) {
+    if (!toyFollow.beforePlay()) {
+      pause();
+      return;
+    }
     const attempt = ++playRequest;
     pending.value = true;
     failure.value = '';
@@ -230,13 +236,22 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
 
   function onPlaying(event) {
     if (event.currentTarget.paused || !requested.value) return;
+    toyFollow.savePosition(event.currentTarget);
     playing.value = true;
     pending.value = false;
     failure.value = '';
   }
 
   function onPause(event) {
-    if (event.currentTarget.paused) playing.value = false;
+    const node = event.currentTarget;
+    if (node.paused) {
+      toyFollow.trackProgress(node, true);
+      playing.value = false;
+    }
+  }
+
+  function onSeeking(event) {
+    toyFollow.savePosition(event.currentTarget);
   }
 
   function onError(event) {
@@ -271,6 +286,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   }
 
   function play() {
+    if (toyFollow.prompt.value) return;
     requested.value = true;
     const node = audio.value;
     if (!node || !activeUrl) return;
@@ -300,15 +316,19 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     const node = audio.value;
     if (!node || !mediaDuration.value || !Number.isFinite(seconds)) return;
     node.currentTime = Math.min(mediaDuration.value, Math.max(0, seconds));
+    toyFollow.savePosition(node);
     elapsed.value = node.currentTime;
   }
 
   function onEnded(event) {
     const node = event.currentTarget;
     if (!node.ended) return;
+    toyFollow.trackProgress(node, true);
     playing.value = false;
     pending.value = false;
-    if (!requested.value || (repeatMode.value === 'all' && advance(1, true))) return;
+    if (!requested.value) return;
+    toyFollow.resetTrack();
+    if (repeatMode.value === 'all' && advance(1, true)) return;
     seek(0);
     void start(node);
   }
@@ -322,6 +342,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     const sameSource = node === previous[0] && activeUrl === url;
     const newZone = previous[2] !== zone.value.key;
     if (sameSource && !newZone) return;
+    toyFollow.resetTrack();
     if (newZone) requested.value = !preview;
 
     // 曲目或分区切换时重置兜底游标；同曲同区仅节点重建时沿用当前备路源，
@@ -419,8 +440,8 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   });
 
   return {
-    audio, volume, muted, repeatMode, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
+    audio, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
     copyFailureReport,
-    play, pause, seek, readPosition, onPause, onPlaying, onEnded, onError,
+    play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onEnded, onError,
   };
 }

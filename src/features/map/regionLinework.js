@@ -1,5 +1,6 @@
 // Work in map pixels, so a bend keeps its shape while zooming.
-const maxTrim = 36;
+const maxTrim = 44;
+const cornerTrimFraction = 0.48;
 const cellSize = 64;
 const vertexTolerance = 0.0125;
 const pointKey = ([x, y]) => `${x} ${y}`;
@@ -138,7 +139,7 @@ function roundCorners(vertices, edges) {
     const [a, b] = pair;
     if (Math.abs(Math.sin(turn(a.direction, b.direction))) < 1e-6) continue;
     const [x, y] = vertex.point;
-    let trim = Math.min(maxTrim, a.length * 0.45, b.length * 0.45);
+    let trim = Math.min(maxTrim, a.length * cornerTrimFraction, b.length * cornerTrimFraction);
     eachCell(x - trim, y - trim, x + trim, y + trim, (key) => {
       for (const edge of cells.get(key) ?? []) {
         if (edge.start === vertex || edge.end === vertex) continue;

@@ -251,7 +251,7 @@ const volumeRange = '.volume-panel input[aria-label="音量"]';
 async function openPlayerVolume(page) {
   await page.click(volumeTrigger);
   await page.waitForSelector(volumeRange, {visible: true});
-  await page.waitForSelector('.volume-reveal.reveal-enter-active', {hidden: true});
+  await page.waitForSelector('.volume-panel.volume-float-enter-active', {hidden: true});
   await page.waitForFunction((selector) => document.activeElement === document.querySelector(selector),
     {timeout: 5000}, volumeRange);
   return page.evaluate(() => {
