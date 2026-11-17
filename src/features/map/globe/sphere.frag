@@ -191,35 +191,52 @@ void main() {
 
   float z = sqrt(max(0., 1. - dot(p, p)));
   vec3 n = normalize(u_right * p.x + u_up * p.y + u_front * z);
-  float lon = atan(n.x, n.z);
-  float lat = asin(clamp(n.y, -1., 1.));
-  vec2 uv = vec2(lon / u_span.x + .5, .5 - lat / u_span.y);
-  vec2 uvDx = chartGradient(n, dFdx(n));
-  vec2 uvDy = chartGradient(n, dFdy(n));
-  if (u_naturalMoon) {
-    vec3 albedo = lunarMineral(textureGrad(u_atlas, uv, uvDx, uvDy).rgb);
-    float light = smoothstep(-.52, .95, dot(vec3(p, z), normalize(vec3(-.63, .59, .64))));
-    vec3 color = albedo * (.36 + light * .60) * vec3(.94, 1.02, 1.08);
-    pixel = vec4(color, 1. - smoothstep(.997, 1.001, r));
-    return;
-  }
-  if (u_projection == 2) {
+  if (!u_naturalMoon && u_projection == 2) {
+    // 霜月路径不用等距柱状 uv 与 chart 梯度，直接走原有 lunarTerrain/lunarHazard。
     vec3 terrain = lunarTerrain(n);
     // Neutral limb shading keeps the original map colors outside the danger overlay.
     terrain *= 1. - .16 * pow(1. - z, 2.);
     pixel = vec4(lunarHazard(terrain, n), 1. - smoothstep(.997, 1.001, r));
     return;
   }
-  if (u_flatten > 0.) {
+  float lon = atan(n.x, n.z);
+  float lat = asin(clamp(n.y, -1., 1.));
+  vec2 uv = vec2(lon / u_span.x + .5, .5 - lat / u_span.y);
+  vec2 uvDx;
+  vec2 uvDy;
+  if (u_naturalMoon) {
+    uvDx = chartGradient(n, dFdx(n));
+    uvDy = chartGradient(n, dFdy(n));
+    vec3 albedo = lunarMineral(textureGrad(u_atlas, uv, uvDx, uvDy).rgb);
+    float light = smoothstep(-.52, .95, dot(vec3(p, z), normalize(vec3(-.63, .59, .64))));
+    vec3 color = albedo * (.36 + light * .60) * vec3(.94, 1.02, 1.08);
+    pixel = vec4(color, 1. - smoothstep(.997, 1.001, r));
+    return;
+  }
+  if (u_flatten == 1.) {
+    // 完全平面：mix(x, y, 1.) 恒等于 y，直接取 chart，跳过球面 chartGradient。
     vec2 center = vec2(atan(u_front.x, u_front.z) / u_span.x + .5,
       .5 - asin(clamp(u_front.y, -1., 1.)) / u_span.y);
-    vec2 chart = center + p * vec2(u_chartScale.x, -u_chartScale.y);
-    uv = mix(uv, chart, u_flatten);
-    uvDx = mix(uvDx, dFdx(chart), u_flatten);
-    uvDy = mix(uvDy, dFdy(chart), u_flatten);
+    uv = center + p * vec2(u_chartScale.x, -u_chartScale.y);
+    uvDx = dFdx(uv);
+    uvDy = dFdy(uv);
+  } else {
+    uvDx = chartGradient(n, dFdx(n));
+    uvDy = chartGradient(n, dFdy(n));
+    if (u_flatten > 0.) {
+      vec2 center = vec2(atan(u_front.x, u_front.z) / u_span.x + .5,
+        .5 - asin(clamp(u_front.y, -1., 1.)) / u_span.y);
+      vec2 chart = center + p * vec2(u_chartScale.x, -u_chartScale.y);
+      uv = mix(uv, chart, u_flatten);
+      uvDx = mix(uvDx, dFdx(chart), u_flatten);
+      uvDy = mix(uvDy, dFdy(chart), u_flatten);
+    }
   }
   float margin = min(min(uv.x, 1. - uv.x), min(uv.y, 1. - uv.y));
-  vec3 terrain = mix(u_sea, readAtlas(uv, uvDx, uvDy), smoothstep(0., .022, margin));
+  float coverage = smoothstep(0., .022, margin);
+  // coverage==0 时 mix 恒等于 u_sea，可跳过纹理 fetch；羽化区间照常。
+  vec3 terrain = u_sea;
+  if (coverage > 0.) terrain = mix(u_sea, readAtlas(uv, uvDx, uvDy), coverage);
   terrain = applyGroundPatch(terrain, uv, uvDx, uvDy);
   if (u_cleanFontaine) terrain = cleanFontaine(uv, terrain);
 

@@ -52,6 +52,8 @@ export class DetailTiles {
     this.columns = Math.ceil(this.size[0] / TILE);
     this.rows = Math.ceil(this.size[1] / TILE);
     this.lookup = new Uint8Array(this.columns * this.rows);
+    this.lookupDirty = false;
+    this.lookupReady = false;
     this.uploadLookup();
   }
 
@@ -153,7 +155,7 @@ export class DetailTiles {
       if (expired !== undefined) {
         this.slots.delete(expired);
         this.lookup[expired] = 0;
-        this.uploadLookup();
+        this.lookupDirty = true;
         this.invalidate();
       }
       throw error;
@@ -164,7 +166,9 @@ export class DetailTiles {
     }
     this.slots.set(key, slot);
     this.lookup[key] = slot + 1;
-    this.uploadLookup();
+    // 同一帧内多张瓦片完成时只标记脏区，由 draw 入口的 flushLookup 在下次
+    // 绘制前合并成一次 texSubImage2D；uploadTile 本身不再逐瓦片重传 lookup。
+    this.lookupDirty = true;
     this.invalidate();
   }
 
@@ -215,6 +219,26 @@ export class DetailTiles {
     gl.bindTexture(gl.TEXTURE_2D, textures.map);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, this.columns, this.rows, 0, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.activeTexture(gl.TEXTURE0);
+    this.lookupReady = true;
+    this.lookupDirty = false;
+  }
+
+  // 把批次内累计的 lookup 改动用一次 texSubImage2D 写入既有存储，
+  // 须在每个 draw 的渲染前调用（存储尺寸只会随 reset 的整次重定义变化）。
+  flushLookup() {
+    if (!this.lookupDirty) return;
+    if (!this.lookupReady) {
+      this.uploadLookup();
+      return;
+    }
+    this.lookupDirty = false;
+    const {gl, textures} = this;
+    gl.activeTexture(gl.TEXTURE0 + textures.mapUnit);
+    gl.bindTexture(gl.TEXTURE_2D, textures.map);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.columns, this.rows, gl.RED, gl.UNSIGNED_BYTE, this.lookup);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
     gl.activeTexture(gl.TEXTURE0);
   }

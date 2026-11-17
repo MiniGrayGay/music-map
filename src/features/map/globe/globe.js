@@ -629,6 +629,9 @@ export class Globe {
       this.lastTileWorld = this.world;
       this.lastTileFocus = focused;
     }
+    // 异步瓦片在上传后只标记 lookup 脏；渲染前统一合并为一次 texSubImage2D。
+    this.tiles.flushLookup();
+    this.nativeTiles.flushLookup();
     if (changed || settled || detailFocusChanged) {
       const pixelWidth = Math.max(1, Math.round(width * ratio));
       const pixelHeight = Math.max(1, Math.round(height * ratio));
