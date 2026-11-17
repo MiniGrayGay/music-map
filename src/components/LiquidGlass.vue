@@ -256,7 +256,8 @@ async function buildFilterInput() {
 .rimless .rdev-pane { box-shadow: 0 10px 28px rgb(0 4 16 / .18); }
 
 .rdev-warp {
-  backdrop-filter: var(--liquid-glass-backdrop, blur(20px) saturate(140%));
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
 }
 
 .liquid-glass--clear .rdev-warp {

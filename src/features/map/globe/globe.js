@@ -942,11 +942,12 @@ export class Globe {
   drawReliefLeads(rings, lift, time) {
     if (this.raise < .5) return;
     const key = this.selected.zone.key;
-    const target = this.reliefTarget?.(key);
-    if (!target) {
+    const relief = this.reliefTarget?.(key);
+    if (!relief) {
       this.hideReliefCard();
       return;
     }
+    const {target, aspect} = relief;
 
     const {left, top} = this.canvas.getBoundingClientRect();
     const points = rings.flatMap(({outline}) => outline).filter(([x, y]) =>
@@ -966,13 +967,14 @@ export class Globe {
     const controls = this.labelObstacles().map(rect => ({
       left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
     }));
-    const panel = placeReliefCard(zone, {width: target.offsetWidth, height: target.offsetHeight},
-      this, controls, this.reliefEdge);
+    const height = clamp(this.height * .29, 184, 300);
+    const width = clamp(height * aspect, 222, Math.min(450, this.width * .38));
+    const panel = placeReliefCard(zone, {width, height}, this, controls, this.reliefEdge);
     if (!panel) {
       this.hideReliefCard();
       return;
     }
-    const {edge, scale} = panel;
+    const {edge} = panel;
     const horizontal = edge === 'top' || edge === 'bottom';
     const start = horizontal ? zone.left : zone.top;
     const end = horizontal ? zone.right : zone.bottom;
@@ -1001,7 +1003,11 @@ export class Globe {
     this.reliefEdge = edge;
     target.dataset.reliefPlaced = '';
     target.dataset.reliefEdge = edge;
-    target.style.transform = `translate(${panel.left}px, ${panel.top}px) scale(${scale})`;
+    // Keep the surface in the backdrop compositor's untransformed geometry.
+    target.style.left = `${panel.left}px`;
+    target.style.top = `${panel.top}px`;
+    target.style.width = `${panel.width}px`;
+    target.style.height = `${panel.height}px`;
     target.style.setProperty('--relief-lead-start', `${100 * leadStart / span}%`);
     target.style.setProperty('--relief-lead-span', `${100 * leadSpan / span}%`);
 

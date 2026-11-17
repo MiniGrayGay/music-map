@@ -19,7 +19,7 @@ const props = defineProps({
   availableMaps: {type: Array, required: true},
   searchHost: {type: HTMLElement, default: null},
   reliefTarget: {type: HTMLElement, default: null},
-  reliefReady: {type: Boolean, default: false},
+  reliefAspect: {type: Number, default: null},
   mobileDevice: {type: Boolean, default: false},
   smoothBoundaries: {type: Boolean, default: true},
 });
@@ -307,14 +307,7 @@ async function showWorld() {
 
 watch([() => props.mapName, zones], showWorld);
 watch(() => props.smoothBoundaries, (enabled) => globe?.setBoundarySmoothing(enabled));
-watch(() => props.reliefReady, () => globe?.requestFrame(), {flush: 'post'});
-watch(() => props.reliefTarget, (target, _, onCleanup) => {
-  globe?.requestFrame();
-  if (!target) return;
-  const observer = new ResizeObserver(() => globe?.requestFrame());
-  observer.observe(target);
-  onCleanup(() => observer.disconnect());
-}, {flush: 'post'});
+watch([() => props.reliefTarget, () => props.reliefAspect], () => globe?.requestFrame(), {flush: 'post'});
 watch(() => props.activeZone, (zone) => {
   globe?.setPlaying(Boolean(zone));
   if (!zone && globe?.selected) clearSelection();
@@ -328,7 +321,8 @@ onMounted(() => {
       onReliefReveal: key => emit('relief-reveal', key),
       reliefTarget(key) {
         const target = props.reliefTarget;
-        return props.reliefReady && target?.dataset.reliefZone === String(key) ? target : null;
+        const aspect = props.reliefAspect;
+        return aspect != null && target?.dataset.reliefZone === String(key) ? {target, aspect} : null;
       },
       labelObstacles(includeRelief = false) {
         const overlays = document.querySelectorAll(
@@ -401,7 +395,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
                  placeholder="搜索地点" @focus="openSearch" @click="openSearch"
                  @keydown="onSearchKeydown" />
         </div>
-        <div v-if="searchOpen" class="globe-results map-glass map-glass-popup scroll-viewport">
+        <div v-if="searchOpen" class="globe-results map-glass scroll-viewport">
           <LiquidGlass />
           <div :id="resultListId" ref="searchResults" role="listbox" aria-label="地点搜索结果">
             <button v-for="(zone, index) in results" :id="resultId(index)" :key="zone.map + '/' + zone.key"
@@ -474,7 +468,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   color: #e1eddf;
   text-align: center;
 }
-.globe-search { contain: inline-size; margin: 0; }
+.globe-search { contain: inline-size; margin: 0; transition-property: none; }
 .globe-search-field, .globe-results {
   width: 100%; border-radius: var(--radius-control);
 }

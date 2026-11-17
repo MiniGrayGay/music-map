@@ -24,6 +24,7 @@ const ReliefPreview = defineAsyncComponent(() => import('./features/map/ReliefPr
 const MapSurface = defineAsyncComponent(() => import('./features/map/MapSurface.vue'));
 
 const mapData = ref(null);
+const appRoot = ref(null);
 const followCardPreview = ref(import.meta.env.DEV ? toyFollowCardPreview() : null);
 const baseMaps = ref({});
 const mapName = ref('Teyvat');
@@ -225,22 +226,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 </script>
 
 <template>
-  <div class="app" :class="{'app--mobile': mobileDevice}">
+  <div ref="appRoot" class="app" :class="{'app--mobile': mobileDevice}">
     <template v-if="mapData">
-      <div ref="mapToolbar" class="map-toolbar">
-        <div class="map-toolbar-row">
-          <div v-if="Object.keys(baseMaps).length" class="map-switcher">
-            <SelectMenu
-              :model-value="mapName"
-              :options="mapOptions"
-              aria-label="切换地图"
-              glass
-              @update:model-value="selectMap"
-            />
-          </div>
-          <LayerPicker :app-canvas="activeMap.canvas" :viewport-rect="view.viewportRect" />
-        </div>
-      </div>
       <div class="app-controls" :class="{'app-controls--globe': showGlobe}">
         <ZoomControls
           :can-zoom-in="view.canZoomIn"
@@ -277,7 +264,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         :available-maps="mapOptions"
         :search-host="mapToolbar"
         :relief-target="reliefDock"
-        :relief-ready="reliefAspect != null"
+        :relief-aspect="reliefAspect"
         :mobile-device="mobileDevice"
         :smooth-boundaries="smoothBoundaries"
         @canvas-frame="receiveBackdrop"
@@ -301,9 +288,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
              class="relief-dock map-glass" aria-label="高程点阵预览"
              :data-relief-zone="reliefZone.key"
              :data-relief-open="reliefOpen"
-             :aria-hidden="!reliefOpen"
-             :style="reliefAspect == null ? undefined : {'--relief-aspect': reliefAspect}">
-        <LiquidGlass variant="clear" :displacement="false" />
+             :aria-hidden="!reliefOpen">
+        <LiquidGlass />
         <div class="relief-content">
           <ReliefPreview :zone="reliefZone" :active="reliefOpen" @aspect="reliefAspect = $event"
                          @empty="emptyReliefKey = $event" @unavailable="reliefUnavailable = true" />
@@ -319,6 +305,20 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @close="closePlayer"
         />
       </Transition>
+      <div ref="mapToolbar" class="map-toolbar">
+        <div class="map-toolbar-row">
+          <div v-if="Object.keys(baseMaps).length" class="map-switcher">
+            <SelectMenu
+              :model-value="mapName"
+              :options="mapOptions"
+              aria-label="切换地图"
+              glass
+              @update:model-value="selectMap"
+            />
+          </div>
+          <LayerPicker :app-canvas="activeMap.canvas" :viewport-rect="view.viewportRect" :floor-host="appRoot" />
+        </div>
+      </div>
       <ToyFollowPrompt v-if="followCardPreview" :author="followCardPreview"
                        @dismiss="followCardPreview = null" />
       <div v-if="!activeZone && bgm.reason && bgm.status !== BGM_STATUS.READY"
@@ -340,19 +340,9 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 
 <style scoped>
 .relief-dock {
-  --relief-height: clamp(184px, 29vh, 300px);
-  --relief-width: calc(var(--relief-height) * var(--relief-aspect, 1.45));
   position: absolute;
-  z-index: 2;
-  inset-inline-start: 0;
-  inset-block-start: 0;
-  inline-size: clamp(222px, var(--relief-width), min(450px, 38vw));
-  block-size: var(--relief-height);
-  transform-origin: top left;
   border-radius: var(--radius-card);
   pointer-events: none;
-  --liquid-glass-tint: rgb(8 27 38 / .48);
-  --liquid-glass-clear-backdrop: blur(14px) saturate(115%);
   --relief-start-left: var(--relief-lead-start, 28%);
   --relief-start-top: 0%;
   --relief-start-width: var(--relief-lead-span, 44%);
@@ -612,7 +602,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   position: absolute;
   top: var(--map-toolbar-top, 15px);
   inset-inline-start: var(--map-toolbar-left);
-  z-index: 5;
   display: grid;
   grid-template-columns: minmax(0, auto);
   row-gap: var(--map-toolbar-row-gap);

@@ -217,13 +217,13 @@ watch(open, (value) => {
           ref="popupRef"
           :inert="!open"
           class="select-popup"
-          :class="{'map-glass map-glass-popup glassed': glass}"
+          :class="{'map-glass glassed': glass}"
           role="listbox"
           :aria-label="ariaLabel"
           :style="popupStyle"
           @pointerdown.prevent
         >
-          <LiquidGlass v-if="glass" variant="clear" />
+          <LiquidGlass v-if="glass" />
           <ScrollPane class="select-scroll liquid-panel-body" :label="`${ariaLabel}选项滚动`">
             <ul ref="listRef" class="select-options">
               <li
@@ -356,8 +356,8 @@ watch(open, (value) => {
 }
 .select-trigger.glassed { border-radius: 18px; }
 .select-popup.glassed {
-  --liquid-glass-tint: rgb(7 22 29 / .54);
-  --liquid-glass-clear-backdrop: blur(18px) saturate(118%) brightness(.9);
+  position: absolute;
+  z-index: auto;
   animation: none;
 }
 .select-trigger.glassed:focus-visible { outline: 2px solid var(--text-secondary); outline-offset: -2px; }
@@ -373,10 +373,5 @@ watch(open, (value) => {
     padding: 6px;
   }
 
-  /* 弹层玻璃触屏端提亮：冷调清底 + 略正亮度，与分层弹层一致。 */
-  .select-popup.glassed {
-    --liquid-glass-tint: rgb(11 32 42 / .34);
-    --liquid-glass-clear-backdrop: blur(14px) saturate(126%) brightness(1.06);
-  }
 }
 </style>

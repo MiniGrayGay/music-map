@@ -35,6 +35,7 @@ import {
 const props = defineProps({
   appCanvas: {type: Object, required: true}, // 应用世界画布 {width,height}
   viewportRect: {type: Object, default: null}, // {x,y,width,height} 世界像素
+  floorHost: {type: HTMLElement, default: null},
   expectedVersion: {type: String, default: DEFAULT_GAME_VERSION},
 });
 
@@ -351,9 +352,9 @@ onBeforeUnmount(() => {
     </div>
 
     <Transition :css="false" v-bind="panelMotion">
-      <div v-show="panelOpen" id="layer-group-panel" class="panel map-glass map-glass-popup"
+      <div v-show="panelOpen" id="layer-group-panel" class="panel map-glass"
            :inert="!panelOpen" :data-panel-open="panelOpen ? '' : undefined">
-        <LiquidGlass variant="clear" />
+        <LiquidGlass />
         <div class="liquid-panel-body">
           <input
             ref="searchRef"
@@ -392,29 +393,31 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
 
-    <div
-      v-if="layerModeActive && floorOptions.length > 0"
-      v-show="!panelOpen"
-      class="floors map-glass"
-      :class="{'more-floors-above': moreFloorsAbove, 'more-floors-below': moreFloorsBelow}"
-    >
-      <LiquidGlass variant="clear" />
-      <p v-if="floorOptions.length > 1" class="floor-count">共 {{ floorOptions.length }} 层</p>
-      <ScrollPane label="楼层列表滚动">
-        <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="分层楼层">
-          <button
-            v-for="floor in floorOptions"
-            :key="floor.level"
-            type="button"
-            class="floor"
-            :class="{active: floor.level === state.activeFloorLevel}"
-            :aria-pressed="floor.level === state.activeFloorLevel ? 'true' : 'false'"
-            :title="activeGroup?.unnamed ? floor.label : floor.name ?? floor.label"
-            @click="chooseFloor(floor.level)"
-          >{{ floor.label }}</button>
-        </div>
-      </ScrollPane>
-    </div>
+    <Teleport :to="floorHost ?? 'body'" :disabled="!floorHost">
+      <div
+        v-if="layerModeActive && floorOptions.length > 0"
+        v-show="!panelOpen"
+        class="floors map-glass"
+        :class="{'more-floors-above': moreFloorsAbove, 'more-floors-below': moreFloorsBelow}"
+      >
+        <LiquidGlass />
+        <p v-if="floorOptions.length > 1" class="floor-count">共 {{ floorOptions.length }} 层</p>
+        <ScrollPane label="楼层列表滚动">
+          <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="分层楼层">
+            <button
+              v-for="floor in floorOptions"
+              :key="floor.level"
+              type="button"
+              class="floor"
+              :class="{active: floor.level === state.activeFloorLevel}"
+              :aria-pressed="floor.level === state.activeFloorLevel ? 'true' : 'false'"
+              :title="activeGroup?.unnamed ? floor.label : floor.name ?? floor.label"
+              @click="chooseFloor(floor.level)"
+            >{{ floor.label }}</button>
+          </div>
+        </ScrollPane>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -547,23 +550,11 @@ onBeforeUnmount(() => {
 }
 
 .panel {
-  --liquid-glass-tint: rgb(7 22 29 / .54);
-  --liquid-glass-clear-backdrop: blur(18px) saturate(118%) brightness(.9);
   position: absolute;
-  z-index: 2;
   top: calc(var(--map-toolbar-row-height) + var(--map-toolbar-row-gap));
   inset-inline-start: 0;
   width: min(320px, calc(100vw - var(--map-toolbar-left) - var(--map-toolbar-right)));
   border-radius: var(--radius-card);
-}
-
-/* 触屏端弹层玻璃提亮：更低不透明度的冷调底 + 略正亮度，清亮不发闷，
-   也降低逐帧 backdrop 重光栅成本。桌面保持原深底。 */
-@media (max-width: 700px), (pointer: coarse) {
-  .panel {
-    --liquid-glass-tint: rgb(11 32 42 / .34);
-    --liquid-glass-clear-backdrop: blur(14px) saturate(126%) brightness(1.06);
-  }
 }
 
 .search {
@@ -640,15 +631,16 @@ onBeforeUnmount(() => {
 }
 
 .floors {
-  --liquid-glass-tint: rgb(7 22 29 / .42);
-  position: fixed;
+  position: absolute;
   top: 50%;
   right: 10px;
   transform: translateY(-50%);
-  z-index: 5;
   --pane-limit: min(58vh, 466px);
   border-radius: var(--radius-card);
   overflow: hidden;
+}
+
+.floors > :not(.liquid-glass) {
   animation: ui-fade-in 200ms ease-out;
 }
 
@@ -673,12 +665,6 @@ onBeforeUnmount(() => {
     --pane-limit: var(--floor-rail-limit);
     --floor-mask-start: #000;
     --floor-mask-end: #000;
-  }
-
-  /* 楼层竖条玻璃同步提亮为冷调清底（与弹层一致）。 */
-  .floors {
-    --liquid-glass-tint: rgb(11 32 42 / .26);
-    --liquid-glass-clear-backdrop: blur(12px) saturate(126%) brightness(1.06);
   }
 
   .floor-count {

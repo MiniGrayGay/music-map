@@ -72,9 +72,6 @@ body {
 .map-glass {
   --scroll-thumb: rgb(228 240 243 / .40);
   --scroll-thumb-hover: rgb(228 240 243 / .56);
-  --map-glass-fill: rgb(8 24 39 / .27);
-  --map-glass-sheen: radial-gradient(ellipse 85% 55% at 25% 13%, rgb(213 235 255 / .18), transparent 87%);
-  --liquid-glass-backdrop: blur(5px) saturate(151%) brightness(1.08);
   --text-primary: #edf5f2;
   --text-secondary: #b8d0d0;
   --control-hover: rgb(220 245 244 / .14);
@@ -96,20 +93,6 @@ body {
     filter: none !important;
   }
 }
-.map-glass:where(:not(:has(> .liquid-glass--clear)))::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: var(--map-glass-sheen), var(--map-glass-fill);
-}
-.map-glass-popup { --map-glass-fill: rgb(9 23 38 / .56); }
-.app:has(.map-surface) .map-glass:not(.map-glass-popup) {
-  --map-glass-fill: rgb(7 25 38 / .45);
-}
-
 @media (forced-colors: active) {
   .map-glass { color: CanvasText; background: Canvas; }
   .map-glass::after { display: none; }
