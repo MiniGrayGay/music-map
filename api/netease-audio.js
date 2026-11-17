@@ -2,9 +2,13 @@
 // 绝不代理或传输音频字节，绝不缓存、硬编码或记录签名地址。曲目 id 仅来自既有曲库白名单。
 // 诊断：并行竞速多个上游取首个成功；全部失败时 502 附带脱敏分层原因（不含完整 URL/签名/响应体）。
 import catalog from '../src/features/bgm/netease-tracks.json' with {type: 'json'};
+import overseasIndex from '../src/features/bgm/overseas-ost.json' with {type: 'json'};
 
 const outerMediaHosts = ['https://music.163.com', 'https://interface3.music.163.com'];
 const outerMediaPath = (id) => `/song/media/outer/url?id=${id}.mp3`;
+// 海外静态 CDN：索引值必须是「正数版本目录/uuid/aac256.m4a」，样本基准为 3/uuid/aac256.m4a。
+const overseasCdnBase = 'https://assets.kuutar.moe/soundtracks/';
+const overseasPathPattern = /^\d+\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/aac256\.m4a$/i;
 const perRequestTimeoutMs = 2500;
 const totalDeadlineMs = 5500;
 
@@ -21,6 +25,38 @@ function sendJson(response, status, body) {
 // 只放行曲库里的公开曲目 id，杜绝参数里塞任意 id。
 function isWhitelisted(id) {
   return /^\d+$/.test(id) && publicTrackIds.has(id);
+}
+
+// 海外索引：只收格式严格合法的映射项，坏条目直接忽略（fail-closed），绝不透传未校验路径。
+const overseasPaths = new Map(
+  Object.entries(overseasIndex ?? {}).flatMap(([id, path]) =>
+    typeof path === 'string' && overseasPathPattern.test(path) && /^\d+$/.test(id) ? [[id, path]] : [],
+  ),
+);
+
+function hasOverseasPath(id) {
+  return overseasPaths.has(id);
+}
+
+// 校验过的静态路径拼接，仅由 overseasPaths 提供值，不含查询串与用户输入。
+function overseasCdnUrl(id) {
+  const path = overseasPaths.get(id);
+  return path ? `${overseasCdnBase}${path}` : null;
+}
+
+// 307 重定向出口（海外 CDN / 官方网易云外链），带取源标记供线上验证。
+function sendRedirect(response, location, source) {
+  response.statusCode = 307;
+  response.setHeader('location', location);
+  response.setHeader('x-music-map-audio-source', source);
+  response.setHeader('cache-control', 'no-store');
+  response.end();
+}
+
+// 地区分流：CN 或无 Vercel 地区头 → 网易云；其他有效两位字母国家码且有海外映射 → 海外源。
+function prefersOverseas(request) {
+  const country = request.headers['x-vercel-ip-country'];
+  return typeof country === 'string' && /^[A-Z]{2}$/.test(country) && country !== 'CN';
 }
 
 // 只放行网易云 CDN 的原始 http(s) 地址，http 升级 https；拒绝凭证、异常端口与非 126.net 音乐域。
@@ -156,14 +192,43 @@ export default async function handler(request, response) {
     return;
   }
   let id;
+  let route;
   try {
     const parsed = new URL(request.url, `https://${request.headers.host ?? 'localhost'}`);
     id = parsed.searchParams.get('id') ?? '';
+    route = parsed.searchParams.get('route') ?? '';
   } catch {
     id = '';
+    route = '';
   }
   if (!isWhitelisted(id)) {
     sendJson(response, 400, {error: 'unknown-track'});
+    return;
+  }
+  if (route !== '' && route !== 'primary' && route !== 'alternate') {
+    sendJson(response, 400, {error: 'unknown-route'});
+    return;
+  }
+
+  // 分流决策（只决定 307 目标，绝不代理音频字节）：
+  // - 无 route（旧前端）：主路已失效，有海外映射即走海外源；未映射保留网易云已有处理。
+  // - primary：非 CN 有效地区且有映射 → 海外源；其余走网易云已有处理。
+  // - alternate：有映射时换另一路（海外主路换网易云，网易云主路换海外源）；未映射同 primary。
+  const overseas = hasOverseasPath(id);
+  const overseasPreferred = prefersOverseas(request);
+  let useOverseas = overseas;
+  if (route === 'primary') useOverseas = overseas && overseasPreferred;
+  else if (route === 'alternate') useOverseas = overseas && !overseasPreferred;
+
+  if (useOverseas) {
+    sendRedirect(response, overseasCdnUrl(id), 'overseas');
+    return;
+  }
+
+  // 中国访问（及真实海外初选失败回退）不走 Vercel 服务端解析：服务端对网易云常 502，
+  // 改为立即 307 到官方外链端点，由浏览器直连换取 CDN 地址。
+  if (route === 'primary' || (route === 'alternate' && overseasPreferred && overseas)) {
+    sendRedirect(response, `${outerMediaHosts[0]}${outerMediaPath(id)}`, route === 'primary' ? 'netease/primary' : 'netease/alternate-overseas');
     return;
   }
 
@@ -182,8 +247,5 @@ export default async function handler(request, response) {
     return;
   }
 
-  response.statusCode = 307;
-  response.setHeader('location', upstreamUrl);
-  response.setHeader('cache-control', 'no-store');
-  response.end();
+  sendRedirect(response, upstreamUrl, 'netease/resolved');
 }

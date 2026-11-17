@@ -2,13 +2,18 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
 const settingsKey = 'teyvat-bgm-playback';
 
-// 网易云固定公开外链（逻辑主 URL）与 API 兜底地址：兜底只读公开元数据接口，
-// 307 交给浏览器直连官方 CDN，本函数绝不接触音频字节。
-const neteaseOuterUrlPattern = /^https:\/\/music\.163\.com\/song\/media\/outer\/url\?id=\d+\.mp3$/;
+// 网易云固定公开外链（逻辑主 URL）与 API 分流地址：API 只按 id 与 route 决定 307 目标，
+// 交给浏览器直连官方/海外 CDN，本函数绝不接触音频字节。
 const neteaseApiFallbackBase = 'https://music-map-azure.vercel.app/api/netease-audio';
+const neteaseApiFallbackHost = new URL(neteaseApiFallbackBase).hostname;
+// 逻辑主 URL 为网易云固定公开外链的曲目才参与分流与备路；其他音源没有备路。
+const neteaseOuterUrlPattern = /^https:\/\/music\.163\.com\/song\/media\/outer\/url\?id=\d+\.mp3$/;
+// 生产域（API 同域部署）：初始用 route=primary 按地区分流，初始源错误换 route=alternate 一次。
+// 静态分发/本地：仍网易云公开外链优先，失败时用无 route 的 API（服务端有海外映射则走海外源）。
+const isProductionSite = typeof window !== 'undefined' && window.location.hostname === neteaseApiFallbackHost;
 
-function neteaseApiFallbackUrl(id) {
-  return `${neteaseApiFallbackBase}?id=${id}`;
+function neteaseApiFallbackUrl(id, route = '') {
+  return route ? `${neteaseApiFallbackBase}?id=${id}&route=${route}` : `${neteaseApiFallbackBase}?id=${id}`;
 }
 
 // 页面会话内的音频失败诊断：模块级数组跨曲目、跨播放器实例保留，仅驻内存，不上报不持久化。
@@ -157,9 +162,20 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   const canPause = computed(() => requested.value && (playing.value || pending.value));
 
   let activeUrl = null;
-  // 兜底状态单一标志：切曲/切区由主 watch 重置；同曲节点重建沿用已发出的兜底，
-  // 不回退到已失效外链。手动重播时清零，重走主 URL + 兜底完整链路。
-  let usingNeteaseFallback = false;
+  // 兜底链路单一游标：0=主路，1=备路。生产域主路=API route=primary（原外链仍是逻辑主 URL），
+  // 备路=route=alternate；静态/本地主路=网易云公开外链，备路=无 route API（有映射时服务端转海外源）。
+  // 切曲/切区由主 watch 重置；同曲节点重建沿用当前游标，不回退到已失效源。
+  // 手动重播时清零，重走完整链路；游标到头即最终失败，不循环。
+  const maxFallbackStage = 1;
+  let fallbackStage = 0;
+  function sourceUrlForStage(stage) {
+    const source = track.value?.url;
+    const neteaseId = track.value?.neteaseId;
+    // 只有逻辑主 URL 是网易云固定公开外链的曲目才参与分流与备路。
+    if (!neteaseId || !neteaseOuterUrlPattern.test(source ?? '')) return null;
+    if (isProductionSite) return neteaseApiFallbackUrl(neteaseId, stage === 0 ? 'primary' : 'alternate');
+    return stage === 0 ? source : neteaseApiFallbackUrl(neteaseId);
+  }
   let playRequest = 0;
   let requestStartedAt = Number.NaN;
   let session;
@@ -226,21 +242,19 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   function onError(event) {
     const node = event.currentTarget;
     if (!activeUrl || !node.error) return;
-    const neteaseId = track.value?.neteaseId;
-    // 首次失败且逻辑主 URL 是网易云固定公开外链：换 API 兜底地址重试一次；
-    // 只记诊断不弹通知，最终失败才提示。用户已暂停时不自动续播。
-    if (neteaseId && !usingNeteaseFallback && neteaseOuterUrlPattern.test(activeUrl)) {
-      usingNeteaseFallback = true;
+    // 首次失败换备路源重试一次；只记诊断不弹通知，最终失败才提示。用户已暂停时不自动续播。
+    if (fallbackStage < maxFallbackStage && sourceUrlForStage(fallbackStage + 1)) {
+      fallbackStage += 1;
       playRequest += 1;
       playing.value = false;
       pending.value = false;
       recordAudioFailure({
-        kind: 'HTMLMediaElement 错误（首次，转 API 兜底）',
+        kind: 'HTMLMediaElement 错误（首次，转备路源）',
         detail: `MediaError code=${node.error.code}${node.error.message ? ` message="${node.error.message}"` : ''}`,
         zone, track, node, requestStartedAt,
       });
       requestStartedAt = performance.now();
-      node.src = neteaseApiFallbackUrl(neteaseId);
+      node.src = sourceUrlForStage(fallbackStage);
       node.load();
       if (requested.value) void start(node);
       return;
@@ -263,10 +277,10 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     if (node.error) {
       elapsed.value = 0;
       mediaDuration.value = 0;
-      // 手动重播视为新尝试：若此前兜底失败，回主 URL 重走完整链路。
-      if (usingNeteaseFallback) {
-        usingNeteaseFallback = false;
-        node.src = activeUrl;
+      // 手动重播视为新尝试：若此前兜底失败，回主路 URL 重走完整链路。
+      if (fallbackStage > 0) {
+        fallbackStage = 0;
+        node.src = sourceUrlForStage(0) ?? activeUrl;
       }
       requestStartedAt = performance.now();
       node.load();
@@ -310,14 +324,14 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     if (sameSource && !newZone) return;
     if (newZone) requested.value = !preview;
 
-    // 曲目或分区切换时重置兜底状态；同曲同区仅节点重建时沿用已发出的兜底，
-    // 避免回退到已失效的外链主 URL。
+    // 曲目或分区切换时重置兜底游标；同曲同区仅节点重建时沿用当前备路源，
+    // 避免回退到已失效的主路 URL。
     const trackChanged = previous[1] !== url;
-    if (trackChanged || newZone) usingNeteaseFallback = false;
-    const neteaseId = track.value?.neteaseId;
-    const effectiveUrl = !trackChanged && !newZone && usingNeteaseFallback && neteaseId
-      ? neteaseApiFallbackUrl(neteaseId)
-      : url;
+    if (trackChanged || newZone) fallbackStage = 0;
+    // 生产域首播主路即 API route=primary；静态/本地首播主路仍是网易云外链（逻辑主 URL）。
+    const effectiveUrl = !trackChanged && !newZone && fallbackStage > 0
+      ? (sourceUrlForStage(fallbackStage) ?? url)
+      : (isProductionSite ? (sourceUrlForStage(0) ?? url) : url);
 
     playRequest += 1;
     elapsed.value = 0;
