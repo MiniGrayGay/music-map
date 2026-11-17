@@ -2,6 +2,120 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
 const settingsKey = 'teyvat-bgm-playback';
 
+// 页面会话内的音频失败诊断：模块级数组跨曲目、跨播放器实例保留，仅驻内存，不上报不持久化。
+// 每次实际失败事件逐条记录，不合并去重；禁止记录签名、凭证或原始查询串。
+const failureDiagnostics = [];
+
+// 只保留音源域名；除网易云固定公开外链路径外不保留任何路径，避免复制 CDN 签名或凭证。
+function describeAudioSource(url) {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return describeAudioOrigin(parsed);
+  } catch {
+    return '(无法解析的音源地址)';
+  }
+}
+
+function describeAudioOrigin(parsed) {
+  const isNetEaseOuter = parsed.origin === 'https://music.163.com' && parsed.pathname === '/song/media/outer/url';
+  return isNetEaseOuter ? `${parsed.origin}${parsed.pathname}` : parsed.origin;
+}
+
+// 错误消息里内嵌完整 URL 时，替换为仅域名（或网易云固定公开外链路径），去掉签名等查询参数。
+function sanitizeDetailText(text) {
+  if (!text) return text;
+  return text.replace(/https?:\/\/[^\s"']+/gi, (match) => {
+    try {
+      return describeAudioOrigin(new URL(match));
+    } catch {
+      return '(音源地址)';
+    }
+  });
+}
+
+function formatDuration(ms) {
+  return Number.isFinite(ms) && ms >= 0 ? `${Math.round(ms)}ms` : '';
+}
+
+// 从 Resource Timing 中找本次 load 开始到失败时刻之间、与媒体 URL 完全一致的请求记录。
+// 查找用完整绝对 URL（getEntriesByName 需要精确匹配），展示仍走脱敏后的 describeAudioSource。
+function describeRequestTiming(node, requestStartedAt) {
+  const rawUrl = node.currentSrc || node.src || '';
+  if (!rawUrl || typeof performance === 'undefined' || typeof performance.getEntriesByName !== 'function') {
+    return '(无可见请求记录)';
+  }
+  const now = typeof performance.now === 'function' ? performance.now() : Number.POSITIVE_INFINITY;
+  let entries = [];
+  try {
+    entries = performance.getEntriesByName(rawUrl, 'resource') ?? [];
+  } catch {
+    return '(无可见请求记录)';
+  }
+  // 只取本次 load 开始之后发出的请求，避免拿旧请求冒充本次失败。
+  const entry = entries
+    .filter((item) => (!Number.isFinite(requestStartedAt) || item.startTime >= requestStartedAt) && item.startTime <= now)
+    .sort((a, b) => b.startTime - a.startTime)[0];
+  if (!entry) return '(本次失败期间找不到可见请求记录，HTTP 状态未暴露)';
+
+  const parts = [];
+  // responseStatus 仅在浏览器暴露时 >0 才是真实 HTTP 码；0 表示受限不可读，绝不当状态码展示。
+  if (entry.responseStatus > 0) parts.push(`HTTP ${entry.responseStatus}`);
+  else parts.push('HTTP 状态未暴露');
+  if (Number.isFinite(entry.duration)) parts.push(`总耗时 ${formatDuration(entry.duration)}`);
+  if (entry.redirectStart > 0 && entry.redirectEnd > 0) {
+    parts.push(`重定向 ${formatDuration(entry.redirectEnd - entry.redirectStart)}`);
+  }
+  if (entry.requestStart > 0 && entry.responseStart > 0) {
+    parts.push(`响应等待 ${formatDuration(entry.responseStart - entry.requestStart)}`);
+  }
+  return parts.join('，');
+}
+
+function recordAudioFailure({kind, detail, zone, track, node, requestStartedAt}) {
+  failureDiagnostics.push({
+    time: new Date().toISOString(),
+    kind,
+    detail: sanitizeDetailText(detail),
+    scene: zone.value?.name ?? '(未知区域)',
+    zoneKey: zone.value?.key ?? '',
+    trackName: track.value?.displayName ?? '(未知曲目)',
+    neteaseId: track.value?.neteaseId ?? '',
+    source: describeAudioSource(node.currentSrc || node.src || ''),
+    request: describeRequestTiming(node, requestStartedAt),
+    online: typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' ? (navigator.onLine ? '在线' : '离线') : '',
+    networkState: node.networkState,
+    readyState: node.readyState,
+  });
+}
+
+function formatFailureDiagnostics() {
+  if (!failureDiagnostics.length) return '';
+  const lines = [`音频播放失败诊断，共 ${failureDiagnostics.length} 条记录`];
+  if (typeof navigator !== 'undefined' && navigator.userAgent) lines.push(`浏览器 UA：${navigator.userAgent}`);
+  failureDiagnostics.forEach((entry, index) => {
+    lines.push(
+      `[${index + 1}] ${entry.time} ${entry.kind}`,
+      `  场景：${entry.scene}（区域 ${entry.zoneKey || '无'}），曲目：${entry.trackName}${entry.neteaseId ? `（公开 NetEase id ${entry.neteaseId}）` : ''}`,
+      `  音源：${entry.source}`,
+      `  媒体请求：${entry.request}${entry.online ? `，网络 ${entry.online}` : ''}`,
+      `  networkState=${entry.networkState} readyState=${entry.readyState}`,
+      `  ${entry.detail}`,
+    );
+  });
+  return lines.join('\n');
+}
+
+async function copyFailureReport() {
+  const text = formatFailureDiagnostics();
+  if (!text) return false;
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function readSettings(preview) {
   const defaults = {volume: 0.65, muted: preview, repeatMode: 'all'};
   if (preview) return defaults;
@@ -35,6 +149,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
 
   let activeUrl = null;
   let playRequest = 0;
+  let requestStartedAt = Number.NaN;
   let session;
   const sessionActions = {
     play: () => play(),
@@ -72,7 +187,13 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     } catch (error) {
       if (attempt !== playRequest || !requested.value || !node.isConnected) return;
       pending.value = false;
-      failure.value = error.name === 'NotAllowedError' ? '点击重试开始播放' : '音频播放失败';
+      if (error.name === 'NotAllowedError') failure.value = '请点击播放按钮开始播放';
+      else failure.value = '音频播放失败';
+      recordAudioFailure({
+        kind: 'play() 被拒绝',
+        detail: `${error.name}: ${error.message || '(无消息)'}`,
+        zone, track, node, requestStartedAt,
+      });
     }
   }
 
@@ -88,11 +209,17 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   }
 
   function onError(event) {
-    if (!activeUrl || !event.currentTarget.error) return;
+    const node = event.currentTarget;
+    if (!activeUrl || !node.error) return;
     playRequest += 1;
     playing.value = false;
     pending.value = false;
     failure.value = '音源读取失败';
+    recordAudioFailure({
+      kind: 'HTMLMediaElement 错误',
+      detail: `MediaError code=${node.error.code}${node.error.message ? ` message="${node.error.message}"` : ''}`,
+      zone, track, node, requestStartedAt,
+    });
   }
 
   function play() {
@@ -102,6 +229,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     if (node.error) {
       elapsed.value = 0;
       mediaDuration.value = 0;
+      requestStartedAt = performance.now();
       node.load();
     }
     void start(node);
@@ -113,13 +241,6 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     playing.value = false;
     pending.value = false;
     audio.value?.pause();
-  }
-
-  function retry() {
-    if (!audio.value || !activeUrl) return;
-    failure.value = '';
-    if (requested.value) play();
-    else audio.value.load();
   }
 
   function seek(seconds) {
@@ -159,8 +280,13 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     activeUrl = url;
     node.pause();
     applySettings(node);
-    if (url) node.src = url;
-    else node.removeAttribute('src');
+    if (url) {
+      requestStartedAt = performance.now();
+      node.src = url;
+    } else {
+      node.removeAttribute('src');
+      requestStartedAt = Number.NaN;
+    }
     node.load();
     if (url && requested.value) void start(node);
   }, {flush: 'post'});
@@ -232,6 +358,7 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
 
   return {
     audio, volume, muted, repeatMode, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
-    play, pause, retry, seek, readPosition, onPause, onPlaying, onEnded, onError,
+    copyFailureReport,
+    play, pause, seek, readPosition, onPause, onPlaying, onEnded, onError,
   };
 }
