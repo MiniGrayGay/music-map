@@ -1,19 +1,48 @@
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import overseasIndex from './overseas-ost.json' with {type: 'json'};
 
 const settingsKey = 'teyvat-bgm-playback';
 
-// 网易云固定公开外链（逻辑主 URL）与 API 分流地址：API 只按 id 与 route 决定 307 目标，
-// 交给浏览器直连官方/海外 CDN，本函数绝不接触音频字节。
+// 浏览器直连两条音源：网易云官方公开外链 + 海外静态 CDN。两者都由本模块直接拼 URL，
+// 不经任何服务端代取音频；生产域仅向 API 查一次地区主备顺序（route=order 返回 JSON）。
 const neteaseApiFallbackBase = 'https://music-map-azure.vercel.app/api/netease-audio';
 const neteaseApiFallbackHost = new URL(neteaseApiFallbackBase).hostname;
-// 逻辑主 URL 为网易云固定公开外链的曲目才参与分流与备路；其他音源没有备路。
+// 逻辑主 URL 为网易云固定公开外链的曲目才参与主备；其他音源没有备路。
 const neteaseOuterUrlPattern = /^https:\/\/music\.163\.com\/song\/media\/outer\/url\?id=\d+\.mp3$/;
-// 生产域（API 同域部署）：初始用 route=primary 按地区分流，初始源错误换 route=alternate 一次。
-// 静态分发/本地：仍网易云公开外链优先，失败时用无 route 的 API（服务端有海外映射则走海外源）。
+// 生产域（API 同域部署）才做地区顺序查询；静态分发/本地/Toy 一律网易云优先，不做查询。
 const isProductionSite = typeof window !== 'undefined' && window.location.hostname === neteaseApiFallbackHost;
 
-function neteaseApiFallbackUrl(id, route = '') {
-  return route ? `${neteaseApiFallbackBase}?id=${id}&route=${route}` : `${neteaseApiFallbackBase}?id=${id}`;
+// 海外静态 CDN：索引值必须是「正数版本目录/uuid/aac256.m4a」，与 api/netease-audio.js 同一校验，坏条目忽略。
+const overseasCdnBase = 'https://assets.kuutar.moe/soundtracks/';
+const overseasPathPattern = /^\d+\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/aac256\.m4a$/i;
+const overseasPaths = new Map(
+  Object.entries(overseasIndex ?? {}).flatMap(([id, path]) =>
+    typeof path === 'string' && overseasPathPattern.test(path) && /^\d+$/.test(id) ? [[id, path]] : [],
+  ),
+);
+
+function overseasCdnUrl(id) {
+  const path = overseasPaths.get(String(id));
+  return path ? `${overseasCdnBase}${path}` : null;
+}
+
+// 地区主备顺序：每页至多一次懒加载，短超时/任何失败都默认网易云顺序，promise 全页缓存。
+// regionOrderValue 只在共享 promise resolve 后赋值；未知（null）且需要排序时异步等待。
+// 绝不用浏览器语言推断国家；地区判断只在 API 内按既有 Vercel 地区头完成。
+let regionOrderValue = null;
+let regionOrderPromise = null;
+function regionOrder() {
+  if (!isProductionSite) return Promise.resolve(regionOrderValue);
+  if (!regionOrderPromise) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    regionOrderPromise = fetch(`${neteaseApiFallbackBase}?route=order`, {signal: controller.signal})
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`http-${res.status}`))))
+      .then((data) => (data && data.primary === 'overseas' ? 'overseas' : 'netease'))
+      .catch(() => 'netease')
+      .finally(() => clearTimeout(timer));
+  }
+  return regionOrderPromise;
 }
 
 // 页面会话内的音频失败诊断：模块级数组跨曲目、跨播放器实例保留，仅驻内存，不上报不持久化。
@@ -163,19 +192,40 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
   const canPause = computed(() => requested.value && (playing.value || pending.value));
 
   let activeUrl = null;
-  // 兜底链路单一游标：0=主路，1=备路。生产域主路=API route=primary（原外链仍是逻辑主 URL），
-  // 备路=route=alternate；静态/本地主路=网易云公开外链，备路=无 route API（有映射时服务端转海外源）。
-  // 切曲/切区由主 watch 重置；同曲节点重建沿用当前游标，不回退到已失效源。
-  // 手动重播时清零，重走完整链路；游标到头即最终失败，不循环。
-  const maxFallbackStage = 1;
+  // 本次加载的两条直连音源（固定数组，按主备顺序）；region/编码确定后一次性绑定。
+  // 空数组 = 尚未绑定或该曲无可播链接，此时 play() 只记 requested，不动媒体。
+  let activeSources = [];
+  // 主备游标：0=主路，1=备路（有海外映射才有备路）。切曲/切区重置；手动重试回第 0 项；
+  // 备路也失败即最终通知，不循环，也不加第三路。
   let fallbackStage = 0;
-  function sourceUrlForStage(stage) {
+  // 每次新加载递增：所有异步回调（地区排序/兜底/启动）只在 generation、当前节点、
+  // 当前曲目 URL 与分区 key 全部一致时才能接上新媒体，过时结果一律丢弃。
+  let loadGeneration = 0;
+  // 编码支持探测：仅 canPlayType，不做任何 UA/语言推断；会话内缓存一次。
+  let codecPrefCache = '';
+  function codecPreference() {
+    if (codecPrefCache) return codecPrefCache;
+    const node = audio.value;
+    if (!node || typeof node.canPlayType !== 'function') return '';
+    const aac = node.canPlayType('audio/mp4; codecs="mp4a.40.2"');
+    const mp3 = node.canPlayType('audio/mpeg');
+    codecPrefCache = !aac && mp3 ? 'mp3-only' : 'default';
+    return codecPrefCache;
+  }
+  // 把当前曲目的直连音源按给定地区顺序绑定成固定数组（一次性，同步完成）。
+  // 非网易云外链曲目只有自身单源。
+  function bindSourcesForCurrentLoad(order) {
     const source = track.value?.url;
     const neteaseId = track.value?.neteaseId;
-    // 只有逻辑主 URL 是网易云固定公开外链的曲目才参与分流与备路。
-    if (!neteaseId || !neteaseOuterUrlPattern.test(source ?? '')) return null;
-    if (isProductionSite) return neteaseApiFallbackUrl(neteaseId, stage === 0 ? 'primary' : 'alternate');
-    return stage === 0 ? source : neteaseApiFallbackUrl(neteaseId);
+    // 只有逻辑主 URL 是网易云固定公开外链的曲目才参与主备。
+    if (!neteaseId || !neteaseOuterUrlPattern.test(source ?? '')) {
+      activeSources = source ? [source] : [];
+      return;
+    }
+    const overseas = overseasCdnUrl(neteaseId);
+    // AAC 明确不支持且 MP3 可播的端跳过海外 AAC 源为主路，只翻转两条顺序，不加第三路。
+    const neteaseFirst = !overseas || codecPreference() === 'mp3-only' || order !== 'overseas';
+    activeSources = neteaseFirst ? [source, overseas].filter(Boolean) : [overseas, source];
   }
   let playRequest = 0;
   let requestStartedAt = Number.NaN;
@@ -256,20 +306,23 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
 
   function onError(event) {
     const node = event.currentTarget;
-    if (!activeUrl || !node.error) return;
-    // 首次失败换备路源重试一次；只记诊断不弹通知，最终失败才提示。用户已暂停时不自动续播。
-    if (fallbackStage < maxFallbackStage && sourceUrlForStage(fallbackStage + 1)) {
+    if (!node.error) return;
+    // 只处理当前 audio 节点与当前选曲的错误：不用 raw/currentSrc 比较（浏览器可能已重定向
+    // 或旧节点同 URL），以「节点与曲目仍一致 + 固定数组的下一项存在」判定可兜底。
+    if (node !== audio.value || activeUrl !== track.value?.url || !activeSources[fallbackStage]) return;
+    const nextUrl = activeSources[fallbackStage + 1] ?? null;
+    if (nextUrl) {
       fallbackStage += 1;
       playRequest += 1;
       playing.value = false;
       pending.value = false;
       recordAudioFailure({
-        kind: 'HTMLMediaElement 错误（首次，转备路源）',
+        kind: 'HTMLMediaElement 错误（转备路源）',
         detail: `MediaError code=${node.error.code}${node.error.message ? ` message="${node.error.message}"` : ''}`,
         zone, track, node, requestStartedAt,
       });
       requestStartedAt = performance.now();
-      node.src = sourceUrlForStage(fallbackStage);
+      node.src = nextUrl;
       node.load();
       if (requested.value) void start(node);
       return;
@@ -289,14 +342,16 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     if (toyFollow.prompt.value) return;
     requested.value = true;
     const node = audio.value;
-    if (!node || !activeUrl) return;
+    // activeSources 还没有当前有效链接（地区排序等待中/无源曲目）时只记 requested，
+    // 不动媒体；绑定完成后由绑定处按 requested 决定是否 start。
+    if (!node || !activeSources.length) return;
     if (node.error) {
       elapsed.value = 0;
       mediaDuration.value = 0;
-      // 手动重播视为新尝试：若此前兜底失败，回主路 URL 重走完整链路。
+      // 手动重播视为新尝试：回固定数组第 0 项重走完整主备链路。
       if (fallbackStage > 0) {
         fallbackStage = 0;
-        node.src = sourceUrlForStage(0) ?? activeUrl;
+        node.src = activeSources[0];
       }
       requestStartedAt = performance.now();
       node.load();
@@ -345,33 +400,64 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     toyFollow.resetTrack();
     if (newZone) requested.value = !preview;
 
-    // 曲目或分区切换时重置兜底游标；同曲同区仅节点重建时沿用当前备路源，
-    // 避免回退到已失效的主路 URL。
+    // 曲目或分区切换时重置主备游标；同曲节点重建沿用当前游标，不回退到已失效源。
     const trackChanged = previous[1] !== url;
     if (trackChanged || newZone) fallbackStage = 0;
-    // 生产域首播主路即 API route=primary；静态/本地首播主路仍是网易云外链（逻辑主 URL）。
-    const effectiveUrl = !trackChanged && !newZone && fallbackStage > 0
-      ? (sourceUrlForStage(fallbackStage) ?? url)
-      : (isProductionSite ? (sourceUrlForStage(0) ?? url) : url);
 
+    // 开始新加载：更新 activeUrl、清空 activeSources、暂停旧节点并递增 generation，
+    // 使旧的异步回调（排序/兜底/启动）全部失效，不会覆盖本次加载。
+    loadGeneration += 1;
+    const gen = loadGeneration;
+    const zoneKey = zone.value.key;
+    activeUrl = url;
+    activeSources = [];
     playRequest += 1;
     elapsed.value = 0;
     mediaDuration.value = 0;
     playing.value = false;
     pending.value = false;
     failure.value = '';
-    activeUrl = url;
     node.pause();
     applySettings(node);
-    if (effectiveUrl) {
-      requestStartedAt = performance.now();
-      node.src = effectiveUrl;
-    } else {
-      node.removeAttribute('src');
-      requestStartedAt = Number.NaN;
+
+    const neteaseId = track.value?.neteaseId;
+    const overseasUrl = overseasCdnUrl(neteaseId ?? '');
+    const needsOrder = isProductionSite
+      && !!neteaseId
+      && neteaseOuterUrlPattern.test(url ?? '')
+      && !!overseasUrl
+      && codecPreference() !== 'mp3-only'
+      && regionOrderValue === null;
+
+    // 绑定主备并接上媒体。所有异步完成只在 generation/节点/URL/分区 key 一致时生效；
+    // 暂停期间也可接上新 src，但仅 requested 才 start。
+    function bindSources(order) {
+      if (gen !== loadGeneration || audio.value !== node || track.value?.url !== url || zone.value.key !== zoneKey) return;
+      bindSourcesForCurrentLoad(order);
+      const stageSrc = activeSources[fallbackStage] ?? null;
+      requestStartedAt = stageSrc ? performance.now() : Number.NaN;
+      if (stageSrc) {
+        node.src = stageSrc;
+      } else {
+        node.removeAttribute('src');
+      }
+      node.load();
+      if (stageSrc && requested.value) void start(node);
     }
-    node.load();
-    if (effectiveUrl && requested.value) void start(node);
+
+    if (needsOrder) {
+      // 地区顺序未知：先摘除旧 src，等共享一次的短超时 regionOrder promise 后绑定排序结果。
+      // 查询失败/超时默认网易云顺序；共享值 resolve 后才赋 regionOrderValue，后续加载同步绑定。
+      node.removeAttribute('src');
+      node.load();
+      void regionOrder().then((order) => {
+        if (regionOrderValue === null) regionOrderValue = order;
+        bindSources(regionOrderValue);
+      });
+    } else {
+      // 地区已知（或静态/本地/Toy、无海外映射、明确 MP3 优先）：同步赋 src，保留原启动手势。
+      bindSources(regionOrderValue ?? 'netease');
+    }
   }, {flush: 'post'});
 
   watch([volume, muted, repeatMode], () => {
@@ -423,7 +509,9 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     pause();
     const node = audio.value;
     if (node) {
+      loadGeneration += 1;
       activeUrl = null;
+      activeSources = [];
       node.removeAttribute('src');
       node.load();
     }

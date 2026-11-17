@@ -201,6 +201,13 @@ export default async function handler(request, response) {
     id = '';
     route = '';
   }
+  // order：浏览器端主备顺序查询。只读 Vercel 地区头，不读任何上游、不校验曲目 id，
+  // 返回 {primary:'overseas'|'netease'}；浏览器拿到后自行排列两条直连音源的先后。
+  if (route === 'order') {
+    sendJson(response, 200, {primary: prefersOverseas(request) ? 'overseas' : 'netease'});
+    return;
+  }
+
   if (!isWhitelisted(id)) {
     sendJson(response, 400, {error: 'unknown-track'});
     return;
