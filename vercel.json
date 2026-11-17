@@ -6,7 +6,7 @@
   "outputDirectory": "dist/site",
   "functions": {
     "api/netease-audio.js": {
-      "regions": ["hkg1"]
+      "regions": ["sin1"]
     }
   }
 }
