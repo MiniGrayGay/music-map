@@ -26,23 +26,19 @@ uniform vec2 u_detailSize;
 uniform vec2 u_nativeSize;
 uniform vec4 u_patchRect;
 uniform vec3 u_occluder;
-uniform bool u_motion;
 out vec4 pixel;
 
 const float PI = 3.14159265359;
 
 vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
-  // 瓦片数组没有 mip 链，只有 textureLod(0)；拖动中背压降采样会让瓦片被缩小
-  // 采样（像素足迹超过 1 纹素），LOD0 直采高频细节产生细花纹噪点。此时只在
-  // 缩小区间跳过瓦片，回落到带完整 mip 链并按 textureGrad 正确低通的底图；
-  // 放大区间保留 LOD0（本就无混叠），停稳后照常恢复瓦片高清。
+  // 按当前像素覆盖的纹素范围，从已加载瓦片的 mip 层采样。
   if (u_nativeSize.x > 0.) {
     vec2 p = clamp(uv * u_nativeSize, vec2(.5), u_nativeSize - .5);
     ivec2 tile = ivec2(floor(p / 512.));
     float layer = texelFetch(u_nativeMap, tile, 0).r * 255. - 1.;
-    if (layer >= -.01 && !(u_motion && max(length(dx * u_nativeSize), length(dy * u_nativeSize)) > 1.02)) {
+    if (layer >= -.01) {
       vec2 local = clamp(p - vec2(tile) * 512., .5, 511.5) / 512.;
-      return textureLod(u_nativeAtlas, vec3(local, round(layer)), 0.).rgb;
+      return textureGrad(u_nativeAtlas, vec3(local, round(layer)), dx * (u_nativeSize / 512.), dy * (u_nativeSize / 512.)).rgb;
     }
   }
   vec3 base = textureGrad(u_atlas, clamp(uv, 0., 1.), dx, dy).rgb;
@@ -50,9 +46,9 @@ vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
     vec2 pixelPos = clamp(uv * u_detailSize, vec2(.5), u_detailSize - .5);
     ivec2 tile = ivec2(floor(pixelPos / 512.));
     float layer = texelFetch(u_detailMap, tile, 0).r * 255. - 1.;
-    if (layer >= -.01 && !(u_motion && max(length(dx * u_detailSize), length(dy * u_detailSize)) > 1.02)) {
+    if (layer >= -.01) {
       vec2 local = clamp(pixelPos - vec2(tile) * 512., .5, 511.5) / 512.;
-      return textureLod(u_detailAtlas, vec3(local, round(layer)), 0.).rgb;
+      return textureGrad(u_detailAtlas, vec3(local, round(layer)), dx * (u_detailSize / 512.), dy * (u_detailSize / 512.)).rgb;
     }
   }
   return base;

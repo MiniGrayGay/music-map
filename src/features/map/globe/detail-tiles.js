@@ -1,6 +1,7 @@
 import {clamp, viewAtlasPoints} from './projection.js';
 
 const TILE = 512;
+const MIP_LEVELS = Math.log2(TILE) + 1;
 export function detailTextures(gl, mapUnit = 1, atlasUnit = 2) {
   const map = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0 + mapUnit);
@@ -11,7 +12,7 @@ export function detailTextures(gl, mapUnit = 1, atlasUnit = 2) {
   const atlas = gl.createTexture();
   gl.activeTexture(gl.TEXTURE0 + atlasUnit);
   gl.bindTexture(gl.TEXTURE_2D_ARRAY, atlas);
-  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -147,14 +148,31 @@ export class DetailTiles {
     gl.activeTexture(gl.TEXTURE0 + textures.atlasUnit);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, textures.atlas);
     if (!this.allocated) {
-      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, gl.RGBA8, TILE, TILE, this.capacity, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, MIP_LEVELS, gl.RGBA8, TILE, TILE, this.capacity);
       this.allocated = true;
     }
     gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, slot, TILE, TILE, 1, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    this.updateMipmaps(slot);
     this.slots.set(key, slot);
     this.lookup[key] = slot + 1;
     this.uploadLookup();
     this.invalidate();
+  }
+
+  updateMipmaps(slot) {
+    const {gl, textures} = this;
+    this.mipRead ??= gl.createFramebuffer();
+    this.mipDraw ??= gl.createFramebuffer();
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.mipRead);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.mipDraw);
+
+    // 逐级缩小刚上传的一张瓦片，其它数组层沿用原来的 mip。
+    for (let level = 1, size = TILE; level < MIP_LEVELS; level += 1, size /= 2) {
+      gl.framebufferTextureLayer(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, textures.atlas, level - 1, slot);
+      gl.framebufferTextureLayer(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, textures.atlas, level, slot);
+      gl.blitFramebuffer(0, 0, size, size, 0, 0, size / 2, size / 2, gl.COLOR_BUFFER_BIT, gl.LINEAR);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
   uploadLookup() {

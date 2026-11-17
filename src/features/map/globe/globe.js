@@ -94,7 +94,7 @@ function initialize(canvas, fragment) {
   gl.deleteShader(material);
   gl.useProgram(program);
   const uniforms = Object.fromEntries(
-    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder', 'motion'].map(
+    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
   );
@@ -142,7 +142,7 @@ function uploadAtlas({gl, texture}, image, wrapLongitude = false) {
 function renderSphere(renderer, canvas, view) {
   const {gl, uniforms} = renderer;
   const {cx, cy, radius, ratio, world, basis, zoom = 1, detailSize = [0, 0],
-    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0], motion = false} = view;
+    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0]} = view;
   const extent = radius * 1.002;
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
   const bottom = Math.max(0, Math.floor(canvas.height - (cy + extent) * ratio));
@@ -173,8 +173,6 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform2fv(uniforms.nativeSize, nativeSize);
   gl.uniform4fv(uniforms.patchRect, patchRect);
   gl.uniform3fv(uniforms.occluder, occluder);
-  // 拖动中让瓦片在缩小区间回落 mip 底图（见 readAtlas），停稳后恢复瓦片高清。
-  gl.uniform1i(uniforms.motion, Number(Boolean(motion)));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.disable(gl.SCISSOR_TEST);
 }
@@ -377,7 +375,7 @@ export class Globe {
 
   resize() {
     const {width, height} = this.canvas.getBoundingClientRect();
-    const ratio = Math.min(devicePixelRatio, this.compact ? 1.15 : 1.45);
+    const ratio = Math.min(devicePixelRatio, 1.45);
     this.width = width;
     this.height = height;
     this.ratio = ratio;
@@ -547,10 +545,7 @@ export class Globe {
     const focused = Boolean(this.selected);
     const detailFocusChanged = this.lastTileFocus !== focused;
     this.cameraMoving = moving;
-    // Only the moving WebGL raster is sampled at a lower resolution.
-    // 紧凑设备拖动期保持更低的采样率换帧率；静止后回到完整 ratio。
-    const rasterRatio = moving ? ratio * (this.compact ? .62 : .72) : ratio;
-    const pose = [this.lon, this.lat, radius, cx, cy, rasterRatio];
+    const pose = [this.lon, this.lat, radius, cx, cy, ratio];
     const changed = !this.sphereState || pose.some((value, index) => value !== this.sphereState[index]);
     // 拖动中密集重算可见瓦片会不断中止在途请求（弱网浪费且打断解码），
     // 紧凑设备在移动期间放宽到飞行航拍的同一节奏，静止后照常补齐。
@@ -567,14 +562,14 @@ export class Globe {
       this.lastTileFocus = focused;
     }
     if (changed || settled || detailFocusChanged) {
-      const pixelWidth = Math.max(1, Math.round(width * rasterRatio));
-      const pixelHeight = Math.max(1, Math.round(height * rasterRatio));
+      const pixelWidth = Math.max(1, Math.round(width * ratio));
+      const pixelHeight = Math.max(1, Math.round(height * ratio));
       if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
       if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
       renderSphere(this, this.canvas, {
-        cx, cy, ratio: rasterRatio, radius, world: this.world, basis,
+        cx, cy, ratio, radius, world: this.world, basis,
         zoom: this.zoom, detailSize: this.tiles.size, nativeSize: this.nativeTiles.size,
-        patchRect: this.patchInAtlas(), motion: moving,
+        patchRect: this.patchInAtlas(),
       });
       this.sphereState = pose;
       // The player captures and refracts this raster. Refresh at a settled pose,
