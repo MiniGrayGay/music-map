@@ -2,6 +2,15 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 
 const settingsKey = 'teyvat-bgm-playback';
 
+// 网易云固定公开外链（逻辑主 URL）与 API 兜底地址：兜底只读公开元数据接口，
+// 307 交给浏览器直连官方 CDN，本函数绝不接触音频字节。
+const neteaseOuterUrlPattern = /^https:\/\/music\.163\.com\/song\/media\/outer\/url\?id=\d+\.mp3$/;
+const neteaseApiFallbackBase = 'https://music-map-azure.vercel.app/api/netease-audio';
+
+function neteaseApiFallbackUrl(id) {
+  return `${neteaseApiFallbackBase}?id=${id}`;
+}
+
 // 页面会话内的音频失败诊断：模块级数组跨曲目、跨播放器实例保留，仅驻内存，不上报不持久化。
 // 每次实际失败事件逐条记录，不合并去重；禁止记录签名、凭证或原始查询串。
 const failureDiagnostics = [];
@@ -148,6 +157,9 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   const canPause = computed(() => requested.value && (playing.value || pending.value));
 
   let activeUrl = null;
+  // 兜底状态单一标志：切曲/切区由主 watch 重置；同曲节点重建沿用已发出的兜底，
+  // 不回退到已失效外链。手动重播时清零，重走主 URL + 兜底完整链路。
+  let usingNeteaseFallback = false;
   let playRequest = 0;
   let requestStartedAt = Number.NaN;
   let session;
@@ -186,6 +198,9 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
       }
     } catch (error) {
       if (attempt !== playRequest || !requested.value || !node.isConnected) return;
+      // 媒体错误已由/将由 onError 记诊断并提示（或转兜底），避免 play() 拒绝早于
+      // error 事件时先闪一次通知。
+      if (node.error) return;
       pending.value = false;
       if (error.name === 'NotAllowedError') failure.value = '请点击播放按钮开始播放';
       else failure.value = '音频播放失败';
@@ -211,6 +226,25 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
   function onError(event) {
     const node = event.currentTarget;
     if (!activeUrl || !node.error) return;
+    const neteaseId = track.value?.neteaseId;
+    // 首次失败且逻辑主 URL 是网易云固定公开外链：换 API 兜底地址重试一次；
+    // 只记诊断不弹通知，最终失败才提示。用户已暂停时不自动续播。
+    if (neteaseId && !usingNeteaseFallback && neteaseOuterUrlPattern.test(activeUrl)) {
+      usingNeteaseFallback = true;
+      playRequest += 1;
+      playing.value = false;
+      pending.value = false;
+      recordAudioFailure({
+        kind: 'HTMLMediaElement 错误（首次，转 API 兜底）',
+        detail: `MediaError code=${node.error.code}${node.error.message ? ` message="${node.error.message}"` : ''}`,
+        zone, track, node, requestStartedAt,
+      });
+      requestStartedAt = performance.now();
+      node.src = neteaseApiFallbackUrl(neteaseId);
+      node.load();
+      if (requested.value) void start(node);
+      return;
+    }
     playRequest += 1;
     playing.value = false;
     pending.value = false;
@@ -229,6 +263,11 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     if (node.error) {
       elapsed.value = 0;
       mediaDuration.value = 0;
+      // 手动重播视为新尝试：若此前兜底失败，回主 URL 重走完整链路。
+      if (usingNeteaseFallback) {
+        usingNeteaseFallback = false;
+        node.src = activeUrl;
+      }
       requestStartedAt = performance.now();
       node.load();
     }
@@ -271,6 +310,15 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     if (sameSource && !newZone) return;
     if (newZone) requested.value = !preview;
 
+    // 曲目或分区切换时重置兜底状态；同曲同区仅节点重建时沿用已发出的兜底，
+    // 避免回退到已失效的外链主 URL。
+    const trackChanged = previous[1] !== url;
+    if (trackChanged || newZone) usingNeteaseFallback = false;
+    const neteaseId = track.value?.neteaseId;
+    const effectiveUrl = !trackChanged && !newZone && usingNeteaseFallback && neteaseId
+      ? neteaseApiFallbackUrl(neteaseId)
+      : url;
+
     playRequest += 1;
     elapsed.value = 0;
     mediaDuration.value = 0;
@@ -280,15 +328,15 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume}) 
     activeUrl = url;
     node.pause();
     applySettings(node);
-    if (url) {
+    if (effectiveUrl) {
       requestStartedAt = performance.now();
-      node.src = url;
+      node.src = effectiveUrl;
     } else {
       node.removeAttribute('src');
       requestStartedAt = Number.NaN;
     }
     node.load();
-    if (url && requested.value) void start(node);
+    if (effectiveUrl && requested.value) void start(node);
   }, {flush: 'post'});
 
   watch([volume, muted, repeatMode], () => {
