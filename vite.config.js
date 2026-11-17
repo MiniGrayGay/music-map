@@ -153,6 +153,35 @@ function serveAudio(server) {
   });
 }
 
+const buildManifestPath = 'data/build-assets.json';
+
+// Vite's manifest only records assets with a rollup `name`; the `vite:worker`
+// plugin emits worker chunks with an explicit fileName and no name, so entries
+// like `assets/tileMipWorker-*.js` never reach data/build-assets.json and the
+// static export script omits them. Backfill those emitted assets here.
+function includeWorkerAssetsInManifest() {
+  return {
+    name: 'teyvat-manifest-backfill-unnamed-assets',
+    generateBundle: {
+      order: 'post',
+      handler(_options, bundle) {
+        const manifestEntry = bundle[buildManifestPath];
+        if (!manifestEntry || manifestEntry.type !== 'asset') return;
+        const manifest = JSON.parse(typeof manifestEntry.source === 'string'
+          ? manifestEntry.source
+          : Buffer.from(manifestEntry.source).toString('utf8'));
+        const listedFiles = new Set(Object.values(manifest).map((entry) => entry.file).filter(Boolean));
+        for (const asset of Object.values(bundle)) {
+          if (asset.type !== 'asset' || !/^assets\/[A-Za-z0-9_-]+\.js$/.test(asset.fileName)) continue;
+          if (listedFiles.has(asset.fileName)) continue;
+          manifest[`_${asset.fileName}`] = {file: asset.fileName};
+        }
+        manifestEntry.source = JSON.stringify(manifest, null, 2);
+      },
+    },
+  };
+}
+
 export default defineConfig({
   base: './',
   esbuild: {jsx: 'automatic'},
@@ -168,8 +197,9 @@ export default defineConfig({
         serveAudio(server);
       },
     },
+    includeWorkerAssetsInManifest(),
   ],
-  build: {emptyOutDir: false, manifest: 'data/build-assets.json'},
+  build: {emptyOutDir: false, manifest: buildManifestPath},
   server: {host: '127.0.0.1', port: 5177, strictPort: true},
   preview: {host: '127.0.0.1', port: 5177, strictPort: true},
 });
