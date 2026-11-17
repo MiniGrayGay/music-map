@@ -1,6 +1,6 @@
 <script setup>
 import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {groundPatch, loadGroundPatch} from './ground-patch.js';
+import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
 
 const props = defineProps({
   mapName: {type: String, required: true},
@@ -27,6 +27,7 @@ let backdropAt = -Infinity;
 let nativeIndex;
 let nativeKeys;
 let patchImage;
+let fontaineImage;
 let active = true;
 
 const keyFor = (z, x, y) => `${z}/${x}/${y}`;
@@ -211,6 +212,18 @@ function draw() {
     ctx.drawImage(patchImage, tx + left * scale, ty + top * scale, width * scale, height * scale);
     element.dataset.groundPatch = 'natlan-49-01';
   }
+  // 枫丹海域贴片独立于纳塔贴片：只要当前是提瓦特就在底图之上叠加。
+  if (fontaineImage && props.mapName === 'Teyvat') {
+    const [fx, fy, fw, fh] = fontaineSeaRect;
+    const left = tx + fx * props.canvas.width * scale;
+    const top = ty + fy * props.canvas.height * scale;
+    const width = fw * props.canvas.width * scale;
+    const height = fh * props.canvas.height * scale;
+    if (left < props.viewport.width && top < props.viewport.height
+      && left + width > 0 && top + height > 0) {
+      ctx.drawImage(fontaineImage, left, top, width, height);
+    }
+  }
   ctx.restore();
   visible.sort((a, b) => Math.hypot(a.left + size / 2 - width / 2, a.top + size / 2 - height / 2)
     - Math.hypot(b.left + size / 2 - width / 2, b.top + size / 2 - height / 2));
@@ -225,11 +238,29 @@ function draw() {
 
 watch(() => [props.transform.tx, props.transform.ty, props.transform.scale,
   props.viewport.width, props.viewport.height], dirty);
+// 枫丹海域贴片加载（loadFontaineSeaPatch 模块级去重，失败后重入可重试）。
+function loadFontaineOverlay() {
+  if (props.mapName !== 'Teyvat' || fontaineImage) return;
+  loadFontaineSeaPatch().then((image) => {
+    if (!active) return;
+    fontaineImage = image;
+    dirty();
+  }).catch(console.warn);
+}
+
+watch(() => props.mapName, () => {
+  if (active) {
+    // 组件复用时切回提瓦特也要补上尚未加载的贴片。
+    loadFontaineOverlay();
+    dirty();
+  }
+});
 onMounted(() => {
   dirty();
   if (props.mapName === groundPatch.map) {
     loadGroundPatch().then((image) => { patchImage = image; dirty(); }).catch(console.warn);
   }
+  loadFontaineOverlay();
 });
 onBeforeUnmount(() => {
   active = false;

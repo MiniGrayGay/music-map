@@ -7,6 +7,8 @@ uniform highp sampler2DArray u_detailAtlas;
 uniform sampler2D u_nativeMap;
 uniform highp sampler2DArray u_nativeAtlas;
 uniform sampler2D u_patch;
+uniform sampler2D u_fontaineSea;
+uniform vec4 u_fontaineSeaRect;
 uniform sampler2D u_moonStencil;
 uniform vec2 u_center;
 uniform float u_radius;
@@ -100,38 +102,14 @@ vec2 chartGradient(vec3 n, vec3 change) {
   return vec2(longitude, -latitude) / u_span;
 }
 
-float featheredBox(vec2 uv, vec2 lo, vec2 hi, float feather) {
-  vec2 enter = smoothstep(lo - feather, lo, uv);
-  vec2 leave = 1. - smoothstep(hi, hi + feather, uv);
-  vec2 coverage = enter * leave;
-  return coverage.x * coverage.y;
-}
-
-vec3 cleanFontaine(vec2 uv, vec3 terrain) {
-  // The source has flat, untextured patches at these two ends of Fontaine.
-  float west = featheredBox(uv, vec2(.386, .308), vec2(.498, .454), .007);
-  float east = featheredBox(uv, vec2(.580, .308), vec2(.644, .429), .007);
-  if (max(west, east) <= 0.) return terrain;
-  vec3 rgb = terrain * 255.;
-  float distanceToFill = min(
-    min(length(rgb - vec3(103., 95., 89.)), length(rgb - vec3(99., 138., 82.))),
-    min(length(rgb - vec3(78., 124., 63.)), length(rgb - vec3(92., 137., 85.)))
-  );
-  float fill = 1. - smoothstep(7., 18., distanceToFill);
-  float westLimit = mix(.493, .450, smoothstep(.368, .413, uv.y));
-  float eastLimit = mix(.399, .428, smoothstep(.585, .614, uv.x));
-  float westCore = featheredBox(uv, vec2(.387, .306), vec2(westLimit, .438), .008);
-  float eastCore = featheredBox(uv, vec2(.581, .306), vec2(.643, eastLimit), .007);
-  vec3 overview = textureLod(u_atlas, uv, 0.).rgb;
-  vec2 stride = 5. / vec2(textureSize(u_atlas, 0));
-  vec3 horizontal = textureLod(u_atlas, uv + vec2(stride.x, 0.), 0.).rgb
-    - textureLod(u_atlas, uv - vec2(stride.x, 0.), 0.).rgb;
-  vec3 vertical = textureLod(u_atlas, uv + vec2(0., stride.y), 0.).rgb
-    - textureLod(u_atlas, uv - vec2(0., stride.y), 0.).rgb;
-  float detail = max(max(length(horizontal), length(vertical)), length(overview - terrain));
-  float uniformity = 1. - smoothstep(.044, .125, detail);
-  float mask = max(max(westCore, eastCore), max(west, east) * fill * uniformity);
-  return mix(terrain, u_sea, mask);
+vec3 applyFontaineSea(vec3 terrain, vec2 uv, vec2 dx, vec2 dy) {
+  // 专用海面贴图：rect 为归一化 (left, top, w, h)，纹理未就绪时 z=0。
+  if (u_fontaineSeaRect.z <= 0.) return terrain;
+  vec2 local = (uv - u_fontaineSeaRect.xy) / u_fontaineSeaRect.zw;
+  if (any(lessThan(local, vec2(0.))) || any(greaterThan(local, vec2(1.)))) return terrain;
+  // 预乘 RGBA（JS 上传时 UNPACK_PREMULTIPLY_ALPHA_WEBGL=true）。
+  vec4 seaPatch = textureGrad(u_fontaineSea, local, dx / u_fontaineSeaRect.zw, dy / u_fontaineSeaRect.zw);
+  return terrain * (1. - seaPatch.a) + seaPatch.rgb;
 }
 
 vec3 oceanRelief(vec3 n) {
@@ -238,7 +216,7 @@ void main() {
   vec3 terrain = u_sea;
   if (coverage > 0.) terrain = mix(u_sea, readAtlas(uv, uvDx, uvDy), coverage);
   terrain = applyGroundPatch(terrain, uv, uvDx, uvDy);
-  if (u_cleanFontaine) terrain = cleanFontaine(uv, terrain);
+  if (u_cleanFontaine) terrain = applyFontaineSea(terrain, uv, uvDx, uvDy);
 
   float land = smoothstep(.085, .25, length(terrain - u_sea));
   float brightness = dot(terrain, vec3(.2126, .7152, .0722));
@@ -248,8 +226,14 @@ void main() {
   sea += (terrain - u_sea) * .32;
   sea += .012 * sin(n.x * 17. + n.y * 21.) * sin(n.z * 14.);
   if (u_oceanRelief) sea += oceanRelief(n) * (.72 + .43 * daylight);
-  vec3 landColor = mix(terrain, vec3(brightness * .94, brightness * 1.04, brightness * 1.04), .20);
-  landColor *= (.51 + daylight * .52) * vec3(.94, 1.02, 1.08);
+  vec3 landColor;
+  if (u_cleanFontaine) {
+    // Teyvat：保留原图色相，仅按日照做轻柔中性明暗；卫星等其他世界保持原光照。
+    landColor = terrain * mix(.72, 1., daylight);
+  } else {
+    landColor = mix(terrain, vec3(brightness * .94, brightness * 1.04, brightness * 1.04), .20);
+    landColor *= (.51 + daylight * .52) * vec3(.94, 1.02, 1.08);
+  }
   vec3 rgb = mix(sea, landColor, land * .94);
 
   vec2 grid = vec2(lon, lat) * (12. / PI);
@@ -265,6 +249,10 @@ void main() {
   rgb = mix(rgb, ice, graticule * (1. - land * .65));
 
   rgb = mix(rgb, vec3(.046, .102, .128), pow(1. - z, 2.6) * .43);
+  // 近景淡回烘焙原图（含海面贴图），复用现有 closeView。
+  if (u_cleanFontaine) {
+    rgb = mix(rgb, terrain, closeView * coverage * smoothstep(.28, .82, z));
+  }
   float opacity = 1. - smoothstep(.997, 1.001, r);
   pixel = vec4(rgb, opacity);
 }

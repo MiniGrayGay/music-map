@@ -130,7 +130,7 @@ function initialize(canvas, fragment) {
   gl.deleteShader(material);
   gl.useProgram(program);
   const uniforms = Object.fromEntries(
-    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'occluder'].map(
+    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'fontaineSeaRect', 'occluder'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
   );
@@ -163,7 +163,16 @@ function initialize(canvas, fragment) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
   gl.uniform1i(gl.getUniformLocation(program, 'u_moonStencil'), 6);
-  return {gl, uniforms, texture, patchTexture, moonStencil,
+  const fontaineSeaTexture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE7);
+  gl.bindTexture(gl.TEXTURE_2D, fontaineSeaTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+  gl.uniform1i(gl.getUniformLocation(program, 'u_fontaineSea'), 7);
+  return {gl, uniforms, texture, patchTexture, moonStencil, fontaineSeaTexture,
     detail: detailTextures(gl), nativeDetail: detailTextures(gl, 3, 4)};
 }
 
@@ -178,7 +187,8 @@ function uploadAtlas({gl, texture}, image, wrapLongitude = false) {
 function renderSphere(renderer, canvas, view) {
   const {gl, uniforms} = renderer;
   const {cx, cy, radius, ratio, world, basis, zoom = 1, detailSize = [0, 0],
-    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], occluder = [0, 0, 0]} = view;
+    nativeSize = [0, 0], patchRect = [0, 0, 0, 0], fontaineSeaRect = [0, 0, 0, 0],
+    occluder = [0, 0, 0]} = view;
   const extent = radius * 1.002;
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
   const bottom = Math.max(0, Math.floor(canvas.height - (cy + extent) * ratio));
@@ -208,6 +218,7 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform2fv(uniforms.detailSize, detailSize);
   gl.uniform2fv(uniforms.nativeSize, nativeSize);
   gl.uniform4fv(uniforms.patchRect, patchRect);
+  gl.uniform4fv(uniforms.fontaineSeaRect, fontaineSeaRect);
   gl.uniform3fv(uniforms.occluder, occluder);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.disable(gl.SCISSOR_TEST);
@@ -391,6 +402,21 @@ export class Globe {
     this.groundPatches ??= new Map();
     this.groundPatches.set(patch.map, {image, patch});
     this.syncGroundPatch();
+  }
+
+  setFontaineSeaPatch(image, rect) {
+    const {gl} = this;
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, this.fontaineSeaTexture);
+    // 海域贴片依赖半透明叠加，上传时预乘避免过滤时 RGB 泄漏。
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.activeTexture(gl.TEXTURE0);
+    this.fontaineSeaRect = rect;
+    this.sphereState = null;
+    this.requestFrame();
   }
 
   syncGroundPatch() {
@@ -674,6 +700,7 @@ export class Globe {
         cx, cy, ratio, radius, world: this.world, basis,
         zoom: this.zoom, detailSize: this.tiles.drawSize, nativeSize: this.nativeTiles.drawSize,
         patchRect: this.patchInAtlas(),
+        fontaineSeaRect: this.world.id === 'Teyvat' ? this.fontaineSeaRect : undefined,
       });
       this.sphereState = pose;
       // The player captures and refracts this raster. Refresh at a settled pose,

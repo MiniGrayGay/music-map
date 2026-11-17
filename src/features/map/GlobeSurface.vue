@@ -3,7 +3,7 @@ import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, 
 import LiquidGlass from '../../components/LiquidGlass.vue';
 import {pushEscapeHandler} from '../../components/escapeStack.js';
 import {musicView} from '../bgm/bgmStatus.js';
-import {groundPatch, loadGroundPatch} from './ground-patch.js';
+import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
 import {Globe} from './globe/globe.js';
 import {atlasAngles, clipAtlasRing, direction, fullSpan} from './globe/projection.js';
 import {
@@ -353,6 +353,8 @@ onMounted(() => {
   document.addEventListener('focusin', dismissOutsideSearch);
   void showWorld();
   loadGroundPatch().then((image) => globe?.setGroundPatch(image, groundPatch)).catch(console.warn);
+  // 默认世界即提瓦特；rect 只在提瓦特渲染中生效，其余世界传零矩形。
+  loadFontaineSeaPatch().then((image) => globe?.setFontaineSeaPatch(image, fontaineSeaRect)).catch(console.warn);
   // 装饰月球的 0.44MB 纹理只在不建第二 WebGL 上下文的桌面端预载。
   if (!globe.compact) texture('lroc-color-2k.jpg').then((image) => globe?.setMoon(image)).catch(() => {});
 });
