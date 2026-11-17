@@ -1,6 +1,6 @@
 <script setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, useId, watch} from 'vue';
-import {dayNightChoices, resolveRegionalPlaylist} from '../features/bgm/regionalPlaylist.js';
+import {resolveRegionalQueue} from '../features/bgm/regionalPlaylist.js';
 import {albumForTrack} from '../features/bgm/albumCovers.js';
 import {useMusicPlayback} from '../features/bgm/useMusicPlayback.js';
 import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
@@ -36,14 +36,13 @@ const volumeOpen = ref(false);
 const mobileVolume = matchMedia('(max-width: 700px), (pointer: coarse)');
 const systemVolume = ref(mobileVolume.matches);
 const selectedId = ref(null);
-const phase = ref('day');
 const overrides = shallowRef({});
 const browse = shallowRef(overrides.value);
 const zone = computed(() => props.zone);
-const music = computed(() => resolveRegionalPlaylist(zone.value, phase.value, overrides.value));
+const music = computed(() => resolveRegionalQueue(zone.value, overrides.value));
 const tracks = computed(() => music.value.tracks);
 const browseMusic = computed(() => browse.value === overrides.value
-  ? music.value : resolveRegionalPlaylist(zone.value, phase.value, browse.value));
+  ? music.value : resolveRegionalQueue(zone.value, browse.value));
 const browseTracks = computed(() => browseMusic.value.tracks);
 const queueKey = computed(() => `${zone.value.key}:${browseTracks.value.map(({id}) => id).join(',')}`);
 let queueHeightMotion;
@@ -565,9 +564,6 @@ onBeforeUnmount(() => {
 
       <RevealPanel :open="detailsOpen" liquid class="details-reveal">
         <div :id="`${uid}-details`" ref="detailsBody" class="player-details player-drawer scroll-viewport">
-          <div class="phase-control">
-            <SegmentedChoice label="昼夜" :choices="dayNightChoices" :value="phase" @select="phase = $event" />
-          </div>
           <SegmentedChoice
             v-for="condition in browseMusic.conditions"
             :key="condition.id"
@@ -1079,11 +1075,6 @@ onBeforeUnmount(() => {
     opacity: 0;
     transform: translateY(-8px);
   }
-}
-
-.phase-control {
-  display: flex;
-  justify-content: flex-start;
 }
 
 .details-reveal {

@@ -1,7 +1,7 @@
 import {markRaw} from 'vue';
 import {audioUrl, normalizeAudioBase} from './audioUrl.js';
 import {projectRings, ringsBBox, ringsPathData} from './zoneGeometry.js';
-import {withVerifiedTrack} from './musicGraph.js';
+import {normalizeGameStates, withVerifiedTrack} from './musicGraph.js';
 import {verifiedTrackFor} from './verifiedTracks.js';
 
 export const BGM_STATUS = {
@@ -141,7 +141,11 @@ function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaName
     cleanRings.push(points);
   }
   const exploration = normalizePlaylist(music?.[raw.state]?.playlists?.exploration, graph?.audioBaseUrl);
-  return {
+  // 清单 raw.gameMusicStates（可选）：复用 musicGraph 的同一份归一化实现，
+  // 含显式 0 值；归一化后为空（缺字段或条目全非法）则不携带字段，保持原
+  // 数据形状。判定只在 musicGraph，regionalPlaylist 门控同用此函数。
+  const gameMusicStates = normalizeGameStates(raw.gameMusicStates);
+  const zone = {
     key,
     id,
     name: name.trim(),
@@ -158,6 +162,8 @@ function normalizeZone(raw, index, keys, skipped, music, graph, origin, areaName
     graph,
     playlists: {exploration},
   };
+  if (Object.keys(gameMusicStates).length > 0) zone.gameMusicStates = gameMusicStates;
+  return zone;
 }
 
 function normalizePlaylist(playlist, audioBase) {

@@ -8,7 +8,7 @@ import {computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} 
 
 import RegionTooltip from '../../components/RegionTooltip.vue';
 import {musicView} from '../bgm/bgmStatus.js';
-import {dayNightChoices, resolveRegionalPlaylist} from '../bgm/regionalPlaylist.js';
+import {resolveRegionalPlaylist} from '../bgm/regionalPlaylist.js';
 import LayerOverlay from '../layers/LayerOverlay.vue';
 import {
   activeFocusRect,
@@ -134,7 +134,7 @@ const activeZoneRegion = computed(() => {
 const playableZones = new WeakMap();
 function zonePlayable(zone) {
   if (!playableZones.has(zone)) {
-    playableZones.set(zone, dayNightChoices.some(({key}) => resolveRegionalPlaylist(zone, key).tracks.length > 0));
+    playableZones.set(zone, ['day', 'night'].some((phase) => resolveRegionalPlaylist(zone, phase).tracks.length > 0));
   }
   return playableZones.get(zone);
 }

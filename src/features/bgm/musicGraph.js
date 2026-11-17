@@ -68,10 +68,29 @@ export function trackDetails(id, graph) {
     url: audioUrl(id, graph.audioBaseUrl)} : null;
 }
 
-function evaluate(graph, location, mode, overrides, discover) {
+// 可信游戏状态条目：uint32 group（>0）-> uint32 value（含 0）。判定只在此实现，
+// regionalPlaylist 的门控同用此函数，避免重复与口径漂移。
+export function isGameStateEntry(group, value) {
+  const id = Number(group);
+  return Number.isSafeInteger(id) && id > 0 && id <= 0xffffffff
+    && Number.isSafeInteger(value) && value >= 0 && value <= 0xffffffff;
+}
+
+// 归一化整份状态对象：非法条目丢弃，键归一为数字。空对象等效未传。
+export function normalizeGameStates(states) {
+  const clean = {};
+  for (const [group, value] of Object.entries(states ?? {})) {
+    if (isGameStateEntry(group, value)) clean[Number(group)] = value;
+  }
+  return clean;
+}
+
+function evaluate(graph, location, mode, overrides, discover, verified = null) {
   const locked = {[graph.zoneGroup]: location, [graph.modeGroup]: graph.modes[mode]};
   const preferred = {...(mode === 'combat' ? graph.combatDefaults : null), ...overrides};
-  const states = {...preferred, ...locked};
+  // 已核实的客户端游戏状态（如天气组）作基础状态；UI overrides 与 zone/mode
+  // 锁定值仍按原优先级覆盖其上。discovery 不读 verified，未命名组照常可发现。
+  const states = {...verified, ...preferred, ...locked};
   const options = new Map();
   const tracks = new Map();
   const unknown = new Set();
@@ -164,12 +183,17 @@ function evaluate(graph, location, mode, overrides, discover) {
   return {tracks: [...tracks.values()], options, preferred, issues, incomplete: unknown.size > 0};
 }
 
-export function resolveMusic(graph, location, mode, overrides = {}) {
+export function resolveMusic(graph, location, mode, overrides = {}, gameStates = null) {
   if (!Number.isSafeInteger(location) || !Object.hasOwn(graph.modes, mode)) {
     return {tracks: [], conditions: [], incomplete: true};
   }
+  // 只接受可信的 uint32 group -> uint32 value（isGameStateEntry 判定）；
+  // 归一化后为空即等效未传，保持旧行为。
+  const verified = normalizeGameStates(gameStates);
+  const hasVerified = Object.keys(verified).length > 0;
+  const verifiedBase = hasVerified ? verified : null;
   const scopedOverrides = {};
-  let resolved = evaluate(graph, location, mode, scopedOverrides, true);
+  let resolved = evaluate(graph, location, mode, scopedOverrides, true, verifiedBase);
   let advanced;
   do {
     advanced = false;
@@ -178,7 +202,7 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
       scopedOverrides[id] = key;
       advanced = true;
     }
-    if (advanced) resolved = evaluate(graph, location, mode, scopedOverrides, true);
+    if (advanced) resolved = evaluate(graph, location, mode, scopedOverrides, true, verifiedBase);
   } while (advanced);
   const conditions = [];
   for (const [id, keys] of resolved.options) {
@@ -187,7 +211,7 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
     const variants = new Map();
     for (const key of keys) {
       const label = graph.groups[id].options[key];
-      const choice = evaluate(graph, location, mode, {...scopedOverrides, [id]: key}, false);
+      const choice = evaluate(graph, location, mode, {...scopedOverrides, [id]: key}, false, verifiedBase);
       const fingerprint = playlistId(choice.tracks);
       if (!fingerprint && choice.incomplete) continue;
       if (variants.has(fingerprint)) continue;
@@ -227,8 +251,8 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
     const keys = [...new Set(graph.clock.points.map(([, key]) => key))]
       .filter((key) => key !== 0 && clockOptions[key] && selectable?.has(key));
     if (keys.length === 2) {
-      const dayChoice = evaluate(graph, location, mode, {...scopedOverrides, [clockId]: keys[0]}, false);
-      const nightChoice = evaluate(graph, location, mode, {...scopedOverrides, [clockId]: keys[1]}, false);
+      const dayChoice = evaluate(graph, location, mode, {...scopedOverrides, [clockId]: keys[0]}, false, verifiedBase);
+      const nightChoice = evaluate(graph, location, mode, {...scopedOverrides, [clockId]: keys[1]}, false, verifiedBase);
         // 两键都完整解析且产物终点都是零 SegmentID：该分区昼夜确实无探索曲，
         // 是确证空而非解析缺口。返回确证空结果，不猜分区、不触发兜底曲。
         const confirmedEmpty = (choice) => choice && !choice.incomplete
@@ -257,7 +281,9 @@ export function resolveMusic(graph, location, mode, overrides = {}) {
   }
   // 兜底条件：探索模式且没有任何 zone 作用域曲目（只剩通配 fallback），
   // 说明该分区在图中没有自己的探索曲；有真实区域曲的分区完全走原逻辑。
-  if (mode === 'exploration' && !resolved.tracks.some((track) => track.scope === 'zone')) {
+  // 明确传入游戏状态（含 0）时解析为空即确证空，不整区兜底。
+  if (mode === 'exploration' && !hasVerified
+    && !resolved.tracks.some((track) => track.scope === 'zone')) {
     const verified = verifiedEncore.get(graph);
     if (verified) {
       return {
