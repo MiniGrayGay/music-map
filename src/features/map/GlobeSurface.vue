@@ -363,6 +363,7 @@ onBeforeUnmount(() => {
 });
 defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 / 1.22),
   resetView, clearSelection,
+  viewportRect: () => globe?.viewportRect(props.mapData.canvas),
   focusZone: () => canvas.value?.focus({preventScroll: true}), jumpToZone,
 });
 </script>

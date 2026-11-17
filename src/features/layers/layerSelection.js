@@ -132,6 +132,20 @@ export const activeFloor = computed(() => floorOptions.value.find(
 export const activeLayerPieces = computed(() =>
   layerModeActive.value ? activeFloor.value?.entries ?? [] : []);
 
+export const contextLayerPieces = computed(() => {
+  const group = activeGroup.value;
+  if (!layerModeActive.value || !group) return [];
+  const drawn = new Set(activeLayerPieces.value.map(entry => entry.layerId));
+  const backgrounds = group.backgroundGroupIds.map(key =>
+    state.groups.find(candidate => candidate.key === key)).filter(Boolean);
+  return [...backgrounds, group].flatMap(candidate => candidate.floors.flatMap(floor => floor.entries))
+    .filter((entry) => {
+      if (drawn.has(entry.layerId)) return false;
+      drawn.add(entry.layerId);
+      return true;
+    });
+});
+
 // 定位目标：当前楼层贴片并集（显示坐标）。选中组/楼层后由选择器 emit，
 // 集成方用它把视口平移缩放到位（layerFocusTransform）。
 export const activeFocusRect = computed(() => {

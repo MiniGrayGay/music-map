@@ -35,6 +35,7 @@ import {
 const props = defineProps({
   appCanvas: {type: Object, required: true}, // 应用世界画布 {width,height}
   viewportRect: {type: Object, default: null}, // {x,y,width,height} 世界像素
+  readViewport: {type: Function, default: null},
   floorHost: {type: HTMLElement, default: null},
   expectedVersion: {type: String, default: DEFAULT_GAME_VERSION},
 });
@@ -56,6 +57,7 @@ const panelOpen = ref(false);
 let panelAnchor;
 const panelMotion = useAnchoredPanel(() => panelAnchor?.isConnected ? panelAnchor : modeButtonRef.value);
 const query = ref('');
+const openedViewport = ref(null);
 const highlightIndex = ref(0);
 
 const ready = computed(() => state.status === 'ready' && state.groups.length > 0);
@@ -77,8 +79,8 @@ const visibleGroups = computed(() => {
       `${group.label} ${group.searchText} ${group.floorText}`.toLocaleLowerCase().includes(text));
   }
   let list;
-  if (props.viewportRect) {
-    const rect = props.viewportRect;
+  const rect = props.viewportRect ?? openedViewport.value;
+  if (rect) {
     const [left, top, right, bottom] = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
     const centerX = (left + right) / 2;
     const centerY = (top + bottom) / 2;
@@ -90,7 +92,7 @@ const visibleGroups = computed(() => {
           + ((group.bbox.top + group.bbox.bottom) / 2 - centerY) ** 2;
         return {group, distance};
       })
-      .sort((a, b) => Number(a.group.unnamed) - Number(b.group.unnamed) || a.distance - b.distance)
+      .sort((a, b) => a.distance - b.distance)
       .slice(0, 20)
       .map((item) => item.group);
   } else {
@@ -123,6 +125,7 @@ function emitFocus() {
 // ---- 面板开关与焦点 ----
 function openPanel(focusSearch) {
   if (panelOpen.value) return;
+  openedViewport.value = props.readViewport?.() ?? null;
   panelAnchor = layerModeActive.value ? groupButtonRef.value : modeButtonRef.value;
   panelOpen.value = true;
   query.value = '';

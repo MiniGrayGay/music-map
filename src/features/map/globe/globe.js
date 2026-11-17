@@ -455,6 +455,38 @@ export class Globe {
       obstacles: this.labelObstacles(), minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM}));
   }
 
+  viewportRect(canvas) {
+    if (!this.world || !this.radius) return null;
+    const radius = this.radius * this.zoom;
+    const {cx, cy, width, height} = this;
+    const basis = cameraBasis(this.lon, this.lat);
+    const left = Math.max(-1, -cx / radius);
+    const right = Math.min(1, (width - cx) / radius);
+    const top = Math.min(1, cy / radius);
+    const bottom = Math.max(-1, (cy - height) / radius);
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (let row = 0; row <= 8; row++) {
+      const y = interpolate(top, bottom, row / 8);
+      for (let column = 0; column <= 8; column++) {
+        const x = interpolate(left, right, column / 8);
+        if (x * x + y * y > 1) continue;
+        for (const [u, v] of viewAtlasPoints(this.world, basis, this.zoom, x, y)) {
+          minU = Math.min(minU, u);
+          maxU = Math.max(maxU, u);
+          minV = Math.min(minV, v);
+          maxV = Math.max(maxV, v);
+        }
+      }
+    }
+    if (maxU <= minU || maxV <= minV) return null;
+    return {
+      x: minU * canvas.width,
+      y: minV * canvas.height,
+      width: (maxU - minU) * canvas.width,
+      height: (maxV - minV) * canvas.height,
+    };
+  }
+
   flyTo(lon, lat, zoom, center = null) {
     this.velocity = null;
     this.flight = null;

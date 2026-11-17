@@ -316,7 +316,10 @@ onBeforeUnmount(() => releasePlayerEscape?.());
               @update:model-value="selectMap"
             />
           </div>
-          <LayerPicker :app-canvas="activeMap.canvas" :viewport-rect="view.viewportRect" :floor-host="appRoot" />
+          <LayerPicker :app-canvas="activeMap.canvas"
+                       :viewport-rect="showGlobe ? null : view.viewportRect"
+                       :read-viewport="showGlobe ? surfaceRef?.viewportRect : null"
+                       :floor-host="appRoot" />
         </div>
       </div>
       <ToyFollowPrompt v-if="followCardPreview" :author="followCardPreview"

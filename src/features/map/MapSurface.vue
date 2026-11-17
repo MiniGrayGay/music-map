@@ -12,6 +12,7 @@ import {resolveRegionalPlaylist} from '../bgm/regionalPlaylist.js';
 import LayerOverlay from '../layers/LayerOverlay.vue';
 import {
   activeFocusRect,
+  contextLayerPieces,
   activeLayerPieces,
   layerFocusTransform,
   layerModeActive,
@@ -465,7 +466,7 @@ onBeforeUnmount(() => {
   <div
     ref="containerRef"
     class="map-surface"
-    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon}"
+    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon, 'layer-mode': layerModeActive}"
     tabindex="0"
     role="application"
     aria-roledescription="提瓦特区域地图"
@@ -487,7 +488,7 @@ onBeforeUnmount(() => {
          alt="" draggable="false" />
     <canvas v-if="isMoonCanon && moonSafety" ref="moonOverlay" class="moon-safety-overlay"
             :class="{'floor-context': layerModeActive}" :style="worldStyle" aria-hidden="true" />
-    <LayerOverlay :pieces="activeLayerPieces" :transform="transform"
+    <LayerOverlay :pieces="activeLayerPieces" :context-pieces="contextLayerPieces" :transform="transform"
                   @loaded="loadedLayerIds.add($event)" />
     <div class="world" :style="worldStyle">
       <!-- 分区透明命中层：不可见；hover/单击/右键/键盘都发生在这层。 -->
@@ -567,7 +568,7 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.map-surface:not(.moon-surface)::after {
+.map-surface:not(.moon-surface, .layer-mode)::after {
   position: absolute;
   z-index: 2;
   inset: 0;
@@ -601,7 +602,7 @@ onBeforeUnmount(() => {
 .tile-layer.floor-context,
 .moon-editor-patch.floor-context,
 .moon-safety-overlay.floor-context {
-  opacity: 0.38;
+  filter: brightness(.58) saturate(.78);
 }
 
 .zone-hits {
