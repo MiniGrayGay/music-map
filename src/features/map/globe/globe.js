@@ -1022,8 +1022,8 @@ export class Globe {
     if (target.hasAttribute('data-relief-closing')) return;
 
     const {left, top} = this.canvas.getBoundingClientRect();
-    const points = rings.flatMap(({outline}) => outline).filter(([x, y]) =>
-      x > 1 && x < this.width - 1 && y - lift > 1 && y - lift < this.height - 1,
+    const points = rings.flatMap(({outline}) => outline.map(([x, y]) => [x, y - lift])).filter(([x, y]) =>
+      x > 1 && x < this.width - 1 && y > 1 && y < this.height - 1,
     );
     if (points.length < 2) {
       this.hideReliefCard();
@@ -1033,8 +1033,8 @@ export class Globe {
     for (const [x, y] of points) {
       zone.left = Math.min(zone.left, x);
       zone.right = Math.max(zone.right, x);
-      zone.top = Math.min(zone.top, y - lift);
-      zone.bottom = Math.max(zone.bottom, y - lift);
+      zone.top = Math.min(zone.top, y);
+      zone.bottom = Math.max(zone.bottom, y);
     }
     const obstacles = this.labelObstacles();
     for (const label of this.labelFor.values()) {
@@ -1044,38 +1044,19 @@ export class Globe {
       left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
     }));
     const spanOnScreen = Math.max(zone.right - zone.left, zone.bottom - zone.top);
-    const height = clamp(96 + spanOnScreen * .28, 112, Math.min(224, this.height * .24));
-    const width = clamp(height * aspect, 120, Math.min(310, this.width * .27));
-    const panel = placeReliefCard(zone, {width, height}, this, controls, this.reliefEdge);
+    const heightLimit = Math.min(288, this.height * .32);
+    const height = Math.min(heightLimit, Math.max(178, 154 + spanOnScreen * .32));
+    const width = Math.min(430, this.width * .34, height * Math.max(1.1, aspect));
+    const panel = placeReliefCard(zone, {width, height}, this, controls, this.reliefEdge, points);
     if (!panel) {
       this.hideReliefCard();
       return;
     }
-    const {edge} = panel;
+    const {edge, leads: [first, second]} = panel;
     const horizontal = edge === 'top' || edge === 'bottom';
-    const start = horizontal ? zone.left : zone.top;
-    const end = horizontal ? zone.right : zone.bottom;
-    const span = horizontal ? panel.width : panel.height;
     const panelStart = horizontal ? panel.left : panel.top;
-    const edgePosition = {top: panel.top, bottom: panel.bottom, left: panel.left, right: panel.right}[edge];
-    const candidates = points.map(([x, baseY]) => {
-      const y = baseY - lift;
-      const along = clamp(horizontal ? x : y, panelStart + span * .12, panelStart + span * .88);
-      const to = horizontal ? [along, edgePosition] : [edgePosition, along];
-      return {x, y, along, to, distance: Math.hypot(to[0] - x, to[1] - y)};
-    });
-    const closer = (best, candidate) => !best || candidate.distance < best.distance ? candidate : best;
-    const first = candidates.reduce(closer);
-    const separation = Math.min(34, span * .18, (end - start) * .2);
-    const second = candidates.reduce((best, candidate) => candidate !== first
-      && Math.abs(candidate.along - first.along) >= Math.max(4, separation)
-      ? closer(best, candidate) : best, null);
-    if (!second) {
-      this.hideReliefCard();
-      return;
-    }
-    const leadStart = Math.min(first.along, second.along) - panelStart;
-    const leadSpan = Math.abs(first.along - second.along);
+    const leadStart = first.attach - panelStart;
+    const leadSpan = second.attach - first.attach;
     this.reliefEdge = edge;
 
     this.reliefLeadStarted ??= time;

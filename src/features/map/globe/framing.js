@@ -1,8 +1,41 @@
 import {atlasAngles, cameraBasis, clamp, outlineDepth, projectAtlas, projectVisibleOutline} from './projection.js';
 
-export function placeReliefCard(zone, card, viewport, obstacles, previousEdge) {
+function reliefConnections(zone, panel, points) {
+  const {edge} = panel;
+  const horizontal = edge === 'top' || edge === 'bottom';
+  const start = horizontal ? panel.left : panel.top;
+  const length = horizontal ? panel.width : panel.height;
+  const middle = horizontal ? (zone.left + zone.right) / 2 : (zone.top + zone.bottom) / 2;
+  const padding = Math.min(18, length * .12);
+  const min = start + padding;
+  const max = start + length - padding;
+  const edgePosition = panel[edge];
+  const best = [null, null];
+
+  for (const [x, y] of points) {
+    const along = horizontal ? x : y;
+    const normalDistance = Math.abs((horizontal ? y : x) - edgePosition);
+    const index = along <= middle ? 0 : 1;
+    const side = index === 0 ? -1 : 1;
+    // Both leads move outward along the edge by a fixed minimum angle,
+    // even when the dock is offset to make room for a map label.
+    const minimumOffset = Math.max(8, normalDistance * .46);
+    const low = side > 0 ? Math.max(min, along + minimumOffset) : min;
+    const high = side < 0 ? Math.min(max, along - minimumOffset) : max;
+    if (low > high) continue;
+    const desiredOffset = clamp(normalDistance * .82, 18, 68);
+    const attach = clamp(along + side * desiredOffset, low, high);
+    const distance = Math.hypot(normalDistance, attach - along);
+    if (!best[index] || distance < best[index].distance) {
+      best[index] = {x, y, attach, to: horizontal ? [attach, edgePosition] : [edgePosition, attach], distance};
+    }
+  }
+  return best.every(Boolean) ? best : null;
+}
+
+export function placeReliefCard(zone, card, viewport, obstacles, previousEdge, points) {
   const margin = 16;
-  const gap = clamp(Math.min(zone.right - zone.left, zone.bottom - zone.top) * .17, 28, 52);
+  const gap = clamp(Math.min(zone.right - zone.left, zone.bottom - zone.top) * .17, 34, 56);
   const compactZone = Math.max(zone.right - zone.left, zone.bottom - zone.top) < 120;
   const centerX = viewport.width / 2;
   const centerY = viewport.height / 2;
@@ -51,7 +84,9 @@ export function placeReliefCard(zone, card, viewport, obstacles, previousEdge) {
         const score = Math.abs(along + size / 2 - center) + inwardPenalty
           + (1 - scale) * 160 + (edge === previousEdge ? 0 : 26);
         if (!best || score < best.score) {
-          best = {left, right, top, bottom, width, height, edge, scale, score};
+          const panel = {left, right, top, bottom, width, height, edge};
+          const leads = reliefConnections(zone, panel, points);
+          if (leads) best = {...panel, score, leads};
         }
       }
     }
