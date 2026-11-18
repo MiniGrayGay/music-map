@@ -1,17 +1,18 @@
 <script setup>
 // 应用组合层：装载地图数据与音乐分区清单，组织地图主画面、缩放控件与分区
-// 音乐播放器。清单缺失/契约不符时保持空态（只有地图本身）；播放器只绑定
-// 真实清单里的分区，页面不展示任何假设的音乐层。
+// 音乐播放器。分区曲目来自地图清单，自建歌单沿用同一播放器。
 import {computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch} from 'vue';
 import LayerPicker from './components/LayerPicker.vue';
 import LiquidGlass from './components/LiquidGlass.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
+import PlaylistLibrary from './components/PlaylistLibrary.vue';
 import SelectMenu from './components/SelectMenu.vue';
 import ToyFollowPrompt from './components/ToyFollowPrompt.vue';
 import ZoomControls from './components/ZoomControls.vue';
 import {useAnchoredPanel} from './components/panelMotion.js';
 import {pushEscapeHandler} from './components/escapeStack.js';
 import {BGM_STATUS, loadRegionBgm} from './features/bgm/bgmStatus.js';
+import {usePlaylistLibrary} from './features/bgm/playlistLibrary.js';
 import {prepareToyFollow, toyFollowCardPreview} from './features/bgm/toyFollow.js';
 import {loadMapData} from './features/map/mapData.js';
 import {retireReliefDock} from './features/map/reliefDockMotion.js';
@@ -41,13 +42,19 @@ const bgm = reactive({
   skipped: 0,
   clientVersion: null,
 });
-const activeZone = ref(null); // 播放器当前绑定的音乐分区（真实清单条目）
+const activeZone = ref(null); // 地图当前选中的音乐分区
+const playlistLibrary = usePlaylistLibrary();
+const playlistPlayback = shallowRef(null);
+const playlistPageOpen = ref(false);
+const playbackZone = computed(() => playlistPlayback.value ?? activeZone.value);
 const presentedZone = ref(null);
 const view = reactive({canZoomIn: true, canZoomOut: true});
 const globeSurface = ref(null);
 const planeSurface = ref(null);
 const planeStage = ref(null);
 const mapToolbar = ref(null);
+const mapPopupPresent = ref(false);
+const layerPopupPresent = ref(false);
 const playerRef = ref(null);
 const playerMotion = useAnchoredPanel(
   (panel) => panel.querySelector('button[aria-label="关闭播放器"]'),
@@ -295,22 +302,40 @@ function receiveBackdrop(canvas) {
   refreshBackdrop();
 }
 
+function readMapBackdrop() {
+  return currentBackdrop;
+}
+
 function refreshBackdrop() {
-  if (activeZone.value && currentBackdrop) playerRef.value?.updateBackdrop(currentBackdrop);
+  if (playbackZone.value && currentBackdrop) playerRef.value?.updateBackdrop(currentBackdrop);
 }
 
 watch(playerRef, refreshBackdrop, {flush: 'post'});
-watch(activeZone, (zone) => {
+watch(playbackZone, (zone) => {
   if (zone) presentedZone.value = zone;
   else playerRef.value?.pause();
 }, {flush: 'sync'});
+
+function activateRegion(zone) {
+  activeZone.value = zone;
+  playlistPlayback.value = null;
+}
+
+function playPlaylist({id, name, tracks, trackId}) {
+  playlistPlayback.value = {
+    key: 'playlist-' + id,
+    name,
+    playlistTracks: tracks,
+    startTrackId: trackId,
+  };
+}
 
 let releasePlayerFrame;
 function releaseClosedPlayer() {
   cancelAnimationFrame(releasePlayerFrame);
   releasePlayerFrame = requestAnimationFrame(() => {
     releasePlayerFrame = requestAnimationFrame(() => {
-      if (!activeZone.value) presentedZone.value = null;
+      if (!playbackZone.value) presentedZone.value = null;
     });
   });
 }
@@ -318,7 +343,7 @@ onBeforeUnmount(() => cancelAnimationFrame(releasePlayerFrame));
 
 function closePlayer() {
   const previousZone = activeZone.value;
-  activeZone.value = null;
+  activateRegion(null);
   surfaceRef.value?.clearSelection();
   surfaceRef.value?.focusZone(previousZone?.key);
 }
@@ -326,12 +351,12 @@ function closePlayer() {
 // Escape 关闭播放器经消费栈排队：试听详情、条件下拉、地图菜单、分层
 // 搜索面板打开时都排在它前面（后开先关）。切区保留播放器原有的栈序。
 let releasePlayerEscape = null;
-watch(() => Boolean(activeZone.value), (open) => {
+watch(() => Boolean(playbackZone.value), (open) => {
   releasePlayerEscape?.();
   releasePlayerEscape = null;
   if (open) {
     releasePlayerEscape = pushEscapeHandler(() => {
-      if (!activeZone.value) return false;
+      if (!playbackZone.value || playlistPageOpen.value) return false;
       closePlayer();
       return true;
     });
@@ -343,7 +368,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 <template>
   <div ref="appRoot" class="app" :class="{'app--mobile': mobileDevice}">
     <template v-if="mapData">
-      <div v-if="!mobileDevice" class="app-controls" :inert="!!mapHandoff">
+      <div v-if="!mobileDevice" class="app-controls" :inert="playlistPageOpen || !!mapHandoff">
         <ZoomControls
           :can-zoom-in="view.canZoomIn"
           :can-zoom-out="view.canZoomOut"
@@ -355,7 +380,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @reset="surfaceRef?.resetView()"
         />
       </div>
-      <div v-if="keepGlobe" class="map-stage" :inert="!!mapHandoff || !showGlobe">
+      <div v-if="keepGlobe" class="map-stage" :inert="playlistPageOpen || !!mapHandoff || !showGlobe">
         <GlobeSurface
           ref="globeSurface"
           :map-data="activeMap"
@@ -363,7 +388,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           :bgm="bgm"
           :active-zone="activeZone"
           :available-maps="mapOptions"
-          :search-host="showGlobe ? mapToolbar : null"
+          :search-host="mapToolbar"
+          :toolbar-covered="!showGlobe || mapPopupPresent || layerPopupPresent"
           :initial-viewport="mapHandoff?.toGlobe ? mapHandoff.viewport : null"
           :relief-target="reliefDock"
           :relief-aspect="reliefAspect"
@@ -372,7 +398,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @canvas-frame="onGlobeFrame"
           @handoff-ready="mapHandoff?.toGlobe && blendSurfaces(mapHandoff)"
           @view="(state) => { if (showGlobe) Object.assign(view, state) }"
-          @zone-activate="activeZone = $event"
+          @zone-activate="activateRegion"
           @zone-focus="focusRelief"
           @relief-reveal="revealRelief"
           @select-map="selectMap"
@@ -380,7 +406,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         />
       </div>
       <div v-if="keepPlane" ref="planeStage" class="map-stage" :style="{opacity: presentedGlobe ? 0 : 1}"
-           :inert="!!mapHandoff || showGlobe">
+           :inert="playlistPageOpen || !!mapHandoff || showGlobe">
         <MapSurface
           :key="mapName"
           ref="planeSurface"
@@ -393,7 +419,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @canvas-frame="(canvas) => { if (!showGlobe) receiveBackdrop(canvas) }"
           @surface-ready="onPlaneReady"
           @view="onPlaneView"
-          @zone-activate="activeZone = $event"
+          @zone-activate="activateRegion"
           @blank-tap="activeZone = null"
         />
       </div>
@@ -422,20 +448,25 @@ onBeforeUnmount(() => releasePlayerEscape?.());
                   @after-leave="releaseClosedPlayer">
         <MusicPlayer
           v-if="presentedZone"
-          v-show="activeZone"
+          v-show="playbackZone"
           ref="playerRef"
           :zone="presentedZone"
+          :favorite-ids="playlistLibrary.favorites.value"
+          :inert="playlistPageOpen"
           @close="closePlayer"
+          @favorite="playlistLibrary.toggleFavorite"
         />
       </Transition>
-      <div ref="mapToolbar" class="map-toolbar">
+      <div ref="mapToolbar" class="map-toolbar" :inert="playlistPageOpen">
         <div class="map-toolbar-row">
-          <div v-if="Object.keys(baseMaps).length" class="map-switcher">
+          <div class="map-switcher">
             <SelectMenu
               :model-value="mapName"
               :options="mapOptions"
+              :disabled="mapOptions.length < 2"
               aria-label="切换地图"
               glass
+              @presence="mapPopupPresent = $event"
               @update:model-value="selectMap"
             />
           </div>
@@ -443,12 +474,15 @@ onBeforeUnmount(() => releasePlayerEscape?.());
                        :viewport-rect="showGlobe ? null : view.viewportRect"
                        :read-viewport="showGlobe ? surfaceRef?.viewportRect : null"
                        :floor-host="appRoot"
-                       :switching="!!mapHandoff" />
+                       :switching="!!mapHandoff"
+                       @presence="layerPopupPresent = $event" />
+          <PlaylistLibrary :library="playlistLibrary" :read-backdrop="readMapBackdrop"
+                           @play="playPlaylist" @page-open="playlistPageOpen = $event" />
         </div>
       </div>
       <ToyFollowPrompt v-if="followCardPreview" :author="followCardPreview"
                        @dismiss="followCardPreview = null" />
-      <div v-if="!activeZone && bgm.reason && bgm.status !== BGM_STATUS.READY"
+      <div v-if="!playbackZone && bgm.reason && bgm.status !== BGM_STATUS.READY"
            class="music-unavailable" role="status">
         <span>{{ bgm.status === BGM_STATUS.LOADING ? '正在重新加载音乐分区' : '暂时无法加载音乐分区' }}</span>
         <button type="button" :disabled="bgm.status === BGM_STATUS.LOADING" @click="loadMusic">重试</button>
@@ -563,12 +597,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   gap: var(--space-1);
 }
 
-.map-toolbar:has(.map-switcher .select-trigger[aria-expanded='true'],
-    .layer-picker .panel:is([data-panel-open], [data-liquid-morph]))
-    :deep(.globe-search) {
-  visibility: hidden;
-}
-
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
   .app {
     /* 移动端控件共享外边距、命中尺寸与行距。 */
@@ -615,7 +643,6 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   }
 
   .app :deep(.layer-picker .bar) {
-    gap: 4px;
     padding: 0;
   }
 
@@ -629,7 +656,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
       - env(safe-area-inset-bottom))));
   }
 
-  .app:has(.floor-buttons) {
+  .app:has(.floors[data-panel-open]) {
     --player-top-clearance: calc(var(--mobile-tools-top) + var(--mobile-control-size) + 16px);
   }
 
@@ -667,8 +694,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
   gap: var(--space-1);
 }
 
-.map-toolbar-row > *,
-.map-toolbar :deep(.globe-search) {
+.map-toolbar-row > * {
   pointer-events: auto;
 }
 

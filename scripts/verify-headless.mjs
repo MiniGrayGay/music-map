@@ -412,7 +412,7 @@ async function main() {
     const search = 'input[aria-label="跳转到地点"]';
     await globe.click(search);
     await globe.type(search, '枫丹廷');
-    await globe.waitForSelector('.globe-results button');
+    await globe.waitForSelector('.globe-results[data-panel-open] button');
     check(await globe.$$eval('.globe-results button', (buttons) =>
       buttons.filter((button) => button.querySelector('span')?.textContent === '枫丹廷区').length === 1),
     '球面搜索合并同名同音乐状态的重复结果');
@@ -422,14 +422,14 @@ async function main() {
     '搜索方向键可选择下一条结果');
     await globe.click('.map-switcher .select-trigger');
     await globe.waitForSelector('.select-popup', {visible: true});
-    check(await globe.$('.globe-results') === null, '地图菜单打开时搜索结果关闭');
+    check(await globe.$('.globe-results[data-panel-open]') === null, '地图菜单打开时搜索结果关闭');
     await globe.keyboard.press('Escape');
     await globe.click(search);
     await globe.keyboard.down('Control');
     await globe.keyboard.press('KeyA');
     await globe.keyboard.up('Control');
     await globe.type(search, '新基捷城');
-    await globe.waitForSelector('.globe-results button');
+    await globe.waitForSelector('.globe-results[data-panel-open] button');
     await globe.keyboard.press('Enter');
     const activeLabel = await globe.waitForSelector('.globe-labels .active-zone-label', {visible: true});
     check(await activeLabel.evaluate((label) => label.textContent) === '新基捷城'

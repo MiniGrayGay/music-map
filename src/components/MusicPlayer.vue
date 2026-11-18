@@ -4,6 +4,7 @@ import {resolveRegionalQueue} from '../features/bgm/regionalPlaylist.js';
 import {albumForTrack} from '../features/bgm/albumCovers.js';
 import {useMusicPlayback} from '../features/bgm/useMusicPlayback.js';
 import {useToyFollow} from '../features/bgm/toyFollow.js';
+import FavoriteHeart from './FavoriteHeart.vue';
 import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
 import LiquidGlass from './LiquidGlass.vue';
 import RevealPanel from './RevealPanel.vue';
@@ -14,8 +15,9 @@ import ToyFollowPrompt from './ToyFollowPrompt.vue';
 const props = defineProps({
   zone: {type: Object, required: true},
   preview: {type: Boolean, default: false},
+  favoriteIds: {type: Array, default: null},
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'favorite']);
 
 const uid = useId();
 const glass = ref(null);
@@ -37,13 +39,17 @@ const detailsBody = ref(null);
 const volumeOpen = ref(false);
 const mobileVolume = matchMedia('(max-width: 700px), (pointer: coarse)');
 const systemVolume = ref(mobileVolume.matches);
-const selectedId = ref(null);
+const selectedId = ref(props.zone.playlistTracks?.find(
+  ({neteaseId}) => neteaseId === props.zone.startTrackId,
+)?.id ?? null);
 const overrides = shallowRef({});
 const browse = shallowRef(overrides.value);
 const zone = computed(() => props.zone);
-const music = computed(() => resolveRegionalQueue(zone.value, overrides.value));
+const music = computed(() => zone.value.playlistTracks
+  ? {tracks: zone.value.playlistTracks, conditions: []}
+  : resolveRegionalQueue(zone.value, overrides.value));
 const tracks = computed(() => music.value.tracks);
-const browseMusic = computed(() => browse.value === overrides.value
+const browseMusic = computed(() => zone.value.playlistTracks || browse.value === overrides.value
   ? music.value : resolveRegionalQueue(zone.value, browse.value));
 const browseTracks = computed(() => browseMusic.value.tracks);
 const queueKey = computed(() => `${zone.value.key}:${browseTracks.value.map(({id}) => id).join(',')}`);
@@ -53,6 +59,7 @@ const activeIndex = computed(() => Math.max(
   tracks.value.findIndex(({id}) => id === selectedId.value),
 ));
 const track = computed(() => tracks.value[activeIndex.value] ?? null);
+const isFavorite = computed(() => props.favoriteIds?.includes(track.value?.neteaseId) ?? false);
 const title = computed(() => track.value?.displayName ?? '暂无曲目');
 const cover = computed(() => track.value ? albumForTrack(track.value.id) : null);
 // 图片加载失败时回退音符占位；封面地址一变就重置，切歌不误报别的封面。
@@ -139,6 +146,20 @@ watch(() => zone.value.key, () => {
   overrides.value = {};
   browse.value = overrides.value;
   volumeOpen.value = false;
+}, {flush: 'sync'});
+
+// 每次列表点播都传入新请求，支持在当前歌单切歌或恢复同一首。
+watch(zone, async (requestedZone) => {
+  if (!requestedZone.playlistTracks) return;
+  const requestedTrack = requestedZone.playlistTracks.find(
+    ({neteaseId}) => neteaseId === requestedZone.startTrackId,
+  );
+  if (!requestedTrack) return;
+  selectedId.value = requestedTrack.id;
+  await nextTick();
+  if (zone.value === requestedZone && track.value?.id === requestedTrack.id && !canPause.value) {
+    play();
+  }
 }, {flush: 'sync'});
 
 // 记录真正解析出的音轨；切换条件时尽量保留仍在当前曲单里的曲目。
@@ -404,16 +425,28 @@ onBeforeUnmount(() => {
           </p>
           <p v-else class="album-row album-row--empty" aria-hidden="true"></p>
         </div>
-        <button
-          v-if="!preview"
-          type="button"
-          class="icon-button"
-          aria-label="关闭播放器"
-          title="关闭播放器"
-          @click="emit('close')"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-        </button>
+        <div v-if="!preview" class="player-heading-actions">
+          <button
+            v-if="favoriteIds && track?.neteaseId"
+            type="button"
+            class="icon-button favorite-toggle"
+            :aria-label="(isFavorite ? '取消收藏 ' : '收藏 ') + title"
+            :aria-pressed="isFavorite"
+            :title="isFavorite ? '取消收藏' : '收藏'"
+            @click="emit('favorite', track.neteaseId)"
+          >
+            <FavoriteHeart :filled="isFavorite" />
+          </button>
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="关闭播放器"
+            title="关闭播放器"
+            @click="emit('close')"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
       </header>
 
       <div class="seek-row">
@@ -676,6 +709,11 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
+.player-heading-actions {
+  display: flex;
+  flex: none;
+}
+
 .cover-slot {
   flex: none;
   width: 72px;
@@ -792,6 +830,10 @@ onBeforeUnmount(() => {
 
 .music-player button[aria-pressed="true"] {
   background-image: var(--player-selection);
+}
+
+.music-player .favorite-toggle[aria-pressed="true"] {
+  background-image: none;
 }
 
 .music-player :is(button, input):focus-visible {

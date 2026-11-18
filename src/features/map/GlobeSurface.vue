@@ -1,6 +1,6 @@
 <script setup>
 import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useId, watch} from 'vue';
-import LiquidGlass from '../../components/LiquidGlass.vue';
+import GlassPanel from '../../components/GlassPanel.vue';
 import {pushEscapeHandler} from '../../components/escapeStack.js';
 import {musicView} from '../bgm/bgmStatus.js';
 import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
@@ -18,6 +18,7 @@ const props = defineProps({
   activeZone: {type: Object, default: null},
   availableMaps: {type: Array, required: true},
   searchHost: {type: HTMLElement, default: null},
+  toolbarCovered: {type: Boolean, default: false},
   reliefTarget: {type: HTMLElement, default: null},
   reliefAspect: {type: Number, default: null},
   initialViewport: {type: Object, default: null},
@@ -42,6 +43,7 @@ const labels = ref(null);
 const moonLink = ref(null);
 const query = ref('');
 const searchForm = ref(null);
+const searchField = ref(null);
 const searchResults = ref(null);
 const searchOpen = ref(false);
 const searchIndex = ref(0);
@@ -96,7 +98,7 @@ function dismissOutsideSearch(event) {
 }
 
 function openSearch() {
-  searchOpen.value = Boolean(query.value.trim());
+  searchOpen.value = !props.toolbarCovered && Boolean(query.value.trim());
 }
 
 function onSearchKeydown(event) {
@@ -128,6 +130,9 @@ watch(query, () => {
 });
 watch(results, ({length}) => {
   searchIndex.value = Math.min(searchIndex.value, Math.max(0, length - 1));
+});
+watch(() => props.toolbarCovered, covered => {
+  if (covered) dismissSearch();
 });
 watch(searchOpen, (open, _, cleanup) => {
   if (!open) return;
@@ -308,7 +313,7 @@ watch(() => props.activeZone, (zone) => {
 onMounted(() => {
   try {
     globe = new Globe({canvas: canvas.value, satellite: moon.value, moonLink: moonLink.value,
-      lunarLayer: lunarLayer.value,
+      lunarLayer: lunarLayer.value, mobileDevice: props.mobileDevice,
       signals: signals.value, stars: stars.value, labels: labels.value, fragment,
       onFrame: (element) => emit('canvas-frame', element),
       onReliefReveal: key => emit('relief-reveal', key),
@@ -319,7 +324,8 @@ onMounted(() => {
       },
       labelObstacles(includeRelief = false) {
         const overlays = document.querySelectorAll(
-          '.app-controls, .map-toolbar-row, .layer-picker .panel[data-panel-open], .globe-search, .music-player:not([inert])',
+          '.app-controls, .map-toolbar-row, .layer-picker .panel[data-panel-open], ' +
+          '.globe-search-field[data-panel-open], .globe-results[data-panel-open], .music-player:not([inert])',
         );
         const bounds = Array.from(overlays, element => element.getBoundingClientRect());
         const relief = props.reliefTarget;
@@ -371,7 +377,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
     <canvas ref="stars" aria-hidden="true" />
     <canvas ref="canvas" class="globe-canvas" tabindex="0"
             aria-label="球面地图，可拖动或用方向键旋转，滚轮缩放，回车选择地点" />
-    <canvas ref="moon" aria-hidden="true" hidden />
+    <canvas ref="moon" class="globe-satellite" aria-hidden="true" hidden />
     <canvas ref="lunarLayer" class="lunar-transition" aria-hidden="true" hidden />
     <canvas ref="signals" aria-hidden="true" />
     <div ref="labels" class="globe-labels" role="group" aria-label="提瓦特地区" />
@@ -381,8 +387,15 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
     <Teleport v-if="searchHost" :to="searchHost">
       <form ref="searchForm" class="globe-search"
             @submit.prevent="searchOpen && chooseResult(results[searchIndex])">
-        <div class="globe-search-field map-glass">
-          <LiquidGlass variant="clear" :light="1.55" />
+        <GlassPanel
+          ref="searchField"
+          :open="!toolbarCovered"
+          class="globe-search-field"
+          variant="clear"
+          :light="1.55"
+          inline
+          appear
+        >
           <svg viewBox="0 0 24 24" class="globe-search-icon" aria-hidden="true">
             <path d="m16 16 4.5 4.5M18 11A7 7 0 1 1 4 11a7 7 0 0 1 14 0Z"
                   fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
@@ -393,18 +406,19 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
                  :aria-activedescendant="searchOpen && results.length ? resultId(searchIndex) : undefined"
                  placeholder="搜索地点" @focus="openSearch" @click="openSearch"
                  @keydown="onSearchKeydown" />
-        </div>
-        <div v-if="searchOpen" class="globe-results map-glass scroll-viewport">
-          <LiquidGlass />
-          <div :id="resultListId" ref="searchResults" role="listbox" aria-label="地点搜索结果">
-            <button v-for="(zone, index) in results" :id="resultId(index)" :key="zone.map + '/' + zone.key"
-                    type="button" role="option" tabindex="-1" :aria-selected="index === searchIndex"
-                    @mousedown.prevent @click="chooseResult(zone)">
-              <span>{{ zone.name }}</span><small v-if="zone.map !== mapName">{{ zone.label }}</small>
-            </button>
+        </GlassPanel>
+        <GlassPanel :open="searchOpen && !toolbarCovered" :anchor="searchField?.element" class="globe-results">
+          <div class="globe-result-list scroll-viewport">
+            <div :id="resultListId" ref="searchResults" role="listbox" aria-label="地点搜索结果">
+              <button v-for="(zone, index) in results" :id="resultId(index)" :key="zone.map + '/' + zone.key"
+                      type="button" role="option" tabindex="-1" :aria-selected="index === searchIndex"
+                      @mousedown.prevent @click="chooseResult(zone)">
+                <span>{{ zone.name }}</span><small v-if="zone.map !== mapName">{{ zone.label }}</small>
+              </button>
+            </div>
+            <p v-if="!results.length" role="status">没有匹配的分区</p>
           </div>
-          <p v-if="!results.length" role="status">没有匹配的分区</p>
-        </div>
+        </GlassPanel>
       </form>
     </Teleport>
   </div>
@@ -425,6 +439,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   background: radial-gradient(ellipse at 33% 50%, #172541, #0d162c 54%, #080c1a);
 }
 .globe-surface > canvas, .globe-labels { position: absolute; inset: 0; width: 100%; height: 100%; }
+.globe-surface > .globe-satellite { right: auto; bottom: auto; }
 .globe-surface > canvas:not(.globe-canvas), .globe-labels { pointer-events: none; }
 .globe-canvas { cursor: grab; touch-action: none; }
 .globe-canvas:active { cursor: grabbing; }
@@ -465,7 +480,13 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   color: #e1eddf;
   text-align: center;
 }
-.globe-search { contain: inline-size; margin: 0; transition-property: none; }
+.globe-search {
+  --search-field-size: 48px;
+  position: relative;
+  contain: inline-size;
+  min-block-size: var(--search-field-size);
+  margin: 0;
+}
 .globe-search-field, .globe-results {
   width: 100%; border-radius: var(--radius-control);
 }
@@ -482,10 +503,12 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   transform: translateY(-50%);
   pointer-events: none;
 }
-.globe-search input { width: 100%; height: 48px; padding-inline: 53px 14px; font: inherit;
+.globe-search input { display: block; width: 100%; height: var(--search-field-size);
+  padding-inline: 53px 14px; font: inherit;
   color: var(--text-primary); background: transparent; border: 0; border-radius: inherit; }
 .globe-search input::placeholder { color: var(--text-secondary); }
-.globe-results { margin-top: 5px; max-height: min(40vh, 360px); overflow: auto; padding: 4px; }
+.globe-results { position: absolute; top: calc(var(--search-field-size) + 5px); }
+.globe-result-list { max-height: min(40dvh, 360px); overflow: auto; padding: 4px; }
 .globe-results button { border: 0; border-radius: 5px; width: 100%; background: transparent;
   min-height: 38px; text-align: start; padding-inline: 8px; cursor: pointer; }
 .globe-results small { display: block; color: var(--text-secondary); font-size: 12px; }
@@ -493,12 +516,12 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
 .globe-results button[aria-selected='true'] { background: var(--control-active); }
 .globe-results p { margin: 8px; }
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
+  .globe-search { --search-field-size: var(--mobile-control-size, 44px); }
   .globe-search-field {
     border-radius: var(--radius-card);
   }
 
   .globe-search input {
-    height: var(--mobile-control-size, 44px);
     padding-inline-start: 44px;
     font-size: 16px;
   }

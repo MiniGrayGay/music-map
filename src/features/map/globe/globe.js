@@ -13,9 +13,10 @@ const TAU = 2 * Math.PI;
 const interpolate = (a, b, factor) => a + (b - a) * factor;
 const MIN_ZOOM = .53;
 const MAX_ZOOM = 18;
+const ORBIT_MAX_ZOOM = 1.5;
 const LUNAR_TRANSITION_DURATION = 820;
 const SPIN_RATE = TAU / 165000;
-const teyvatHomeCenter = [.5, .5];
+const centeredHome = [.5, .5];
 const orbitMajor = orbitDirection(0);
 const orbitMinor = orbitDirection(Math.PI / 2);
 const orbitRoll = Math.atan2(-orbitMajor[1], orbitMajor[0]);
@@ -269,9 +270,9 @@ function renderSphere(renderer, canvas, view) {
 }
 
 export class Globe {
-  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment,
+  constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment, mobileDevice,
     labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost}) {
-    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels,
+    Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels, mobileDevice,
       labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost});
     Object.assign(this, initialize(canvas, fragment));
     this.compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
@@ -366,12 +367,28 @@ export class Globe {
 
   captureLunarFrame() {
     const snapshot = this.lunarLayer;
-    snapshot.width = this.canvas.width;
-    snapshot.height = this.canvas.height;
+    const {cx: x, cy: y, ratio} = this;
+    const radius = this.radius * this.zoom;
+    const {width, height} = this.canvas;
+    // The returning moon carries only the visible lunar disk, not the whole viewport.
+    const crop = this.world.id === 'MoonCanon';
+    const pad = radius + 2;
+    const left = crop ? clamp(Math.floor((x - pad) * ratio), 0, width - 1) : 0;
+    const top = crop ? clamp(Math.floor((y - pad) * ratio), 0, height - 1) : 0;
+    const right = crop ? clamp(Math.ceil((x + pad) * ratio), left + 1, width) : width;
+    const bottom = crop ? clamp(Math.ceil((y + pad) * ratio), top + 1, height) : height;
+    snapshot.width = right - left;
+    snapshot.height = bottom - top;
+    const frame = {left: left / ratio, top: top / ratio};
+    Object.assign(snapshot.style, {
+      left: `${frame.left}px`, top: `${frame.top}px`,
+      width: `${snapshot.width / ratio}px`, height: `${snapshot.height / ratio}px`,
+    });
     const context = snapshot.getContext('2d');
-    context.drawImage(this.canvas, 0, 0);
-    context.drawImage(this.signals, 0, 0, snapshot.width, snapshot.height);
-    return {x: this.cx, y: this.cy, radius: this.radius * this.zoom,
+    const region = [left, top, snapshot.width, snapshot.height, 0, 0, snapshot.width, snapshot.height];
+    context.drawImage(this.canvas, ...region);
+    context.drawImage(this.signals, ...region);
+    return {...frame, x, y, radius,
       moon: this.moonPose?.visible ? this.moonPose : null};
   }
 
@@ -429,7 +446,7 @@ export class Globe {
         this.orbitTime = null;
         this.drawSatellite(performance.now(), this.radius, true);
       }
-      const origin = `${departure.x}px ${departure.y}px`;
+      const origin = `${departure.x - departure.left}px ${departure.y - departure.top}px`;
       const movement = `translate(${dock.x - departure.x}px, ${dock.y - departure.y}px)`;
       const scale = dock.radius / departure.radius;
       const start = {transformOrigin: origin, transform: 'translate(0, 0) scale(1)'};
@@ -445,7 +462,8 @@ export class Globe {
       if (hasSatellite) {
         // Both disks share the same position and radius throughout the retreat.
         // Fade the chart over the orbit texture while the moon is shrinking.
-        const dockOrigin = `${dock.x}px ${dock.y}px`;
+        const localCenter = this.satellite.width / (2 * this.ratio);
+        const dockOrigin = `${localCenter}px ${localCenter}px`;
         const inverse = `translate(${departure.x - dock.x}px, ${departure.y - dock.y}px) scale(${1 / scale})`;
         const rest = {transformOrigin: dockOrigin, transform: 'translate(0, 0) scale(1)'};
         this.lunarAnimations.push(snapshot.animate([
@@ -533,19 +551,28 @@ export class Globe {
     this.height = height;
     this.ratio = ratio;
     const phone = width <= 650;
-    this.otherHomeCenter = [phone ? .46 : width <= 900 ? .362 : .374, phone ? .305 : .485];
-    this.radius = Math.min(width * (phone ? .428 : .326), height * (phone ? .25 : .368));
-    for (const canvas of [this.canvas, this.satellite, this.signals, this.stars]) {
+    this.otherHomeCenter = this.mobileDevice || phone ? centeredHome : [width <= 900 ? .362 : .374, .485];
+    // This is the fit at zoom 1; overview and close-up gates still use camera zoom.
+    this.radius = Math.min(width * (phone ? .475 : .36), height * (phone ? .286 : .43));
+    for (const canvas of [this.canvas, this.signals, this.stars]) {
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
+    }
+    // Allocate once per viewport, with room for the largest satellite in overview.
+    if (this.moonRenderer) {
+      const moonSide = 4 + 2 * this.moonRadius(this.radius * ORBIT_MAX_ZOOM, -1);
+      const pixels = Math.ceil(moonSide * ratio);
+      this.satellite.width = this.satellite.height = pixels;
+      this.satellite.style.width = this.satellite.style.height = `${pixels / ratio}px`;
     }
     sky(this.stars, width, height, ratio);
     this.sphereState = null;
     this.orbitTime = null;
+    this.moonPose = null;
     this.requestFrame();
   }
 
-  get homeCenter() { return this.world?.id === 'Teyvat' ? teyvatHomeCenter : this.otherHomeCenter; }
+  get homeCenter() { return this.world?.id === 'Teyvat' ? centeredHome : this.otherHomeCenter; }
   get cx() { return this.width * (this.center ?? this.homeCenter)[0]; }
   get cy() { return this.height * (this.center ?? this.homeCenter)[1]; }
   get magnified() { return Math.max(this.zoom, this.zoomTarget) > 1.01; }
@@ -775,8 +802,9 @@ export class Globe {
     if (!this.world) return;
     this.advance(time, clamp(time - this.lastFrame, 1, 34));
     this.lastFrame = time;
-    const overview = this.world.id === 'Teyvat' && this.zoom <= 1.5;
-    const autoSpin = overview && !this.selected && this.zoom >= 1 && this.zoomTarget >= 1 && this.zoomTarget <= 1.5
+    const overview = this.world.id === 'Teyvat' && this.zoom <= ORBIT_MAX_ZOOM;
+    const autoSpin = overview && !this.selected && this.zoom >= 1 && this.zoomTarget >= 1
+      && this.zoomTarget <= ORBIT_MAX_ZOOM
       && !this.compact && !this.reducedMotion.matches;
     if (autoSpin && time >= this.spinAfter && !this.pointer && !this.flight && !this.velocity) {
       this.spinTime ??= time;
@@ -849,8 +877,16 @@ export class Globe {
       }
     }
     const orbit = this.moon && overview;
+    const priorMoon = this.moonPose;
     this.drawSatellite(time, radius, orbit);
-    const lockVisible = this.drawSignals(time, radius, basis, orbit);
+    // In overview only the orbit moves; a second clear between orbit ticks
+    // would redraw the same signals across the whole viewport.
+    const idleOverview = overview && !focused && !moving && !this.reliefDock;
+    let lockVisible = false;
+    if (!idleOverview || !this.idleOverview || changed || detailFocusChanged || priorMoon !== this.moonPose) {
+      lockVisible = this.drawSignals(time, radius, basis, orbit);
+    }
+    this.idleOverview = idleOverview;
     // 霜月切换在目标世界首帧绘制完成后才启动，保证起点取景已生效。
     if (this.pendingLunarChange) {
       const pending = this.pendingLunarChange;
@@ -942,17 +978,25 @@ export class Globe {
     const {ratio} = this;
     const [cx, cy, depth, radial] = this.orbitPoint(angle, radius);
     const size = this.moonRadius(radius, depth);
+    if (this.moonPose?.angle === angle && this.moonPose.radius === size
+      && this.moonPose.x === cx && this.moonPose.y === cy) return;
     const distance = Math.hypot(cx - this.cx, cy - this.cy);
     const masked = depth > 0 && distance < radius + size * .32;
     const visible = !masked && cx >= size && cx <= this.width - size * .5
       && cy >= 55 && cy <= this.height - 68;
     const basis = lockedMoonBasis(radial);
-    this.moonPose = {x: cx, y: cy, radius: size, visible,
+    this.moonPose = {x: cx, y: cy, radius: size, visible, angle,
       basis: [...basis.right, ...basis.up, ...basis.front]};
+    const local = this.satellite.width / (2 * ratio);
+    const left = cx - local;
+    const top = cy - local;
+    this.satellite.style.left = `${left}px`;
+    this.satellite.style.top = `${top}px`;
     renderSphere(this.moonRenderer, this.satellite, {
-      cx, cy, ratio, radius: size, world: this.moon,
+      cx: local, cy: local, ratio, radius: size, world: this.moon,
       basis,
-      occluder: depth > 0 ? [this.cx * ratio, this.satellite.height - this.cy * ratio, radius * ratio] : [0, 0, 0],
+      occluder: depth > 0 ? [(this.cx - left) * ratio, this.satellite.height - (this.cy - top) * ratio,
+        radius * ratio] : [0, 0, 0],
     });
     if (visible && (depth <= 0 || distance >= radius + size)) this.lastVisibleMoonAngle = angle;
     if (this.moonLink) {

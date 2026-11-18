@@ -1,7 +1,6 @@
 <script setup>
-import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import LiquidGlass from './LiquidGlass.vue';
-import {useAnchoredPanel} from './panelMotion.js';
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch} from 'vue';
+import GlassPanel from './GlassPanel.vue';
 import ScrollPane from './ScrollPane.vue';
 import {pushEscapeHandler} from './escapeStack.js';
 
@@ -19,7 +18,7 @@ const props = defineProps({
   expectedVersion: {type: String, default: DEFAULT_GAME_VERSION},
 });
 
-const emit = defineEmits(['focus']);
+const emit = defineEmits(['focus', 'presence']);
 
 const {state, load, selectGroup, selectFloor, enterLayers, exitLayers,
   layerModeActive, activeGroup, floorOptions, activeFocusRect} = useLayerSelection();
@@ -31,13 +30,19 @@ const searchRef = ref(null);
 const listRef = ref(null);
 const floorButtonsRef = ref(null);
 const panelOpen = ref(false);
-const panelMotion = useAnchoredPanel(() => groupButtonRef.value ?? modeButtonRef.value);
+const panelAnchor = ref(null);
 const query = ref('');
 const openedViewport = ref(null);
 const highlightIndex = ref(0);
 
 const ready = computed(() => state.status === 'ready' && state.groups.length > 0);
+const hadLayers = ref(false);
+const showBar = computed(() => ready.value || (hadLayers.value && state.status === 'loading'));
 const activeGroupId = computed(() => state.groups.length > 0 ? state.activeGroupId : null);
+const displayedFloor = shallowRef({options: [], selected: null, unnamed: false});
+watch([floorOptions, () => state.activeFloorLevel, activeGroup], ([options, selected, group]) => {
+  if (options.length) displayedFloor.value = {options, selected, unnamed: group?.unnamed};
+}, {immediate: true});
 
 onMounted(() => {
   load({expectedGameVersion: props.expectedVersion, appCanvas: props.appCanvas});
@@ -98,7 +103,8 @@ function emitFocus() {
 
 // ---- 面板开关与焦点 ----
 function openPanel(focusSearch) {
-  if (panelOpen.value) return;
+  if (panelOpen.value || !ready.value) return;
+  panelAnchor.value = groupButtonRef.value ?? modeButtonRef.value;
   openedViewport.value = props.readViewport?.() ?? null;
   panelOpen.value = true;
   query.value = '';
@@ -153,6 +159,7 @@ function returnToSurface() {
 }
 
 function toggleMode(event) {
+  if (!ready.value) return;
   if (layerModeActive.value) {
     returnToSurface();
     return;
@@ -236,8 +243,9 @@ watch(panelOpen, (value) => {
 });
 
 watch(ready, (value) => {
-  if (!value) closePanel(false);
-});
+  if (value) hadLayers.value = true;
+  else closePanel(false);
+}, {immediate: true});
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointerDown, true);
@@ -247,7 +255,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-if="ready"
     ref="rootRef"
     class="layer-picker"
     @pointerdown.stop
@@ -255,8 +262,7 @@ onBeforeUnmount(() => {
     @keydown="onRootKeydown"
     @focusout="onFocusOut"
   >
-    <div class="bar map-glass">
-      <LiquidGlass variant="clear" />
+    <GlassPanel :open="showBar" class="bar" variant="clear" inline appear>
       <button
         ref="modeButtonRef"
         type="button"
@@ -264,7 +270,7 @@ onBeforeUnmount(() => {
         :aria-expanded="layerModeActive ? undefined : panelOpen"
         :aria-controls="layerModeActive ? undefined : 'layer-group-panel'"
         :aria-label="layerModeActive ? '退出分层' : '切换分层地图'"
-        :aria-disabled="!layerModeActive && switching || undefined"
+        :aria-disabled="!ready || (!layerModeActive && switching) || undefined"
         @click="toggleMode"
       >
         <svg v-if="!layerModeActive" viewBox="0 0 24 24" class="layer-icon" aria-hidden="true">
@@ -296,77 +302,73 @@ onBeforeUnmount(() => {
                 stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
-    </div>
+    </GlassPanel>
 
-    <Transition :css="false" v-bind="panelMotion">
-      <div v-show="panelOpen" id="layer-group-panel" class="panel map-glass"
-           :inert="!panelOpen" :data-panel-open="panelOpen ? '' : undefined">
-        <LiquidGlass />
-        <div class="liquid-panel-body">
-          <input
-            ref="searchRef"
-            v-model="query"
-            class="search"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="layer-group-list"
-            :aria-activedescendant="visibleGroups.length > 0
-              ? `layer-group-opt-${highlightIndex}` : null"
-            aria-label="搜索分层区域"
-            aria-autocomplete="list"
-            placeholder="搜索区域"
-            autocomplete="off"
-            spellcheck="false"
-            type="text"
-            @keydown="onSearchKeydown"
-          >
-          <ScrollPane v-if="visibleGroups.length" class="group-scroll" label="分层区域列表滚动">
-            <ul id="layer-group-list" ref="listRef" class="options" role="listbox" aria-label="分层区域">
-              <li
-                v-for="(group, index) in visibleGroups"
-                :id="`layer-group-opt-${index}`"
-                :key="group.key"
-                role="option"
-                :class="{highlight: index === highlightIndex, chosen: group.key === activeGroupId}"
-                :aria-selected="group.key === activeGroupId ? 'true' : 'false'"
-                :title="group.label"
-                @click="chooseGroup(group)"
-                @pointermove="highlightIndex = index"
-              >{{ group.label }}</li>
-            </ul>
-          </ScrollPane>
-          <p v-else class="no-match" role="status">无匹配</p>
-        </div>
-      </div>
-    </Transition>
+    <GlassPanel
+      :open="panelOpen && ready"
+      :anchor="panelAnchor?.isConnected ? panelAnchor : modeButtonRef"
+      id="layer-group-panel"
+      class="panel"
+      @presence="emit('presence', $event)"
+    >
+      <input
+        ref="searchRef"
+        v-model="query"
+        class="search"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="layer-group-list"
+        :aria-activedescendant="visibleGroups.length > 0
+          ? `layer-group-opt-${highlightIndex}` : null"
+        aria-label="搜索分层区域"
+        aria-autocomplete="list"
+        placeholder="搜索区域"
+        autocomplete="off"
+        spellcheck="false"
+        type="text"
+        @keydown="onSearchKeydown"
+      >
+      <ScrollPane v-if="visibleGroups.length" class="group-scroll" label="分层区域列表滚动">
+        <ul id="layer-group-list" ref="listRef" class="options" role="listbox" aria-label="分层区域">
+          <li
+            v-for="(group, index) in visibleGroups"
+            :id="`layer-group-opt-${index}`"
+            :key="group.key"
+            role="option"
+            :class="{highlight: index === highlightIndex, chosen: group.key === activeGroupId}"
+            :aria-selected="group.key === activeGroupId ? 'true' : 'false'"
+            :title="group.label"
+            @click="chooseGroup(group)"
+            @pointermove="highlightIndex = index"
+          >{{ group.label }}</li>
+        </ul>
+      </ScrollPane>
+      <p v-else class="no-match" role="status">无匹配</p>
+    </GlassPanel>
 
     <Teleport :to="floorHost ?? 'body'" :disabled="!floorHost">
-      <Transition name="floor-tools">
-        <div
-          v-if="layerModeActive && floorOptions.length > 0"
-          v-show="!panelOpen"
-          class="floors map-glass"
-          :inert="panelOpen || !layerModeActive"
-          @pointerdown.stop
-          @wheel.stop
-          @keydown="onRootKeydown"
-        >
-          <LiquidGlass />
-          <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="地图楼层">
-            <button
-              v-for="floor in floorOptions"
-              :key="floor.level"
-              type="button"
-              class="floor"
-              :aria-pressed="floor.level === state.activeFloorLevel"
-              :aria-disabled="switching || undefined"
-              :title="activeGroup?.unnamed ? floor.label : floor.name ?? floor.label"
-              @click="chooseFloor(floor.level)"
-            >{{ floor.label }}</button>
-          </div>
-          <span v-if="floorOptions.length > 1" class="floor-count">共 {{ floorOptions.length }} 层</span>
+      <GlassPanel
+        :open="layerModeActive && floorOptions.length > 0 && !panelOpen"
+        class="floors"
+        inline
+        @pointerdown.stop
+        @wheel.stop
+        @keydown="onRootKeydown"
+      >
+        <div ref="floorButtonsRef" class="floor-buttons" role="group" aria-label="地图楼层">
+          <button
+            v-for="floor in displayedFloor.options"
+            :key="floor.level"
+            type="button"
+            class="floor"
+            :aria-pressed="floor.level === displayedFloor.selected"
+            :aria-disabled="switching || undefined"
+            :title="displayedFloor.unnamed ? floor.label : floor.name ?? floor.label"
+            @click="chooseFloor(floor.level)"
+          >{{ floor.label }}</button>
         </div>
-      </Transition>
+        <span v-if="displayedFloor.options.length > 1" class="floor-count">共 {{ displayedFloor.options.length }} 层</span>
+      </GlassPanel>
     </Teleport>
   </div>
 </template>
@@ -377,11 +379,14 @@ onBeforeUnmount(() => {
 }
 
 .bar {
+  padding: 5px;
+  border-radius: 19px;
+}
+
+.bar :deep(.liquid-panel-body) {
   display: flex;
   align-items: stretch;
   gap: 4px;
-  padding: 5px;
-  border-radius: 19px;
 }
 
 .mode,
@@ -567,27 +572,15 @@ onBeforeUnmount(() => {
   inset-inline-start: var(--floor-tools-left, var(--map-inline-inset));
   max-inline-size: min(360px, calc(100% - var(--floor-tools-left, var(--map-inline-inset)) - var(--floor-tools-right, 20px)));
   box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   width: max-content;
   padding: 5px;
   border-radius: var(--radius-card);
 }
 
-.floor-tools-enter-active,
-.floor-tools-leave-active {
-  transition: opacity 180ms ease, translate 180ms ease;
-}
-
-.floor-tools-enter-from,
-.floor-tools-leave-to {
-  opacity: 0;
-  translate: 0 -4px;
-}
-
-.floor-tools-leave-active {
-  pointer-events: none;
+.floors :deep(.liquid-panel-body) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .floor-count {
@@ -613,8 +606,6 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .floor-tools-enter-active,
-  .floor-tools-leave-active,
   .caret {
     transition: none;
   }

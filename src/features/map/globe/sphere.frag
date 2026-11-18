@@ -94,12 +94,10 @@ vec2 lunarUV(vec3 n, float side) {
   return disk.xy + vec2(side * n.x, -n.y) * scale * disk.zw;
 }
 
-vec3 lunarTerrain(vec3 n) {
-  vec2 nearUV = lunarUV(n, 1.);
-  vec2 farUV = lunarUV(n, -1.);
+vec3 lunarTerrain(vec2 nearUV, vec2 farUV, float depth) {
   vec2 nearDx = dFdx(nearUV), nearDy = dFdy(nearUV);
   vec2 farDx = dFdx(farUV), farDy = dFdy(farUV);
-  float nearWeight = smoothstep(-.23, .23, n.z);
+  float nearWeight = smoothstep(-.23, .23, depth);
   if (nearWeight <= 0.) return lunarChart(farUV, farDx, farDy);
   if (nearWeight >= 1.) return lunarChart(nearUV, nearDx, nearDy);
   return mix(lunarChart(farUV, farDx, farDy), lunarChart(nearUV, nearDx, nearDy), nearWeight);
@@ -145,23 +143,20 @@ float lunarDot(vec2 cell, vec2 footprint) {
   return 1. - smoothstep(.17 - edge, .17 + edge, length(fract(cell) - .5));
 }
 
-vec3 lunarHazard(vec3 color, vec3 normal) {
-  vec2 nearUV = lunarUV(normal, 1.);
-  vec2 farUV = lunarUV(normal, -1.);
-  bool nearSide = normal.z >= 0.;
+vec3 lunarHazard(vec3 color, vec2 nearUV, vec2 farUV, bool nearSide) {
   vec2 uv = nearSide ? nearUV : farUV;
   float level = log2(max(1., u_zoom));
   vec2 cells = vec2(190., 190. * 9. / 17.) * exp2(floor(level));
   vec2 nearWidth = fwidth(nearUV * cells);
   vec2 farWidth = fwidth(farUV * cells);
+  ivec2 size = textureSize(u_moonStencil, 0);
+  ivec2 sourcePixel = clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1);
+  if (texelFetch(u_moonStencil, sourcePixel, 0).g >= .5) return color;
   vec2 footprint = nearSide ? nearWidth : farWidth;
   vec2 cell = uv * cells;
   // Refine the map-space lattice as the camera closes in, keeping the art readable.
   float dotMask = mix(lunarDot(cell, footprint), lunarDot(cell * 2., footprint * 2.),
     smoothstep(.38, .96, fract(level)));
-  ivec2 size = textureSize(u_moonStencil, 0);
-  ivec2 sourcePixel = clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1);
-  if (texelFetch(u_moonStencil, sourcePixel, 0).g >= .5) return color;
   vec3 stencil = textureLod(u_moonStencil, uv, 0.).rgb;
   vec3 blue = mix(vec3(.13, .44, .93), vec3(.24, .65, .99), dotMask);
   color = mix(color, blue, stencil.r * (.14 + dotMask * .67));
@@ -238,11 +233,14 @@ void main() {
   vec3 airColor = vec3(0.);
   if (hasAtmosphere) {
     limbLight = smoothstep(-.17, .94, dot(p / max(r, .001), ORBIT_SUN.xy));
-    float altitude = max(0., r - 1.);
-    float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * 24.);
-    airOpacity = bloom * (1. - smoothstep(.035, .09, altitude))
-      * mix(.018, .98, limbLight) * u_orbitLook;
-    airColor = mix(vec3(.065, .18, .40), vec3(.44, .84, 1.), limbLight);
+    // The disk is opaque inside the rim, so the outer glow cannot contribute there.
+    if (r > .997) {
+      float altitude = max(0., r - 1.);
+      float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * 24.);
+      airOpacity = bloom * (1. - smoothstep(.035, .09, altitude))
+        * mix(.018, .98, limbLight) * u_orbitLook;
+      airColor = mix(vec3(.065, .18, .40), vec3(.44, .84, 1.), limbLight);
+    }
   }
   if (r >= 1.001) {
     pixel = vec4(airColor, airOpacity);
@@ -269,10 +267,12 @@ void main() {
       }
     }
     // 霜月路径不用等距柱状 uv 与 chart 梯度，直接走原有 lunarTerrain/lunarHazard。
-    vec3 terrain = lunarTerrain(n);
+    vec2 nearUV = lunarUV(n, 1.);
+    vec2 farUV = lunarUV(n, -1.);
+    vec3 terrain = lunarTerrain(nearUV, farUV, n.z);
     // Neutral limb shading keeps the original map colors outside the danger overlay.
     terrain *= 1. - .16 * pow(1. - z, 2.);
-    vec3 chart = lunarHazard(terrain, n);
+    vec3 chart = lunarHazard(terrain, nearUV, farUV, n.z >= 0.);
     vec3 shaded = mix(chart, lunarSideLight(chart, p, z), u_orbitLook);
     if (u_lunarMapBlend < 1.) {
       // Compact layouts have no orbit thumbnail. Start with neutral terrain.
@@ -322,7 +322,11 @@ void main() {
   vec3 sea = mix(vec3(.023, .059, .08), vec3(.094, .242, .276), daylight);
   sea += (terrain - u_sea) * .32;
   sea += .012 * sin(n.x * 17. + n.y * 21.) * sin(n.z * 14.);
-  if (u_oceanRelief) sea += oceanRelief(n) * (.72 + .43 * daylight) * (1. - .90 * u_orbitLook);
+  // The distant body uses clouds and open-water color. Contours only become
+  // useful as the chart comes back into view.
+  if (u_oceanRelief && u_orbitLook < 1.) {
+    sea += oceanRelief(n) * (.72 + .43 * daylight) * (1. - u_orbitLook);
+  }
   vec3 landColor;
   if (u_cleanFontaine) {
     // Teyvat：保留原图色相，仅按日照做轻柔中性明暗；卫星等其他世界保持原光照。
@@ -333,17 +337,19 @@ void main() {
   }
   vec3 rgb = mix(sea, landColor, land * .94);
 
-  vec2 grid = vec2(lon, lat) * (12. / PI);
-  vec2 gridDist = abs(fract(grid + .5) - .5);
-  float lonDx = n.z * dFdx(n.x) - n.x * dFdx(n.z);
-  float lonDy = n.z * dFdy(n.x) - n.x * dFdy(n.z);
-  float longitudeWidth = (abs(lonDx) + abs(lonDy)) * (12. / PI) / max(.004, dot(n.xz, n.xz));
-  vec2 gridWidth = clamp(vec2(longitudeWidth, fwidth(grid.y)) * .8, .001, .12);
-  vec2 etched = 1. - smoothstep(gridWidth * .45, gridWidth * 1.3, gridDist);
-  float graticule = max(etched.x, etched.y) * (.04 + daylight * .085) * smoothstep(.15, .6, z);
   float closeView = smoothstep(1.3, 4.4, u_zoom);
-  graticule *= (1. - closeView * .92) * (1. - u_orbitLook);
-  rgb = mix(rgb, ice, graticule * (1. - land * .65));
+  if (u_orbitLook < 1.) {
+    vec2 grid = vec2(lon, lat) * (12. / PI);
+    vec2 gridDist = abs(fract(grid + .5) - .5);
+    float lonDx = n.z * dFdx(n.x) - n.x * dFdx(n.z);
+    float lonDy = n.z * dFdy(n.x) - n.x * dFdy(n.z);
+    float longitudeWidth = (abs(lonDx) + abs(lonDy)) * (12. / PI) / max(.004, dot(n.xz, n.xz));
+    vec2 gridWidth = clamp(vec2(longitudeWidth, fwidth(grid.y)) * .8, .001, .12);
+    vec2 etched = 1. - smoothstep(gridWidth * .45, gridWidth * 1.3, gridDist);
+    float graticule = max(etched.x, etched.y) * (.04 + daylight * .085) * smoothstep(.15, .6, z);
+    graticule *= (1. - closeView * .92) * (1. - u_orbitLook);
+    rgb = mix(rgb, ice, graticule * (1. - land * .65));
+  }
 
   rgb = mix(rgb, vec3(.046, .102, .128), pow(1. - z, 2.6) * .43);
   // 近景淡回烘焙原图（含海面贴图），复用现有 closeView。

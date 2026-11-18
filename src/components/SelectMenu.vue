@@ -5,10 +5,10 @@
 // ScrollPane 的原生滚动与预留槽位。弹层 fixed 定位到 body，避免被抽屉的滚动
 // 容器裁剪，空间不足时向上翻转。
 import {computed, nextTick, onBeforeUnmount, ref, useId, watch} from 'vue';
+import GlassPanel from './GlassPanel.vue';
 import LiquidGlass from './LiquidGlass.vue';
 import ScrollPane from './ScrollPane.vue';
 import {pushEscapeHandler} from './escapeStack.js';
-import {useAnchoredPanel} from './panelMotion.js';
 
 const props = defineProps({
   modelValue: {type: [Number, String], default: null},
@@ -16,11 +16,12 @@ const props = defineProps({
   ariaLabel: {type: String, required: true},
   placeholder: {type: String, default: ''},
   glass: {type: Boolean, default: false},
+  disabled: {type: Boolean, default: false},
   // 'auto' 优先下方、空间不足翻上；'top' 优先上方（下方播放器等状态需要
   // 与选项同屏可见的场景），上方空间不足才回退向下。
   placement: {type: String, default: 'auto'},
 });
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'presence']);
 
 const listboxId = useId();
 const triggerRef = ref(null);
@@ -29,7 +30,6 @@ const listRef = ref(null);
 const open = ref(false);
 const activeIndex = ref(0);
 const popupStyle = ref(null);
-const popupMotion = useAnchoredPanel(() => triggerRef.value);
 
 const selected = computed(() =>
   props.options.find((option) => option.value === props.modelValue) ?? null);
@@ -94,7 +94,7 @@ function scrollActiveIntoView() {
 }
 
 async function openPopup() {
-  if (open.value) return;
+  if (open.value || props.disabled) return;
   open.value = true;
   activeIndex.value = Math.max(0, props.options.findIndex(
     (option) => option.value === props.modelValue));
@@ -149,7 +149,7 @@ function onTriggerKeydown(event) {
 
 // 外部点击（含其他弹层）关闭；弹层内部 pointerdown 阻止焦点转移。
 function onDocPointerDown(event) {
-  if (open.value && !popupRef.value?.contains(event.target)
+  if (open.value && !popupRef.value?.element?.contains(event.target)
     && event.target !== triggerRef.value && !triggerRef.value?.contains(event.target)) {
     close();
   }
@@ -191,6 +191,7 @@ watch(open, (value) => {
       ref="triggerRef"
       type="button"
       class="select-trigger"
+      :disabled="disabled"
       :class="{'map-glass glassed': glass}"
       aria-haspopup="listbox"
       :aria-expanded="open ? 'true' : 'false'"
@@ -210,40 +211,39 @@ watch(open, (value) => {
       </span>
     </button>
     <Teleport to="body">
-      <Transition :css="false" v-bind="glass ? popupMotion : {}">
-        <div
-          v-show="open"
-          :id="listboxId"
-          ref="popupRef"
-          :inert="!open"
-          class="select-popup"
-          :class="{'map-glass glassed': glass}"
-          role="listbox"
-          :aria-label="ariaLabel"
-          :style="popupStyle"
-          @pointerdown.prevent
-        >
-          <LiquidGlass v-if="glass" />
-          <ScrollPane class="select-scroll liquid-panel-body" :label="`${ariaLabel}选项滚动`">
-            <ul ref="listRef" class="select-options">
-              <li
-                v-for="(option, index) in options"
-                :id="optionId(index)"
-                :key="option.value"
-                role="option"
-                :aria-selected="option.value === modelValue ? 'true' : 'false'"
-                :class="{active: index === activeIndex, chosen: option.value === modelValue}"
-                :title="option.label"
-                @click="choose(option)"
-                @pointermove="activeIndex = index"
-              >
-                <span class="option-label">{{ option.label }}</span>
-                <span v-if="option.meta" class="option-meta">{{ option.meta }}</span>
-              </li>
-            </ul>
-          </ScrollPane>
-        </div>
-      </Transition>
+      <GlassPanel
+        :open="open"
+        :anchor="triggerRef"
+        :glass="glass"
+        :id="listboxId"
+        ref="popupRef"
+        class="select-popup"
+        :class="{glassed: glass}"
+        role="listbox"
+        :aria-label="ariaLabel"
+        :style="popupStyle"
+        @presence="emit('presence', $event)"
+        @pointerdown.prevent
+      >
+        <ScrollPane class="select-scroll" :label="`${ariaLabel}选项滚动`">
+          <ul ref="listRef" class="select-options">
+            <li
+              v-for="(option, index) in options"
+              :id="optionId(index)"
+              :key="option.value"
+              role="option"
+              :aria-selected="option.value === modelValue ? 'true' : 'false'"
+              :class="{active: index === activeIndex, chosen: option.value === modelValue}"
+              :title="option.label"
+              @click="choose(option)"
+              @pointermove="activeIndex = index"
+            >
+              <span class="option-label">{{ option.label }}</span>
+              <span v-if="option.meta" class="option-meta">{{ option.meta }}</span>
+            </li>
+          </ul>
+        </ScrollPane>
+      </GlassPanel>
     </Teleport>
   </div>
 </template>
@@ -271,6 +271,7 @@ watch(open, (value) => {
 .select-trigger:hover,
 .select-trigger[aria-expanded='true'] { background: var(--glass-light), var(--surface-overlay-open); }
 .select-trigger:active { background: var(--glass-light), var(--surface-overlay-open); }
+.select-trigger:disabled { cursor: default; }
 .select-trigger:focus-visible {
   background: linear-gradient(var(--control-focus), var(--control-focus)), var(--surface-overlay-open);
 }

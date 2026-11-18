@@ -168,7 +168,7 @@ try {
   await page.waitForSelector('.globe-status', {hidden: true});
   await page.click(search);
   await page.type(search, zone.name);
-  await page.waitForSelector('.globe-results button');
+  await page.waitForSelector('.globe-results[data-panel-open] button');
   await page.keyboard.press('Enter');
   const daytimeSelector = `button[data-value="${daytime.key}"]`;
   await page.waitForSelector(daytimeSelector, {visible: true});
