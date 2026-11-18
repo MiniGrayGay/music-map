@@ -30,12 +30,6 @@ function overlaps(a, b, padding = 0) {
 
 function roundElevationRing(points) {
   const outline = [];
-  const sharp = [];
-  const area = points.reduce((sum, [x, y], index) => {
-    const [px, py] = points.at(index - 1);
-    return sum + px * y - py * x;
-  }, 0);
-  const winding = Math.sign(area);
   for (const [index, point] of points.entries()) {
     const [x, y] = point;
     const [ax, ay] = points.at(index - 1);
@@ -52,22 +46,9 @@ function roundElevationRing(points) {
     const vy = (by - y) / b;
     const angle = ux * vx + uy * vy;
     const trim = Math.min(9, a * .25, b * .25);
-    if (angle < -.995) {
+    // Preserve straight runs, fine bends and narrow tips.
+    if (angle < -.995 || trim < .5 || angle > .5) {
       outline.push(point);
-      continue;
-    }
-    // Retain fine bends and needle tips. The normal bisects the two edge normals.
-    if (trim < .5 || angle > .5) {
-      outline.push(point);
-      if (winding && angle > -.94 && !sharp.some((corner) =>
-        Math.hypot(x - corner.x, y - corner.y) < 10)) {
-        const tx = vx - ux;
-        const ty = vy - uy;
-        const length = Math.hypot(tx, ty);
-        const nx = length > .01 ? ty / length : vy;
-        const ny = length > .01 ? -tx / length : -vx;
-        sharp.push({x, y, nx: nx * winding, ny: ny * winding});
-      }
       continue;
     }
     for (const t of [0, .25, .5, .75, 1]) {
@@ -76,7 +57,7 @@ function roundElevationRing(points) {
       outline.push([x + before * ux + after * vx, y + before * uy + after * vy]);
     }
   }
-  return {outline, sharp};
+  return outline;
 }
 
 function sky(canvas, width, height, ratio) {
@@ -1109,7 +1090,7 @@ export class Globe {
     const top = new Path2D();
     const sides = new Path2D();
     let left = Infinity, right = -Infinity, topY = Infinity, bottom = -Infinity;
-    for (const {outline: ring} of rings) {
+    for (const ring of rings) {
       footprint.moveTo(...ring[0]);
       top.moveTo(ring[0][0], ring[0][1] - lift);
       for (const [index, [x, y]] of ring.entries()) {
@@ -1161,32 +1142,9 @@ export class Globe {
     ctx.stroke(top);
     ctx.restore();
     if (this.world.id === 'Teyvat') {
-      this.drawElevationCorners(rings, lift);
       this.drawReliefLeads(rings, lift, time);
     }
     return lift;
-  }
-
-  drawElevationCorners(rings, lift) {
-    const {context: ctx} = this;
-    ctx.save();
-    ctx.globalAlpha = this.raise;
-    ctx.strokeStyle = '#f0fbffd6';
-    ctx.fillStyle = '#f0fbff';
-    ctx.lineWidth = .85;
-    for (const {sharp} of rings) {
-      for (const {x, y, nx, ny} of sharp) {
-        const top = y - lift;
-        ctx.beginPath();
-        ctx.moveTo(x, top);
-        ctx.lineTo(x + nx * 10, top + ny * 10);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(x, top, 1.45, 0, TAU);
-        ctx.fill();
-      }
-    }
-    ctx.restore();
   }
 
   drawReliefLeads(rings, lift, time) {
@@ -1211,7 +1169,7 @@ export class Globe {
     if (target.hasAttribute('data-relief-closing')) return;
 
     const {left, top} = this.canvas.getBoundingClientRect();
-    const points = rings.flatMap(({outline}) => outline.map(([x, y]) => [x, y - lift])).filter(([x, y]) =>
+    const points = rings.flatMap((ring) => ring.map(([x, y]) => [x, y - lift])).filter(([x, y]) =>
       x > 1 && x < this.width - 1 && y > 1 && y < this.height - 1,
     );
     if (points.length < 2) {
@@ -1240,35 +1198,40 @@ export class Globe {
       this.hideReliefCard();
       return;
     }
-    const {edge, leads: [first, second]} = panel;
+    const {edge, leads} = panel;
     const horizontal = edge === 'top' || edge === 'bottom';
     const panelStart = horizontal ? panel.left : panel.top;
-    const leadStart = first.attach - panelStart;
-    const leadSpan = second.attach - first.attach;
+    const edgeLength = horizontal ? panel.width : panel.height;
+    const revealSpan = leads ? leads[1].attach - leads[0].attach : Math.min(28, edgeLength);
+    const revealStart = leads ? leads[0].attach - panelStart : (edgeLength - revealSpan) / 2;
     this.reliefEdge = edge;
 
-    this.reliefLeadStarted ??= time;
-    const progress = this.reducedMotion.matches ? 1 : clamp((time - this.reliefLeadStarted) / 320, 0, 1);
-    const reach = 1 - (1 - progress) ** 2;
-    const {context: ctx} = this;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(232, 249, 255, 0.68)';
-    ctx.fillStyle = '#f0fbff';
-    ctx.lineWidth = .85;
-    ctx.lineCap = 'round';
-    for (const {x, y, to: [endX, endY]} of [first, second]) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(interpolate(x, endX, reach), interpolate(y, endY, reach));
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(x, y, 1.5, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-    if (progress < 1) {
-      this.requestFrame();
-      return;
+    if (leads) {
+      this.reliefLeadStarted ??= time;
+      const progress = this.reducedMotion.matches ? 1 : clamp((time - this.reliefLeadStarted) / 320, 0, 1);
+      const reach = 1 - (1 - progress) ** 2;
+      const {context: ctx} = this;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(232, 249, 255, 0.68)';
+      ctx.fillStyle = '#f0fbff';
+      ctx.lineWidth = .85;
+      ctx.lineCap = 'round';
+      for (const {x, y, to: [endX, endY]} of leads) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(interpolate(x, endX, reach), interpolate(y, endY, reach));
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+      if (progress < 1) {
+        this.requestFrame();
+        if (!this.reliefRevealed) return;
+      }
+    } else {
+      this.reliefLeadStarted = null;
     }
     if (!target.querySelector(':scope > .liquid-glass.is-ready')) return;
     this.reliefOpeningAt ??= time;
@@ -1276,10 +1239,10 @@ export class Globe {
     const expanding = clamp(elapsed / 360, 0, 1);
     const eased = expanding * expanding * (3 - 2 * expanding);
     const revealDepth = 12;
-    const startX = horizontal ? leadStart : edge === 'right' ? panel.width - revealDepth : 0;
-    const startY = horizontal ? edge === 'bottom' ? panel.height - revealDepth : 0 : leadStart;
-    const startWidth = horizontal ? leadSpan : revealDepth;
-    const startHeight = horizontal ? revealDepth : leadSpan;
+    const startX = horizontal ? revealStart : edge === 'right' ? panel.width - revealDepth : 0;
+    const startY = horizontal ? edge === 'bottom' ? panel.height - revealDepth : 0 : revealStart;
+    const startWidth = horizontal ? revealSpan : revealDepth;
+    const startHeight = horizontal ? revealDepth : revealSpan;
 
     // Write the first glass frame before making the dock visible. Geometry and
     // content share this clock so the final-size backing cannot paint first.

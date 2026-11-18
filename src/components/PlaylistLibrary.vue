@@ -6,11 +6,13 @@ import {pushEscapeHandler} from './escapeStack.js';
 import FavoriteHeart from './FavoriteHeart.vue';
 import GlassPanel from './GlassPanel.vue';
 import LiquidGlass from './LiquidGlass.vue';
+import PlayPauseIcon from './PlayPauseIcon.vue';
 import {useAnchoredPanel} from './panelMotion.js';
 
 const props = defineProps({
   library: {type: Object, required: true},
   readBackdrop: {type: Function, required: true},
+  playback: {type: Object, default: null},
 });
 const emit = defineEmits(['play', 'page-open']);
 const id = useId();
@@ -50,6 +52,11 @@ const current = computed(() => playlists.value.find((list) => list.id === select
 const favoriteIds = computed(() => new Set(favorites.value));
 const highlightedTab = computed(() => tabDestination.value ?? tab.value);
 const isFavorites = computed(() => view.value === 'library' && tab.value === 'favorites');
+const playingTrackId = computed(() => {
+  const id = isFavorites.value ? 'favorites' : current.value?.id;
+  return props.playback?.playing && props.playback.key === 'playlist-' + id
+    ? props.playback.trackId : null;
+});
 const selectsTracks = computed(() => ['new-tracks', 'add', 'edit'].includes(view.value));
 const displaysTracks = computed(() => selectsTracks.value || isFavorites.value || view.value === 'detail');
 const titles = {
@@ -443,8 +450,9 @@ function play(trackId) {
   if (!list?.trackIds.length) return;
   const tracks = tracksForPlaylist(list.trackIds);
   if (!tracks.length) return;
-  emit('play', {id: list.id, name: list.name, tracks, trackId: trackId ?? tracks[0].neteaseId});
-  if (mobile.value) close();
+  const fromRow = trackId != null;
+  emit('play', {id: list.id, name: list.name, tracks, trackId: trackId ?? tracks[0].neteaseId, fromRow});
+  if (mobile.value && !fromRow) close();
 }
 
 function timeLabel(duration) {
@@ -530,11 +538,14 @@ function importList() {
               v-if="mobile || view !== 'library'"
               ref="backButton"
               type="button"
-              class="playlist-icon"
+              class="playlist-icon playlist-back"
               :aria-label="view === 'library' ? '返回地图' : '返回'"
               @click="back"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 6-6 6 6 6"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15.5 5.6L11.6 8.72C10.616 9.507 9.304 10.557 9.304 12
+                  C9.304 13.443 10.616 14.493 11.6 15.28L15.5 18.4" stroke-width="2.4" />
+              </svg>
             </button>
             <h2 ref="heading" tabindex="-1" :title="title">{{ title }}</h2>
             <button
@@ -548,7 +559,11 @@ function importList() {
               @click="toggleMenu"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 12h.1m6.9 0h.1m6.9 0h.1" stroke-width="2.6" />
+                <g fill="currentColor" stroke="none">
+                  <circle cx="5" cy="12" r="1.55" />
+                  <circle cx="12" cy="12" r="1.55" />
+                  <circle cx="19" cy="12" r="1.55" />
+                </g>
               </svg>
             </button>
             <button v-if="!mobile" type="button" class="playlist-icon" aria-label="关闭歌单" @click="close">
@@ -556,8 +571,7 @@ function importList() {
             </button>
           </header>
 
-          <nav v-if="view === 'library'" ref="tabStrip" class="playlist-tabs" aria-label="歌单管理"
-               :data-tab="highlightedTab">
+          <nav v-if="view === 'library'" ref="tabStrip" class="playlist-tabs" aria-label="歌单管理">
             <button type="button" :aria-pressed="highlightedTab === 'playlists'" @click="showLibraryTab('playlists')">
               我的歌单
             </button>
@@ -604,29 +618,35 @@ function importList() {
               </label>
               <div ref="scroll" class="playlist-scroll scroll-viewport" @scroll.passive="loadMore">
                 <ul class="playlist-tracks" aria-label="歌单曲目">
-                  <li v-for="track in visibleTracks" :key="track.neteaseId" class="playlist-track">
-                    <label v-if="selectsTracks" class="playlist-track-select">
-                      <input
-                        type="checkbox"
-                        :aria-label="'选择 ' + track.displayName"
-                        :checked="checking.has(track.neteaseId)"
-                        @change="toggleChecked(track.neteaseId)"
-                      >
-                      <svg viewBox="0 0 16 16" class="playlist-checkmark" aria-hidden="true">
-                        <path d="m3.5 8 3 3L12.5 5" />
-                      </svg>
-                    </label>
-                    <button
-                      v-if="view === 'detail' || isFavorites"
-                      type="button"
-                      class="playlist-track-play"
-                      :aria-label="'播放 ' + track.displayName"
-                      @click="play(track.neteaseId)"
+                  <li v-for="track in visibleTracks" :key="track.neteaseId" class="playlist-track-row">
+                    <component
+                      :is="selectsTracks ? 'label' : 'button'"
+                      class="playlist-track"
+                      :class="selectsTracks ? 'playlist-track--selectable' : 'playlist-track-play'"
+                      :type="selectsTracks ? undefined : 'button'"
+                      :aria-label="selectsTracks ? undefined
+                        : (playingTrackId === track.neteaseId ? '暂停 ' : '播放 ') + track.displayName"
+                      @click="!selectsTracks && play(track.neteaseId)"
                     >
-                      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6.5 4.7 8.5 5.3-8.5 5.3z"/></svg>
-                    </button>
-                    <span class="playlist-track-name" :title="track.displayName">{{ track.displayName }}</span>
-                    <span class="playlist-track-time">{{ timeLabel(track.duration) }}</span>
+                      <span v-if="selectsTracks" class="playlist-track-select">
+                        <input
+                          type="checkbox"
+                          :aria-label="'选择 ' + track.displayName"
+                          :checked="checking.has(track.neteaseId)"
+                          @change="toggleChecked(track.neteaseId)"
+                        >
+                        <svg viewBox="0 0 24 24" class="playlist-checkbox" aria-hidden="true">
+                          <rect x="4" y="4" width="16" height="16" rx="5.5" stroke-width="2" />
+                          <path class="playlist-checkmark" pathLength="1" stroke-width="2"
+                                d="m8.25 12 1.95 1.95q.55.55 1.1 0l4.45-4.45" />
+                        </svg>
+                      </span>
+                      <span v-else class="playlist-play-mark" aria-hidden="true">
+                        <PlayPauseIcon :playing="playingTrackId === track.neteaseId" />
+                      </span>
+                      <span class="playlist-track-name" :title="track.displayName">{{ track.displayName }}</span>
+                      <span class="playlist-track-time">{{ timeLabel(track.duration) }}</span>
+                    </component>
                     <button
                       v-if="isFavorites"
                       type="button"
@@ -636,12 +656,6 @@ function importList() {
                       @click="toggleFavorite(track.neteaseId)"
                     >
                       <FavoriteHeart :filled="favoriteIds.has(track.neteaseId)" />
-                    </button>
-                  </li>
-                  <li v-if="view === 'detail' && visibleTracks.length === tracks.length">
-                    <button type="button" class="playlist-add" @click="navigate('add')">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                      添加歌曲
                     </button>
                   </li>
                 </ul>
@@ -675,39 +689,48 @@ function importList() {
             </p>
 
             <footer
-              v-if="!isFavorites && (view !== 'detail' || tracks.length)"
+              v-if="!isFavorites"
               class="playlist-footer"
             >
               <template v-if="view === 'library' && !isFavorites">
-                <button type="button" class="playlist-quiet" @click="beginForm('import')">导入</button>
-                <button type="button" class="playlist-action map-glass" @click="beginForm('new')">
-                  <LiquidGlass variant="clear" /><span>新建</span>
+                <button type="button" class="playlist-text-action playlist-library-action"
+                        @click="beginForm('import')">导入</button>
+                <button type="button" class="playlist-text-action playlist-library-action playlist-create"
+                        @click="beginForm('new')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" stroke="none"
+                          d="M12 4a1.25 1.25 0 0 1 1.25 1.25v4.9q0 .6.6.6h4.9a1.25 1.25 0 0 1 0 2.5
+                            h-4.9q-.6 0-.6.6v4.9a1.25 1.25 0 0 1-2.5 0v-4.9q0-.6-.6-.6h-4.9
+                            a1.25 1.25 0 0 1 0-2.5h4.9q.6 0 .6-.6v-4.9A1.25 1.25 0 0 1 12 4Z" />
+                  </svg>
+                  新建
                 </button>
               </template>
-              <button
-                v-else-if="view === 'detail'"
-                type="button"
-                class="playlist-action playlist-play-all map-glass"
-                @click="play()"
-              >
-                <LiquidGlass variant="clear" />
-                <span>
-                  <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6.5 4.7 8.5 5.3-8.5 5.3z"/></svg>
+              <template v-else-if="view === 'detail'">
+                <button type="button" class="playlist-add" @click="navigate('add')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                  添加歌曲
+                </button>
+                <button v-if="tracks.length" type="button" class="playlist-text-action" @click="play()">
                   播放
-                </span>
-              </button>
-              <button v-else-if="view === 'new-tracks'" type="button" class="playlist-action map-glass"
+                </button>
+              </template>
+              <button v-else-if="view === 'new-tracks'" type="button" class="playlist-text-action"
                       @click="createPlaylist">
-                <LiquidGlass variant="clear" /><span>确认创建</span>
+                确认创建
               </button>
               <button v-else-if="view === 'add' || view === 'edit'" type="button"
                       class="playlist-action map-glass" :disabled="!checking.size"
                       @click="view === 'add' ? addChecked(current) : removeChecked()">
                 <LiquidGlass variant="clear" /><span>{{ view === 'add' ? '添加' : '移除' }}</span>
               </button>
-              <button v-else-if="view === 'new' || view === 'rename'" type="submit"
+              <button v-else-if="view === 'new'" type="submit" form="playlist-name-form"
+                      class="playlist-text-action" :disabled="!draft.trim()">
+                选歌
+              </button>
+              <button v-else-if="view === 'rename'" type="submit"
                       form="playlist-name-form" class="playlist-action map-glass" :disabled="!draft.trim()">
-                <LiquidGlass variant="clear" /><span>{{ view === 'new' ? '选歌' : '保存' }}</span>
+                <LiquidGlass variant="clear" /><span>保存</span>
               </button>
               <button v-else-if="view === 'import'" type="submit" form="playlist-import-form"
                       class="playlist-action map-glass" :disabled="!draft.trim()">
@@ -871,37 +894,35 @@ function importList() {
   border-radius: var(--radius-control);
 }
 
-.playlist-pane :is(.playlist-icon, .playlist-add, .playlist-list-item, .playlist-quiet):hover,
-.playlist-pane .playlist-icon[aria-expanded='true'],
-.playlist-menu button:hover:not(:disabled) {
+.playlist-pane .playlist-icon:not(.playlist-back):hover,
+.playlist-pane .playlist-icon[aria-expanded='true'] {
   background: var(--control-hover);
 }
 
+.playlist-pane .playlist-back {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.playlist-back svg {
+  width: 26px;
+  height: 26px;
+  stroke-width: 2;
+}
+
+.playlist-pane :is(.playlist-back, .playlist-text-action, .playlist-list-item, .playlist-add,
+  .playlist-quiet, .playlist-tabs button):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+  background: transparent;
+}
+
 .playlist-tabs {
-  --tab-gap: 3px;
-  --tab-inset: 2px;
-  position: relative;
-  isolation: isolate;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--tab-gap);
-  padding: var(--tab-inset);
-}
-
-.playlist-tabs::before {
-  position: absolute;
-  z-index: -1;
-  inset-block: var(--tab-inset);
-  inset-inline-start: var(--tab-inset);
-  inline-size: calc((100% - 2 * var(--tab-inset) - var(--tab-gap)) / 2);
-  border-radius: var(--radius-control);
-  background: var(--control-selected);
-  content: '';
-  transition: translate var(--scene-transfer-duration) var(--ease-glass-in);
-}
-
-.playlist-tabs[data-tab='favorites']::before {
-  translate: calc(100% + var(--tab-gap));
+  gap: 3px;
+  padding: 2px;
 }
 
 .playlist-tabs button {
@@ -913,11 +934,7 @@ function importList() {
 
 .playlist-tabs button[aria-pressed='true'] {
   color: var(--text-primary);
-}
-
-.playlist-tabs button:focus-visible {
-  outline: 2px solid var(--text-primary);
-  outline-offset: -2px;
+  font-weight: 650;
 }
 
 @media (forced-colors: active) {
@@ -949,11 +966,33 @@ function importList() {
   padding: 0;
 }
 
+.playlist-track-row {
+  display: flex;
+}
+
 .playlist-track {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 5px;
+  min-width: 0;
   min-height: 38px;
+}
+
+.playlist-track--selectable {
+  padding-inline: 4px 8px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background-color var(--glass-dismiss-duration) ease;
+}
+
+.playlist-track--selectable:has(input:checked) {
+  background-color: rgb(255 255 255 / .13);
+}
+
+.playlist-track--selectable:has(input:focus-visible) {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
 }
 
 .playlist-track-name {
@@ -970,33 +1009,43 @@ function importList() {
   font-variant-numeric: tabular-nums;
 }
 
-.playlist-pane :is(.playlist-track-play, .playlist-heart) {
+.playlist-pane .playlist-heart {
   flex: none;
   display: grid;
   place-items: center;
   width: 27px;
-  height: 34px;
   padding: 0;
   color: var(--text-secondary);
 }
 
 .playlist-pane .playlist-track-play {
+  padding: 0;
+  border-radius: var(--radius-control);
+  text-align: start;
+  user-select: none;
+}
+
+.playlist-play-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
   width: 34px;
+  height: 34px;
   border-radius: 50%;
   background-color: rgb(220 245 244 / .08);
   color: var(--text-primary);
   transition: background-color var(--glass-dismiss-duration) ease;
 }
 
-.playlist-track-play svg {
-  width: 15px;
-  height: 15px;
+.playlist-play-mark svg {
+  width: 22px;
+  height: 22px;
   fill: currentColor;
   stroke-width: 1.6;
 }
 
 @media (hover: hover) {
-  .playlist-pane .playlist-track-play:hover {
+  .playlist-track-play:hover .playlist-play-mark {
     background-color: var(--control-hover);
   }
 }
@@ -1004,10 +1053,10 @@ function importList() {
 .playlist-pane .playlist-track-play:focus-visible {
   outline: 2px solid var(--text-primary);
   outline-offset: -2px;
-  background-color: var(--control-focus);
+  background: transparent;
 }
 
-.playlist-pane .playlist-track-play:active { background-color: var(--control-active); }
+.playlist-track-play:active .playlist-play-mark { background-color: var(--control-active); }
 
 .playlist-track-select {
   display: grid;
@@ -1019,45 +1068,51 @@ function importList() {
 
 .playlist-track-select input {
   grid-area: 1 / 1;
-  appearance: none;
   inline-size: 20px;
   block-size: 20px;
   margin: 0;
-  border: 1px solid var(--text-secondary);
-  border-radius: 5px;
-  background: transparent;
+  opacity: 0;
   cursor: pointer;
 }
 
-.playlist-track-select input:checked {
-  border-color: var(--text-primary);
-  background: var(--control-active);
-}
-
-.playlist-track-select input:focus-visible {
-  outline: 2px solid var(--text-primary);
-  outline-offset: 2px;
-}
-
-.playlist-track-select .playlist-checkmark {
+.playlist-track-select .playlist-checkbox {
   grid-area: 1 / 1;
-  inline-size: 14px;
-  block-size: 14px;
-  visibility: hidden;
-  color: var(--text-primary);
+  inline-size: 24px;
+  block-size: 24px;
+  color: var(--text-secondary);
   pointer-events: none;
+  transition: color var(--glass-dismiss-duration) ease;
 }
 
-.playlist-track-select input:checked + .playlist-checkmark {
-  visibility: visible;
+.playlist-checkbox .playlist-checkmark {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: stroke-dashoffset var(--glass-dismiss-duration) ease-in,
+    opacity var(--glass-dismiss-duration) step-end;
+}
+
+.playlist-track-select input:checked + .playlist-checkbox {
+  color: var(--text-primary);
+}
+
+.playlist-track-select input:checked + .playlist-checkbox .playlist-checkmark {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transition: stroke-dashoffset 205ms var(--ease-glass-in);
 }
 
 @media (forced-colors: active) {
-  .playlist-track-select input { appearance: auto; }
-  .playlist-track-select input:checked + .playlist-checkmark { visibility: hidden; }
+  .playlist-track--selectable:has(input:checked) {
+    outline: 1px solid Highlight;
+    outline-offset: -1px;
+  }
+
+  .playlist-track-select input { opacity: 1; }
+  .playlist-track-select .playlist-checkbox { display: none; }
 }
 
-.playlist-pane :is(.playlist-add, .playlist-list-item) {
+.playlist-pane .playlist-list-item {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1068,7 +1123,16 @@ function importList() {
   text-align: start;
 }
 
-.playlist-pane .playlist-add { color: var(--text-secondary); }
+.playlist-pane .playlist-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  margin-inline-end: auto;
+  padding-inline: 5px;
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+}
 .playlist-list-item .playlist-disc {
   width: 25px;
   height: 25px;
@@ -1093,7 +1157,12 @@ function importList() {
   color: var(--text-primary);
 }
 
-.playlist-search { display: flex; align-items: center; gap: 7px; }
+.playlist-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+}
 .playlist-search:focus-within { border-color: var(--text-secondary); }
 .playlist-search input {
   width: 100%;
@@ -1135,9 +1204,24 @@ function importList() {
   font-size: 14px;
 }
 
-.playlist-pane .playlist-play-all {
-  padding-inline: var(--space-2);
-  border-radius: 999px;
+.playlist-pane .playlist-text-action {
+  min-height: 44px;
+  padding-inline: 12px;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 650;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.playlist-pane .playlist-library-action {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.playlist-pane .playlist-create {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .playlist-pane button:disabled, .playlist-menu button:disabled {
@@ -1170,7 +1254,11 @@ function importList() {
   border-radius: calc(var(--radius-card) - var(--menu-inset));
 }
 
-.playlist-menu button:focus-visible { background: var(--control-focus); }
+.playlist-menu button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+  background: transparent;
+}
 
 .playlist-menu--touch button { min-height: 44px; }
 
@@ -1195,17 +1283,24 @@ function importList() {
 .playlist-pane--page :is(.playlist-body, .playlist-view) { gap: 10px; }
 .playlist-pane--page .playlist-footer { margin-block-start: auto; }
 
+.playlist-pane--page .playlist-tabs {
+  --text-primary: #f5f5f5;
+  --text-secondary: rgb(245 245 245 / .74);
+}
+
 .playlist-pane--page .playlist-header { min-height: 56px; }
 .playlist-pane--page .playlist-header h2 { font-size: 25px; }
 .playlist-pane--page .playlist-track { min-height: 52px; font-size: 16px; }
-.playlist-pane--page :is(.playlist-add, .playlist-action, .playlist-quiet, .playlist-list-item) {
+.playlist-pane--page :is(.playlist-action, .playlist-quiet, .playlist-list-item) {
   min-height: 44px;
 }
-.playlist-pane--page :is(.playlist-icon, .playlist-track-play, .playlist-heart, .playlist-track-select) {
+.playlist-pane--page :is(.playlist-icon, .playlist-track-select) {
   min-width: 38px;
   min-height: 44px;
 }
-.playlist-pane--page .playlist-track-play { width: 44px; height: 44px; }
+.playlist-pane--page .playlist-back { width: 44px; }
+.playlist-pane--page .playlist-play-mark { width: 44px; height: 44px; }
+.playlist-pane--page .playlist-heart { width: 44px; }
 .playlist-pane--page :is(input[type="search"], .playlist-input) { font-size: 16px; }
 
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {

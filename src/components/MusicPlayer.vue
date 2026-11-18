@@ -7,6 +7,7 @@ import {useToyFollow} from '../features/bgm/toyFollow.js';
 import FavoriteHeart from './FavoriteHeart.vue';
 import FluidSourceSurface, {fluidBackdropKey} from './FluidSourceSurface.vue';
 import LiquidGlass from './LiquidGlass.vue';
+import PlayPauseIcon from './PlayPauseIcon.vue';
 import RevealPanel from './RevealPanel.vue';
 import SegmentedChoice from './SegmentedChoice.vue';
 import {pushEscapeHandler} from './escapeStack.js';
@@ -59,7 +60,8 @@ const activeIndex = computed(() => Math.max(
   tracks.value.findIndex(({id}) => id === selectedId.value),
 ));
 const track = computed(() => tracks.value[activeIndex.value] ?? null);
-const isFavorite = computed(() => props.favoriteIds?.includes(track.value?.neteaseId) ?? false);
+const favoriteTracks = computed(() => new Set(props.favoriteIds));
+const isFavorite = computed(() => favoriteTracks.value.has(track.value?.neteaseId));
 const title = computed(() => track.value?.displayName ?? '暂无曲目');
 const cover = computed(() => track.value ? albumForTrack(track.value.id) : null);
 // 图片加载失败时回退音符占位；封面地址一变就重置，切歌不误报别的封面。
@@ -82,6 +84,23 @@ const {
   copyFailureReport,
   play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onSeeked, onEnded, onError, stopProgress,
 } = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume, toyFollow});
+
+const playlistTransport = computed(() => zone.value.playlistTracks ? {
+  key: zone.value.key,
+  trackId: track.value?.neteaseId ?? null,
+  playing: canPause.value,
+} : null);
+const playingQueueTrackId = computed(() =>
+  canPause.value && browseMatchesPlayback.value ? track.value?.id : null);
+
+function togglePlayback() {
+  if (canPause.value) pause();
+  else play();
+}
+
+function resumePlayback() {
+  if (!canPause.value) play();
+}
 
 function dismissFollowPrompt() {
   followAuthor.value = null;
@@ -282,10 +301,26 @@ function revealQueue(incoming) {
 }
 
 async function playFromList(item) {
+  if (browseMatchesPlayback.value && track.value?.id === item.id) {
+    togglePlayback();
+    return;
+  }
   overrides.value = browse.value;
   selectedId.value = item.id;
   await nextTick();
   if (track.value?.id === item.id && !canPause.value) play();
+}
+
+function showQueueTouchPress(event) {
+  if (event.pointerType === 'touch' && event.isPrimary) {
+    event.currentTarget.dataset.queuePressed = String(event.pointerId);
+  }
+}
+
+function clearQueueTouchPress(event) {
+  if (event.currentTarget.dataset.queuePressed === String(event.pointerId)) {
+    delete event.currentTarget.dataset.queuePressed;
+  }
 }
 
 function timeLabel(seconds) {
@@ -353,7 +388,8 @@ function reactToControl(event) {
   if (systemVolume.value || !(event.target instanceof Element)) return;
   const clicked = event.type === 'click';
   const control = event.target.closest(clicked ? 'button' : 'input[type="range"]');
-  if (!control || control.disabled || control.matches('.icon-button:not(.play-toggle)')) return;
+  if (!control || control.disabled
+      || control.matches('.icon-button:not(.play-toggle), .track-list button')) return;
   glass.value?.reactAt(control, clicked && event.detail ? event : null);
 }
 
@@ -371,7 +407,7 @@ function updateBackdrop(canvas) {
   }
 }
 
-defineExpose({updateBackdrop, pause});
+defineExpose({updateBackdrop, pause, togglePlayback, resumePlayback, playlistTransport});
 onMounted(() => mobileVolume.addEventListener('change', updateVolumeMode));
 onBeforeUnmount(() => {
   mobileVolume.removeEventListener('change', updateVolumeMode);
@@ -543,13 +579,10 @@ onBeforeUnmount(() => {
             :aria-label="canPause ? '暂停' : '播放'"
             :title="canPause ? '暂停' : '播放'"
             :disabled="!track"
-            @click="canPause ? pause() : play()"
+            @click="togglePlayback"
           >
             <LiquidGlass variant="lens" />
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path v-if="canPause" d="M9 6v12m6-12v12" stroke-width="2.5" />
-              <path v-else d="M9 5.8 19 12 9 18.2V5.8Z" fill="currentColor" stroke="none" />
-            </svg>
+            <PlayPauseIcon :playing="canPause" />
           </button>
           <button
             type="button"
@@ -629,16 +662,29 @@ onBeforeUnmount(() => {
                     <li v-for="item in browseTracks" :key="item.id">
                       <button
                         type="button"
+                        class="queue-play"
                         :aria-current="browseMatchesPlayback && item.id === track?.id ? 'true' : undefined"
+                        :aria-label="(playingQueueTrackId === item.id ? '暂停 ' : '播放 ') + item.displayName"
                         :title="item.displayName"
+                        @pointerdown="showQueueTouchPress"
+                        @pointerup="clearQueueTouchPress"
+                        @pointercancel="clearQueueTouchPress"
+                        @lostpointercapture="clearQueueTouchPress"
                         @click="playFromList(item)"
                       >
-                        <svg class="queue-marker" viewBox="0 0 16 16" aria-hidden="true">
-                          <path v-if="browseMatchesPlayback && item.id === track?.id" d="M3 6v4m5-7v10m5-8v6" />
-                          <path v-else d="M5 3.5 12 8l-7 4.5z" />
-                        </svg>
+                        <PlayPauseIcon class="queue-marker" :playing="playingQueueTrackId === item.id" />
                         <span class="queue-name">{{ item.displayName }}</span>
                         <span v-if="item.duration" class="queue-duration">{{ timeLabel(item.duration) }}</span>
+                      </button>
+                      <button
+                        v-if="favoriteIds && item.neteaseId"
+                        type="button"
+                        class="icon-button favorite-toggle queue-favorite"
+                        :aria-pressed="favoriteTracks.has(item.neteaseId)"
+                        :aria-label="(favoriteTracks.has(item.neteaseId) ? '取消收藏 ' : '收藏 ') + item.displayName"
+                        @click="emit('favorite', item.neteaseId)"
+                      >
+                        <FavoriteHeart :filled="favoriteTracks.has(item.neteaseId)" />
                       </button>
                     </li>
                   </ul>
@@ -820,11 +866,11 @@ onBeforeUnmount(() => {
     transform 170ms var(--ease-glass-in);
 }
 
-.music-player button:active:not(:disabled) {
+.music-player button:active:not(:disabled, .track-list button) {
   transform: scale(.965);
 }
 
-.music-player button:hover:not(:disabled, .icon-button, :has(.fluid-source-surface)) {
+.music-player button:hover:not(:disabled, .icon-button, .track-list button, :has(.fluid-source-surface)) {
   background-color: var(--player-hover);
 }
 
@@ -1135,6 +1181,7 @@ onBeforeUnmount(() => {
 }
 
 .track-list {
+  --queue-favorite-size: 36px;
   display: grid;
   align-content: start;
   gap: 3px;
@@ -1168,7 +1215,15 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-.track-list button {
+.track-list li:has(> .queue-favorite) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--queue-favorite-size);
+  align-items: center;
+}
+
+.queue-play {
+  --queue-ink: var(--player-secondary);
+  --queue-marker-opacity: .66;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
@@ -1178,7 +1233,22 @@ onBeforeUnmount(() => {
   min-height: 36px;
   padding: 5px 9px;
   border-radius: 10px;
+  color: var(--queue-ink);
   text-align: start;
+  user-select: none;
+  transition: color 130ms ease;
+}
+
+.queue-play:is([aria-current="true"], [data-queue-pressed], :active, :focus-visible) {
+  --queue-ink: var(--player-text);
+  --queue-marker-opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .queue-play:hover:not([aria-current="true"], [data-queue-pressed], :active, :focus-visible) {
+    --queue-ink: color-mix(in srgb, var(--player-text) 65%, var(--player-secondary));
+    --queue-marker-opacity: .88;
+  }
 }
 
 .track-list button:focus-visible {
@@ -1192,24 +1262,20 @@ onBeforeUnmount(() => {
 }
 
 .queue-duration {
-  color: var(--player-secondary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
 .queue-marker {
-  width: 15px;
-  height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: .66;
+  width: 20px;
+  height: 20px;
+  justify-self: center;
+  opacity: var(--queue-marker-opacity);
+  transition: opacity 130ms ease;
 }
 
-.track-list button[aria-current="true"] {
-  background-image: var(--player-selection);
+.queue-play[aria-current="true"] {
+  font-weight: 650;
 }
 
 .music-player audio {
@@ -1311,7 +1377,11 @@ onBeforeUnmount(() => {
     overflow: visible;
   }
 
-  .track-list button {
+  .track-list {
+    --queue-favorite-size: 44px;
+  }
+
+  .queue-play {
     min-height: 44px;
   }
 }

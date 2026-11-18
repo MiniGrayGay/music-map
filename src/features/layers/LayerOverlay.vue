@@ -5,22 +5,30 @@ import {rasterPosition} from '../map/mapModel.js';
 const props = defineProps({
   pieces: {type: Array, required: true},
   contextPieces: {type: Array, default: () => []},
+  stagedPieces: {type: Array, required: true},
+  readyIds: {type: Set, required: true},
   transform: {type: Object, required: true},
 });
 defineEmits(['loaded', 'failed']);
-const images = computed(() => [
-  ...props.contextPieces.map(piece => ({...piece, context: true})),
-  ...props.pieces,
-]);
+const images = computed(() => {
+  const shown = new Set([...props.contextPieces, ...props.pieces].map(({layerId}) => layerId));
+  return [
+    ...props.contextPieces.map(piece => ({...piece, context: true})),
+    ...props.pieces,
+    ...props.stagedPieces.filter(({layerId}) => !shown.has(layerId))
+      .map(piece => ({...piece, staged: true})),
+  ];
+});
 </script>
 
 <template>
   <TransitionGroup name="layer-art">
     <img
-      v-for="{layerId, url, rect, context} in images"
+      v-for="{layerId, url, rect, context, staged} in images"
       :key="layerId"
       class="layer-piece"
-      :class="{'layer-piece-context': context}"
+      :class="{'layer-piece-context': context,
+        'layer-piece-pending': staged || !readyIds.has(layerId)}"
       :src="url"
       :style="rasterPosition(transform, rect.left, rect.top, rect.width, rect.height)"
       alt=""
@@ -41,7 +49,8 @@ const images = computed(() => [
 }
 
 .layer-art-enter-from,
-.layer-art-leave-to {
+.layer-art-leave-to,
+.layer-piece-pending {
   opacity: 0;
 }
 

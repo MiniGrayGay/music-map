@@ -56,17 +56,48 @@ const tooltipPoint = reactive({x: 0, y: 0});
 const loadedLayerIds = reactive(new Set());
 const failedLayerIds = reactive(new Set());
 const rasterReady = ref(false);
-const savedLayers = shallowRef(null);
+let cameraFrame = 0;
+const shownLayers = shallowRef(null);
+const stagedLayers = shallowRef(null);
+const requestedLayers = computed(() => layerModeActive.value ? {
+  pieces: activeLayerPieces.value,
+  context: contextLayerPieces.value,
+  focus: activeFocusRect.value,
+} : null);
+
+const allLayerPieces = (selection) => selection ? [...selection.context, ...selection.pieces] : [];
+const stagedPieces = computed(() => allLayerPieces(stagedLayers.value));
+
+watch(requestedLayers, (next, previous) => {
+  if (!next || !previous) {
+    stagedLayers.value = null;
+    if (next) shownLayers.value = next;
+    return;
+  }
+
+  // Art already in the active or staged DOM can be reused. A retired image
+  // has to report readiness again before it can replace the current layer.
+  const retained = new Set([...allLayerPieces(shownLayers.value), ...stagedPieces.value]
+    .map(({layerId}) => layerId));
+  for (const {layerId} of allLayerPieces(next)) {
+    if (retained.has(layerId)) continue;
+    loadedLayerIds.delete(layerId);
+    failedLayerIds.delete(layerId);
+  }
+  cancelAnimationFrame(cameraFrame);
+  stagedLayers.value = next;
+}, {immediate: true});
+
 watchEffect(() => {
-  if (layerModeActive.value) {
-    savedLayers.value = {
-      pieces: activeLayerPieces.value,
-      context: contextLayerPieces.value,
-      focus: activeFocusRect.value,
-    };
+  const next = stagedLayers.value;
+  if (!next) return;
+  if (next.pieces.every(({layerId}) => loadedLayerIds.has(layerId))
+      || next.pieces.some(({layerId}) => failedLayerIds.has(layerId))) {
+    shownLayers.value = next;
+    stagedLayers.value = null;
   }
 });
-const layers = computed(() => layerModeActive.value || props.retainLayers ? savedLayers.value : null);
+const layers = computed(() => layerModeActive.value || props.retainLayers ? shownLayers.value : null);
 const focusRect = computed(() => layers.value?.focus ?? null);
 // 独立地图默认取景：viewBounds 归一化 [x,y,width,height]（0..1）转 canvas 像素；
 // 缺失或非法（越界/非正宽高/非有限值）时为 null，回退整画布 fit。
@@ -87,7 +118,6 @@ const selectedZoneKey = ref(null);
 
 let fitMinScale = 0.01;
 let resizeObserver = null;
-let cameraFrame = 0;
 
 const worldStyle = computed(() => ({
   width: `${props.mapData.canvas.width}px`,
@@ -148,21 +178,18 @@ watch(currentLayerIds, (ids, previous) => {
   hoveredZoneKey.value = null;
   focusedZoneKey.value = null;
   selectedZoneKey.value = null;
-  emit('blank-tap');
+  if (!ids.length || !previous.length) emit('blank-tap');
 });
 
 // RegionLines 只认 {id1, rings, path}：分区传投影 rings、id1=zone.key、path。
 const zoneRegions = computed(() => zones.value.map((zone) => ({
   id1: zone.key,
   rings: zone.pixelRings,
-  lines: zone.pixelLines,
+  lines: layers.value && zone.pixelLines?.length === 0 && zonePlayable(zone) ? null : zone.pixelLines,
   path: zone.pathData,
 })));
-const activeZoneRegion = computed(() => {
-  const zone = activeZone.value;
-  if (!zone) return null;
-  return {id1: zone.key, rings: zone.pixelRings, lines: zone.pixelLines, path: zone.pathData};
-});
+const activeZoneRegion = computed(() =>
+  zoneRegions.value.find(({id1}) => id1 === activeZone.value?.key) ?? null);
 
 const playableZones = new WeakMap();
 function zonePlayable(zone) {
@@ -182,8 +209,8 @@ function emitView() {
 
 function applyTransform(next, animating = false) {
   if (!animating) cancelAnimationFrame(cameraFrame);
-  const clamped = clampTransform(next, viewport, props.mapData.canvas, fitMinScale,
-    Math.max(fitMinScale, zoomCeiling.value));
+  const ceiling = Math.max(fitMinScale, zoomCeiling.value, animating ? transform.scale : 0);
+  const clamped = clampTransform(next, viewport, props.mapData.canvas, fitMinScale, ceiling);
   transform.scale = clamped.scale;
   transform.tx = clamped.tx;
   transform.ty = clamped.ty;
@@ -199,10 +226,13 @@ function resetView(animate = false) {
       return;
     }
     const from = {...transform};
-    const start = performance.now();
+    let last = performance.now();
+    let elapsed = 0;
     cancelAnimationFrame(cameraFrame);
     const advance = (time) => {
-      const t = Math.min(1, (time - start) / 380);
+      elapsed += Math.min(48, Math.max(0, time - last));
+      last = time;
+      const t = Math.min(1, elapsed / 380);
       const ease = t * t * (3 - 2 * t);
       applyTransform({
         scale: from.scale + (next.scale - from.scale) * ease,
@@ -251,7 +281,8 @@ watch([() => props.initialZoneKey, zones], locateInitialZone);
 
 // ---- 指针交互 ----
 const pointers = new Map(); // pointerId → {x, y}
-const dragState = reactive({active: false, lastX: 0, lastY: 0, moved: 0, pinch: null});
+const dragState = reactive({active: false, lastX: 0, lastY: 0, dragged: false, pinch: null});
+const tapTolerance = 8;
 
 function pointFromEvent(event) {
   const rect = containerRef.value.getBoundingClientRect();
@@ -283,7 +314,7 @@ function onPointerDown(event) {
     dragState.active = true;
     dragState.lastX = point.x;
     dragState.lastY = point.y;
-    dragState.moved = 0;
+    dragState.dragged = false;
     dragState.pinch = null;
   } else if (pointers.size === 2) {
     const info = pinchInfo();
@@ -322,7 +353,9 @@ function onPointerMove(event) {
   if (dragState.active) {
     const dx = point.x - dragState.lastX;
     const dy = point.y - dragState.lastY;
-    dragState.moved += Math.abs(dx) + Math.abs(dy);
+    // Keep the map and the hit point stable while a press is still a tap.
+    if (!dragState.dragged && Math.hypot(dx, dy) < tapTolerance) return;
+    dragState.dragged = true;
     dragState.lastX = point.x;
     dragState.lastY = point.y;
     applyTransform(panBy(transform, dx, dy));
@@ -330,7 +363,7 @@ function onPointerMove(event) {
 }
 
 function onPointerUp(event) {
-  const isTap = pointers.size === 1 && dragState.active && dragState.moved < 8;
+  const isTap = pointers.size === 1 && dragState.active && !dragState.dragged;
   const activates = isTap && (event.pointerType !== 'mouse' || event.button === 0);
   pointers.delete(event.pointerId);
   if (pointers.size < 2) dragState.pinch = null;
@@ -339,7 +372,7 @@ function onPointerUp(event) {
     const [remaining] = pointers.values();
     dragState.lastX = remaining.x;
     dragState.lastY = remaining.y;
-    dragState.moved = 8; // 视为已移动，抬起时不再当作点选
+    dragState.dragged = true;
     dragState.active = true;
   }
   if (pointers.size === 0) {
@@ -357,7 +390,7 @@ function onPointerUp(event) {
     emit('blank-tap');
     return;
   }
-  if (pointers.size === 0 && event.pointerType === 'mouse' && dragState.moved >= 8) {
+  if (pointers.size === 0 && event.pointerType === 'mouse' && dragState.dragged) {
     // 捕获拖动期间命中 path 的 pointerenter/leave 不会派发；释放捕获后按
     // 坐标刷新悬停，避免残留拖动前的选中。
     const zone = zoneAt(event.clientX, event.clientY);
@@ -580,7 +613,8 @@ onBeforeUnmount(() => {
          alt="" draggable="false" />
     <canvas v-if="isMoonCanon && moonSafety" ref="moonOverlay" class="moon-safety-overlay"
             :class="{'floor-context': layers}" :style="worldStyle" aria-hidden="true" />
-    <LayerOverlay :pieces="layers?.pieces ?? []" :context-pieces="layers?.context ?? []" :transform="transform"
+    <LayerOverlay :pieces="layers?.pieces ?? []" :context-pieces="layers?.context ?? []"
+                  :staged-pieces="stagedPieces" :ready-ids="loadedLayerIds" :transform="transform"
                   @loaded="loadedLayerIds.add($event)" @failed="failedLayerIds.add($event)" />
     <div class="world" :style="worldStyle">
       <!-- 分区透明命中层：不可见；hover/单击/右键/键盘都发生在这层。 -->

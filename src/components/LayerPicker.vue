@@ -20,7 +20,7 @@ const props = defineProps({
 
 const emit = defineEmits(['focus', 'presence']);
 
-const {state, load, selectGroup, selectFloor, enterLayers, exitLayers,
+const {state, load, selectGroup, selectFloor, exitLayers,
   layerModeActive, activeGroup, floorOptions, activeFocusRect} = useLayerSelection();
 
 const rootRef = ref(null);
@@ -30,6 +30,7 @@ const searchRef = ref(null);
 const listRef = ref(null);
 const floorButtonsRef = ref(null);
 const panelOpen = ref(false);
+const panelPresent = ref(false);
 const panelAnchor = ref(null);
 const query = ref('');
 const openedViewport = ref(null);
@@ -57,35 +58,22 @@ const visibleGroups = computed(() => {
     return state.groups.filter((group) =>
       `${group.label} ${group.searchText} ${group.floorText}`.toLocaleLowerCase().includes(text));
   }
-  let list;
   const rect = props.viewportRect ?? openedViewport.value;
-  if (rect) {
-    const [left, top, right, bottom] = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
-    const centerX = (left + right) / 2;
-    const centerY = (top + bottom) / 2;
-    const intersecting = state.groups.filter(({bbox}) => bbox
-      && bbox.left <= right && bbox.right >= left && bbox.top <= bottom && bbox.bottom >= top);
-    list = (intersecting.length > 0 ? intersecting : state.groups)
-      .map((group) => {
-        const distance = ((group.bbox.left + group.bbox.right) / 2 - centerX) ** 2
-          + ((group.bbox.top + group.bbox.bottom) / 2 - centerY) ** 2;
-        return {group, distance};
-      })
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 20)
-      .map((item) => item.group);
-  } else {
-    list = state.groups;
-  }
-  const chosen = state.groups.find((group) => group.key === activeGroupId.value);
-  if (chosen && !list.some((group) => group.key === chosen.key)) list = [chosen, ...list];
-  return list;
+  if (!rect) return [];
+  const [left, top, right, bottom] = [rect.x, rect.y, rect.x + rect.width, rect.y + rect.height];
+  const centerX = (left + right) / 2;
+  const centerY = (top + bottom) / 2;
+  return state.groups.filter(({bbox}) => bbox
+    && bbox.left <= right && bbox.right >= left && bbox.top <= bottom && bbox.bottom >= top)
+    .map((group) => {
+      const distance = ((group.bbox.left + group.bbox.right) / 2 - centerX) ** 2
+        + ((group.bbox.top + group.bbox.bottom) / 2 - centerY) ** 2;
+      return {group, distance};
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 20)
+    .map(({group}) => group);
 });
-
-function clampHighlight() {
-  const count = visibleGroups.value.length;
-  highlightIndex.value = count === 0 ? 0 : Math.min(highlightIndex.value, count - 1);
-}
 
 watch(visibleGroups, () => {
   highlightIndex.value = 0;
@@ -93,8 +81,12 @@ watch(visibleGroups, () => {
 
 watch(highlightIndex, async () => {
   await nextTick();
-  listRef.value?.querySelectorAll('li[role="option"]')[highlightIndex.value]
-    ?.scrollIntoView({block: 'nearest'});
+  const option = listRef.value?.children[highlightIndex.value];
+  const scroll = listRef.value?.parentElement;
+  if (!option || !scroll) return;
+  const item = option.getBoundingClientRect();
+  const bounds = scroll.getBoundingClientRect();
+  scroll.scrollTop += Math.min(0, item.top - bounds.top) + Math.max(0, item.bottom - bounds.bottom);
 });
 
 function emitFocus() {
@@ -121,7 +113,16 @@ function closePanel(restoreFocus) {
 
 function togglePanel(event) {
   if (panelOpen.value) closePanel(false);
-  else openPanel(event.pointerType !== 'touch');
+  else {
+    const mouse = event.pointerType ? event.pointerType === 'mouse'
+      : matchMedia('(pointer: fine) and (hover: hover)').matches;
+    openPanel(event.detail === 0 || mouse);
+  }
+}
+
+function updatePanelPresence(present) {
+  panelPresent.value = present;
+  emit('presence', present);
 }
 
 // ---- 选择 ----
@@ -139,8 +140,7 @@ function chooseGroup(group) {
   if (props.switching) return;
   closePanel(true);
   if (group.key === activeGroupId.value) return;
-  if (!layerModeActive.value && group.key === state.lastGroupKey) enterLayers();
-  else selectGroup(group.key);
+  selectGroup(group.key);
   emitFocus();
   void nextTick(revealActiveFloor);
 }
@@ -165,14 +165,6 @@ function toggleMode(event) {
     return;
   }
   if (props.switching) return;
-  if (!panelOpen.value) {
-    enterLayers();
-    if (activeGroup.value) {
-      emitFocus();
-      void nextTick(revealActiveFloor);
-      return;
-    }
-  }
   togglePanel(event);
 }
 
@@ -309,7 +301,7 @@ onBeforeUnmount(() => {
       :anchor="panelAnchor?.isConnected ? panelAnchor : modeButtonRef"
       id="layer-group-panel"
       class="panel"
-      @presence="emit('presence', $event)"
+      @presence="updatePanelPresence"
     >
       <input
         ref="searchRef"
@@ -343,12 +335,12 @@ onBeforeUnmount(() => {
           >{{ group.label }}</li>
         </ul>
       </ScrollPane>
-      <p v-else class="no-match" role="status">无匹配</p>
+      <p v-else class="no-match" role="status">{{ query.trim() ? '无匹配' : '附近没有分层' }}</p>
     </GlassPanel>
 
     <Teleport :to="floorHost ?? 'body'" :disabled="!floorHost">
       <GlassPanel
-        :open="layerModeActive && floorOptions.length > 0 && !panelOpen"
+        :open="layerModeActive && floorOptions.length > 0 && !panelOpen && !panelPresent && !switching"
         class="floors"
         inline
         @pointerdown.stop

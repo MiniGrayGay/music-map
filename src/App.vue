@@ -441,13 +441,24 @@ watch(playbackZone, (zone) => {
 }, {flush: 'sync'});
 
 function activateRegion(zone) {
+  if (layerModeActive.value && zone && !playlistPlayback.value && activeZone.value?.key === zone.key) {
+    playerRef.value?.resumePlayback();
+    return;
+  }
   activeZone.value = zone;
   playlistPlayback.value = null;
 }
 
-function playPlaylist({id, name, tracks, trackId}) {
+function playPlaylist({id, name, tracks, trackId, fromRow}) {
+  const key = 'playlist-' + id;
+  const transport = playerRef.value?.playlistTransport;
+  if (fromRow && playlistPlayback.value?.key === key && transport?.key === key
+      && transport.trackId === trackId) {
+    playerRef.value.togglePlayback();
+    return;
+  }
   playlistPlayback.value = {
-    key: 'playlist-' + id,
+    key,
     name,
     playlistTracks: tracks,
     startTrackId: trackId,
@@ -605,6 +616,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
                        :switching="!!mapHandoff || mapSwitching"
                        @presence="layerPopupPresent = $event" />
           <PlaylistLibrary :library="playlistLibrary" :read-backdrop="readMapBackdrop"
+                           :playback="playerRef?.playlistTransport"
                            @play="playPlaylist" @page-open="playlistPageOpen = $event" />
         </div>
       </div>

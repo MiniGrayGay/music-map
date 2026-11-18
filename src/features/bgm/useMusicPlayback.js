@@ -464,6 +464,14 @@ export function useMusicPlayback({track, zone, preview, advance, systemVolume, t
     const sameSource = node === previous[0] && activeUrl === url;
     const newZone = previous[2] !== zone.value.key;
     if (sameSource && !newZone) return;
+    // Two floors can resolve to the same recording. Keep its media node and
+    // position while updating the selected region and available queue.
+    const betweenFloors = zone.value.key.startsWith('layer-')
+      && previous[2]?.startsWith('layer-');
+    if (sameSource && betweenFloors && activeSources.length && !node.error) {
+      if (!requested.value) play();
+      return;
+    }
     toyFollow.resetTrack();
     if (newZone) requested.value = !preview;
 

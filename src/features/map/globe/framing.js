@@ -41,6 +41,7 @@ export function placeReliefCard(zone, card, viewport, obstacles, previousEdge, p
   const centerY = viewport.height / 2;
   const zoneDistance = Math.hypot((zone.left + zone.right) / 2 - centerX, (zone.top + zone.bottom) / 2 - centerY);
   let best = null;
+  let linked = null;
   for (const scale of [1, .84, .7, .56]) {
     for (const edge of ['left', 'right', 'top', 'bottom']) {
       const vertical = edge === 'left' || edge === 'right';
@@ -83,15 +84,17 @@ export function placeReliefCard(zone, card, viewport, obstacles, previousEdge, p
         const inwardPenalty = compactZone ? Math.max(0, zoneDistance - cardDistance) * .55 : 0;
         const score = Math.abs(along + size / 2 - center) + inwardPenalty
           + (1 - scale) * 160 + (edge === previousEdge ? 0 : 26);
-        if (!best || score < best.score) {
-          const panel = {left, right, top, bottom, width, height, edge};
+        const panel = {left, right, top, bottom, width, height, edge, score};
+        if (!best || score < best.score) best = panel;
+        if (!linked || score < linked.score) {
           const leads = reliefConnections(zone, panel, points);
-          if (leads) best = {...panel, score, leads};
+          if (leads) linked = {...panel, leads};
         }
       }
     }
   }
-  return best;
+  // Leader lines are optional. A clear position is enough to show the card.
+  return linked ?? best;
 }
 
 function unobstructedFrame(width, height, obstacles) {

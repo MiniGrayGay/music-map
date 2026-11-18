@@ -21,8 +21,6 @@ const state = reactive({
   groups: [], // 当前地图的组（仅含可投影组；无底图地图为空）
   activeGroupId: null, // null = 未进入分层（回地面）
   activeFloorLevel: null,
-  lastGroupKey: null, // 退出分层前所在组/层，再进分层时原样恢复（工作室行为）
-  lastFloorLevel: null,
   skipped: 0,
 });
 
@@ -85,15 +83,6 @@ function resetSelection() {
   state.activeFloorLevel = null;
 }
 
-export function enterLayers() {
-  const group = state.groups.find((item) => item.key === state.lastGroupKey);
-  if (!group) return;
-  state.activeGroupId = group.key;
-  state.activeFloorLevel = group.floors.some((floor) => floor.level === state.lastFloorLevel)
-    ? state.lastFloorLevel
-    : group.defaultFloorLevel;
-}
-
 export function selectGroup(groupKey) {
   const group = state.groups.find((item) => item.key === groupKey);
   if (!group) return;
@@ -107,14 +96,8 @@ export function selectFloor(level) {
   state.activeFloorLevel = level;
 }
 
-// 退出分层＝回地面；记住上次组与楼层，再进分层时原样恢复（工作室行为）。
 export function exitLayers() {
-  if (state.activeGroupId !== null) {
-    state.lastGroupKey = state.activeGroupId;
-    state.lastFloorLevel = state.activeFloorLevel;
-  }
-  state.activeGroupId = null;
-  state.activeFloorLevel = null;
+  resetSelection();
 }
 
 export const layerModeActive = computed(() => state.status === 'ready'
@@ -191,7 +174,6 @@ export function useLayerSelection() {
     load: loadLayers,
     reload: reloadLayers,
     setActiveMap,
-    enterLayers,
     selectGroup,
     selectFloor,
     exitLayers,
