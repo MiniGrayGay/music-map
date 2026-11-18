@@ -81,7 +81,6 @@ const toyFollow = useToyFollow(props.preview);
 const {prompt: followAuthor} = toyFollow;
 const {
   audio, progressInput, volume, muted, repeatMode, nativeLoop, toggleRepeat, elapsed, duration, mediaDuration, failure, canPause,
-  copyFailureReport,
   play, pause, seek, readPosition, onPause, onPlaying, onSeeking, onSeeked, onEnded, onError, stopProgress,
 } = useMusicPlayback({track, zone, preview: props.preview, advance, systemVolume, toyFollow});
 
@@ -112,20 +111,6 @@ watch(followAuthor, (next, previous) => {
 
 const repeatLabel = computed(() => repeatMode.value === 'one' ? '单曲循环' : '列表循环');
 
-// 失败通知的“复制报错”：一次复制页面会话内全部失败诊断；成功/失败都有短暂反馈。
-const copyState = ref(''); // '' | 'copied' | 'failed'
-let copyStateTimer = 0;
-
-async function copyFailureToClipboard() {
-  clearTimeout(copyStateTimer);
-  const ok = await copyFailureReport();
-  copyState.value = ok ? 'copied' : 'failed';
-  copyStateTimer = window.setTimeout(() => {
-    copyStateTimer = 0;
-    copyState.value = '';
-  }, 2000);
-}
-
 // 音源读取失败改为页面短通知：监听 failure，Teleport 到页面顶部，约 4 秒自动消失。
 const failureToast = ref(false);
 let failureToastTimer = 0;
@@ -133,9 +118,6 @@ let failureToastTimer = 0;
 function closeFailureToast() {
   clearTimeout(failureToastTimer);
   failureToastTimer = 0;
-  clearTimeout(copyStateTimer);
-  copyStateTimer = 0;
-  copyState.value = '';
   failureToast.value = false;
 }
 
@@ -412,7 +394,6 @@ onMounted(() => mobileVolume.addEventListener('change', updateVolumeMode));
 onBeforeUnmount(() => {
   mobileVolume.removeEventListener('change', updateVolumeMode);
   clearTimeout(failureToastTimer);
-  clearTimeout(copyStateTimer);
   clearTimeout(backdropTimer);
   queueHeightMotion?.cancel();
   cancelTrackMotion();
@@ -635,9 +616,9 @@ onBeforeUnmount(() => {
             <button
               type="button"
               class="retry-button"
-              :aria-label="copyState === 'copied' ? '报错已复制' : '复制报错诊断信息'"
-              @click="copyFailureToClipboard"
-            >{{ copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制报错' }}</button>
+              aria-label="重试播放"
+              @click="play"
+            >重试</button>
           </div>
         </Transition>
       </Teleport>
