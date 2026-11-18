@@ -1,6 +1,7 @@
 <script setup>
 import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
+import {decodeTileImage} from './tileImage.js';
 
 const props = defineProps({
   mapName: {type: String, required: true},
@@ -56,9 +57,9 @@ async function fetchTile(key) {
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const image = await createImageBitmap(await response.blob());
+    const image = await decodeTileImage(await response.blob());
     if (!active) {
-      image.close();
+      image.close?.();
       return;
     }
     bitmaps.set(key, image);
@@ -68,7 +69,7 @@ async function fetchTile(key) {
         readTile(oldest);
         continue;
       }
-      bitmaps.get(oldest).close();
+      bitmaps.get(oldest).close?.();
       bitmaps.delete(oldest);
     }
   } catch (error) {
@@ -274,7 +275,7 @@ onBeforeUnmount(() => {
   cancelAnimationFrame(frameId);
   clearTimeout(backdropTimer);
   for (const controller of requested.values()) controller.abort();
-  for (const image of bitmaps.values()) image.close();
+  for (const image of bitmaps.values()) image.close?.();
 });
 </script>
 

@@ -221,6 +221,10 @@ vec3 sampleMoonPreview(sampler2D atlas, vec3 n, vec2 p, float z) {
   return moonPreviewTone(textureGrad(atlas, uv, dx, dy).rgb, p, z);
 }
 
+vec4 premultiplied(vec3 color, float opacity) {
+  return vec4(clamp(color, 0., 1.) * opacity, opacity);
+}
+
 void main() {
   if (u_occluder.z > 0. && distance(gl_FragCoord.xy, u_occluder.xy) < u_occluder.z) discard;
   vec2 p = (gl_FragCoord.xy - u_center) / u_radius;
@@ -243,7 +247,7 @@ void main() {
     }
   }
   if (r >= 1.001) {
-    pixel = vec4(airColor, airOpacity);
+    pixel = premultiplied(airColor, airOpacity);
     return;
   }
 
@@ -252,7 +256,8 @@ void main() {
   float z = sqrt(max(0., 1. - dot(p, p)));
   vec3 n = normalize(u_right * p.x + u_up * p.y + u_front * z);
   if (u_naturalMoon) {
-    pixel = vec4(sampleMoonPreview(u_atlas, n, p, z), 1. - smoothstep(.997, 1.001, r));
+    float opacity = 1. - smoothstep(.997, 1.001, r);
+    pixel = premultiplied(sampleMoonPreview(u_atlas, n, p, z), opacity);
     return;
   }
   if (u_projection == 2) {
@@ -262,7 +267,7 @@ void main() {
       vec3 previewNormal = normalize(u_lunarPreviewBasis * vec3(p, z));
       preview = sampleMoonPreview(u_lunarPreview, previewNormal, p, z);
       if (u_lunarMapBlend == 0.) {
-        pixel = vec4(preview, opacity);
+        pixel = premultiplied(preview, opacity);
         return;
       }
     }
@@ -279,7 +284,7 @@ void main() {
       if (!u_hasLunarPreview) preview = moonPreviewTone(terrain, p, z);
       shaded = mix(preview, shaded, u_lunarMapBlend);
     }
-    pixel = vec4(shaded, opacity);
+    pixel = premultiplied(shaded, opacity);
     return;
   }
   float lon = atan(n.x, n.z);
@@ -369,11 +374,8 @@ void main() {
     rgb = mix(rgb, orbitalSurface(orbitalAlbedo, p, z, limbLight), u_orbitLook);
   }
   float opacity = 1. - smoothstep(.997, 1.001, r);
-  if (airOpacity > 0. && opacity < 1.) {
-    // Composite the shell behind the disk through the antialiased limb.
-    float visibleAir = airOpacity * (1. - opacity);
-    rgb = (rgb * opacity + airColor * visibleAir) / (opacity + visibleAir);
-    opacity += visibleAir;
-  }
-  pixel = vec4(rgb, opacity);
+  // Output premultiplied RGBA for the canvas compositor. The atmosphere lies
+  // behind the visible disk and contributes only through its uncovered edge.
+  float visibleAir = airOpacity * (1. - opacity);
+  pixel = premultiplied(rgb, opacity) + premultiplied(airColor, visibleAir);
 }

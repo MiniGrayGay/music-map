@@ -11,7 +11,8 @@ const pending = new Map(); // id → {resolve, reject, blob, signal, onAbort}
 function ensureWorker() {
   if (workerFailed) return null;
   if (worker) return worker;
-  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') {
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined'
+    || typeof createImageBitmap !== 'function') {
     workerFailed = true;
     return null;
   }
@@ -36,7 +37,7 @@ function ensureWorker() {
       if (entry.signal) entry.signal.removeEventListener('abort', entry.onAbort);
       if (error) {
         if (image) image.close();
-        entry.reject(new Error(error));
+        decodeLocally(entry.blob, entry.signal).then(entry.resolve, entry.reject);
       } else {
         entry.resolve({ image, mipmaps });
       }
@@ -95,7 +96,7 @@ function getLocalContext() {
 async function decodeLocally(blob, signal) {
   const { image, mipmaps } = await decodeTileMipmaps(blob, getLocalContext());
   if (signal && signal.aborted) {
-    image.close();
+    image.close?.();
     throw new DOMException('aborted', 'AbortError');
   }
   return { image, mipmaps };

@@ -104,7 +104,7 @@ function installCloudField(gl) {
 
 function initialize(canvas, fragment) {
   const gl = canvas.getContext('webgl2', {
-    alpha: true, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true,
+    alpha: true, antialias: false, depth: false, premultipliedAlpha: true, preserveDrawingBuffer: true,
   });
   if (!gl) throw new Error('WebGL 2 不可用');
   function shader(type, source) {
@@ -259,10 +259,10 @@ export class Globe {
     Object.assign(this, initialize(canvas, fragment));
     this.compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
     // 资源紧张时浏览器直接收走上下文：交给上层切换到 2D 平面地图，而不是停在白屏。
-    canvas.addEventListener('webglcontextlost', (event) => {
-      event.preventDefault();
+    this.onContextLoss = () => {
       this.onContextLost?.();
-    });
+    };
+    canvas.addEventListener('webglcontextlost', this.onContextLoss);
     const invalidate = () => {
       this.sphereState = null;
       this.requestFrame();
@@ -295,6 +295,16 @@ export class Globe {
     this.resize = this.resize.bind(this);
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(canvas);
+    this.onVisibility = () => {
+      if (document.hidden) {
+        clearTimeout(this.spinWake);
+        cancelAnimationFrame(this.frame);
+        this.frame = 0;
+      } else {
+        this.requestFrame();
+      }
+    };
+    document.addEventListener('visibilitychange', this.onVisibility);
     this.bindInput();
     this.resize();
   }
@@ -531,6 +541,7 @@ export class Globe {
   resize() {
     const {width, height} = this.canvas.getBoundingClientRect();
     const ratio = Math.min(devicePixelRatio, 1.45);
+    if (!width || !height || (width === this.width && height === this.height && ratio === this.ratio)) return;
     this.width = width;
     this.height = height;
     this.ratio = ratio;
@@ -720,11 +731,15 @@ export class Globe {
 
   requestFrame() {
     clearTimeout(this.spinWake);
-    if (!this.disposed && !this.frame) this.frame = requestAnimationFrame((time) => this.draw(time));
+    if (!this.disposed && !document.hidden && !this.frame) {
+      this.frame = requestAnimationFrame((time) => this.draw(time));
+    }
   }
 
   dispose() {
     this.disposed = true;
+    document.removeEventListener('visibilitychange', this.onVisibility);
+    this.canvas.removeEventListener('webglcontextlost', this.onContextLoss);
     this.observer.disconnect();
     clearTimeout(this.spinWake);
     cancelAnimationFrame(this.frame);
@@ -785,7 +800,7 @@ export class Globe {
 
   draw(time) {
     this.frame = 0;
-    if (!this.world) return;
+    if (!this.world || !this.width || !this.height) return;
     this.advance(time, clamp(time - this.lastFrame, 1, 34));
     this.lastFrame = time;
     const overview = this.world.id === 'Teyvat' && this.zoom <= ORBIT_MAX_ZOOM;
@@ -949,8 +964,8 @@ export class Globe {
   }
 
   drawSatellite(time, radius, active) {
-    this.satellite.hidden = !active;
     if (!active) {
+      this.satellite.hidden = true;
       if (this.moonLink) this.moonLink.hidden = true;
       this.orbitTime = null;
       this.moonPose = null;
@@ -979,6 +994,12 @@ export class Globe {
     const basis = lockedMoonBasis(radial);
     this.moonPose = {x: cx, y: cy, radius: size, visible, angle,
       basis: [...basis.right, ...basis.up, ...basis.front]};
+    const extent = size * 1.001;
+    const inView = cx + extent > 0 && cx - extent < this.width
+      && cy + extent > 0 && cy - extent < this.height;
+    this.satellite.hidden = !inView || (depth > 0 && distance + extent <= radius);
+    if (this.moonLink) this.moonLink.hidden = !visible;
+    if (this.satellite.hidden) return;
     const local = this.satellite.width / (2 * ratio);
     const left = cx - local;
     const top = cy - local;
@@ -991,13 +1012,10 @@ export class Globe {
         radius * ratio] : [0, 0, 0],
     });
     if (visible && (depth <= 0 || distance >= radius + size)) this.lastVisibleMoonAngle = angle;
-    if (this.moonLink) {
-      this.moonLink.hidden = !visible;
-      if (visible) {
-        this.moonLink.style.left = cx + 'px';
-        this.moonLink.style.top = cy + 'px';
-        this.moonLink.style.setProperty('--moon-size', Math.max(28, size * 2) + 'px');
-      }
+    if (this.moonLink && visible) {
+      this.moonLink.style.left = cx + 'px';
+      this.moonLink.style.top = cy + 'px';
+      this.moonLink.style.setProperty('--moon-size', Math.max(28, size * 2) + 'px');
     }
   }
 

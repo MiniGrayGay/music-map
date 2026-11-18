@@ -1,4 +1,6 @@
-// 瓦片 mipmap 数据：整数 RGBA8 box filter，纯函数，无 DOM/Worker 依赖。
+import {decodeTileImage} from '../tileImage.js';
+
+// 瓦片 mipmap 数据：整数 RGBA8 box filter。
 // 输出为 level 1..9 连续紧排的 Uint8Array（level 0 由原始位图直接上传）。
 
 export const TILE_SIZE = 512;
@@ -57,7 +59,7 @@ export function buildTileMipmaps(rgba) {
 export async function decodeTileMipmaps(blob, context) {
   let image = null;
   try {
-    image = await createImageBitmap(blob, { premultiplyAlpha: 'none' });
+    image = await decodeTileImage(blob, { premultiplyAlpha: 'none' });
     if (image.width !== TILE_SIZE || image.height !== TILE_SIZE) {
       throw new Error(`tile size mismatch: ${image.width}x${image.height}`);
     }
@@ -68,7 +70,7 @@ export async function decodeTileMipmaps(blob, context) {
     const mipmaps = buildTileMipmaps(rgba);
     return { image, mipmaps };
   } catch (err) {
-    if (image) image.close();
+    image?.close?.();
     throw err;
   }
 }

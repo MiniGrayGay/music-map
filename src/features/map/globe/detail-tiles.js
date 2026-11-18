@@ -133,7 +133,7 @@ export class DetailTiles {
     } catch (error) {
       if (revision === this.revision && !controller.signal.aborted) this.failed.add(key);
     } finally {
-      tile?.image.close();
+      tile?.image.close?.();
       this.inflight -= 1;
       if (revision === this.revision) this.pending.delete(key);
       this.pump();
