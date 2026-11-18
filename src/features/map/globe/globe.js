@@ -1048,6 +1048,12 @@ export class Globe {
   }
 
   drawReliefLeads(rings, lift, time) {
+    // Match the map's regional-detail scale. Overview zooms leave room for
+    // the map, while a closer view can reveal the selected region again.
+    if (this.zoom < 1.85) {
+      this.hideReliefCard();
+      return;
+    }
     if (this.reliefSuppressed || this.raise < .5) return;
     if (!this.reliefRevealed && this.cameraMoving) {
       this.reliefLeadStarted = null;
@@ -1157,9 +1163,13 @@ export class Globe {
   }
 
   hideReliefCard() {
+    this.reliefLeadStarted = null;
+    this.reliefOpeningAt = null;
+    this.reliefRevealed = false;
     if (!this.reliefDock) return;
     const retiring = retireReliefDock(this.reliefDock);
     this.reliefDock = null;
+    this.onReliefReveal?.(null);
     if (retiring) void retiring.then(() => this.requestFrame());
   }
 

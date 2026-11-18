@@ -205,6 +205,10 @@ function focusRelief(zone) {
   }
 }
 function revealRelief(key) {
+  if (key === null) {
+    reliefOpen.value = false;
+    return;
+  }
   if (reliefZone.value?.key !== key) return;
   reliefOpen.value = true;
 }
@@ -456,6 +460,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 
 .relief-dock:not([data-relief-closing]):is(:not([data-relief-placed]), [data-relief-open='false']) {
   visibility: hidden;
+  opacity: 0;
 }
 
 .relief-content {

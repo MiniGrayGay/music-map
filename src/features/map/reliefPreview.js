@@ -163,7 +163,10 @@ export function mountReliefPreview(canvas, active = true) {
     if (canvas.width !== width) canvas.width = width;
     if (canvas.height !== height) canvas.height = height;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    schedule();
+    // Resizing clears the drawing buffer. Redraw before the browser paints,
+    // so a map zoom cannot expose an empty point cloud for one frame.
+    cancelAnimationFrame(frame);
+    draw(performance.now());
   });
   observer.observe(canvas);
   function onVisibility() {
