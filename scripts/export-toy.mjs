@@ -10,6 +10,7 @@ import sharp from 'sharp';
 import {build, normalizePath, transformWithEsbuild} from 'vite';
 import {PACKED_RELIEF, encodeCompactRelief} from '../src/features/map/reliefCompact.js';
 import {reliefBlockBytes} from '../src/features/map/reliefFormat.js';
+import {mapLabels} from '../src/features/layers/mapBases.js';
 import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
 
 const run = promisify(execFile);
@@ -20,7 +21,7 @@ const bundle = path.join(work, 'app');
 const output = path.join(distribution, 'teyvat-toy.zip');
 const maxBytes = 50_000_000;
 const quality = 80;
-const keepMaps = new Set(['Teyvat', 'MoonCanon']);
+const keepMaps = new Set(Object.keys(mapLabels));
 const pick = (entries, names) => Object.fromEntries(
   Object.entries(entries).filter(([key]) => names.has(key)),
 );

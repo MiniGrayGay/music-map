@@ -39,6 +39,7 @@ const props = defineProps({
   bgm: {type: Object, required: true}, // {status, reason, zones, …}（bgmStatus 结果）
   smoothBoundaries: {type: Boolean, default: true},
   retainLayers: {type: Boolean, default: false},
+  initialZoneKey: {type: String, default: null}, // 跨图搜索目标分区：就绪后定位到其 bbox
 });
 
 const emit = defineEmits(['view', 'zone-activate', 'blank-tap', 'canvas-frame', 'surface-ready']);
@@ -67,6 +68,17 @@ watchEffect(() => {
 });
 const layers = computed(() => layerModeActive.value || props.retainLayers ? savedLayers.value : null);
 const focusRect = computed(() => layers.value?.focus ?? null);
+// 独立地图默认取景：viewBounds 归一化 [x,y,width,height]（0..1）转 canvas 像素；
+// 缺失或非法（越界/非正宽高/非有限值）时为 null，回退整画布 fit。
+const defaultFocusRect = computed(() => {
+  const bounds = props.mapData.viewBounds;
+  if (!Array.isArray(bounds) || bounds.length !== 4) return null;
+  const [x, y, width, height] = bounds;
+  if (![x, y, width, height].every((value) => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
+  if (width <= 0 || height <= 0) return null;
+  const canvas = props.mapData.canvas;
+  return {x: x * canvas.width, y: y * canvas.height, width: width * canvas.width, height: height * canvas.height};
+});
 
 // 音乐分区交互状态：hover / 键盘焦点 / 激活选中，任一即为“当前分区”。
 const hoveredZoneKey = ref(null);
@@ -179,8 +191,9 @@ function applyTransform(next, animating = false) {
 }
 
 function resetView(animate = false) {
-  if (focusRect.value) {
-    const next = layerFocusTransform(viewport, focusRect.value, fitMinScale, zoomCeiling.value);
+  const rect = focusRect.value ?? defaultFocusRect.value;
+  if (rect) {
+    const next = layerFocusTransform(viewport, rect, fitMinScale, zoomCeiling.value);
     if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
       applyTransform(next);
       return;
@@ -210,6 +223,31 @@ watch(focusRect, (rect) => {
   if (rect) resetView(true);
   else applyTransform(transform);
 });
+
+// ---- 跨图搜索初始定位 ----
+// viewport ready 且 zones 加载后，把 initialZoneKey 指向的分区 bbox 取景到位。
+// lastLocatedKey 保证每个 key 只定位一次：音乐元数据等普通 reactive 变动触发
+// 的 zones 重算不会反复重置用户拖动的镜头。不激活分区，只记 selectedZoneKey。
+let lastLocatedKey = null;
+function locateInitialZone() {
+  const key = props.initialZoneKey;
+  if (!key || lastLocatedKey === key) return;
+  if (!viewport.width || !viewport.height) return;
+  const zone = zones.value.find((entry) => entry.key === key);
+  if (!zone) return;
+  const bbox = zone.bbox; // canvas 像素 [xmin, ymin, xmax, ymax]
+  if (!Array.isArray(bbox) || bbox.length !== 4
+      || !bbox.every((value) => Number.isFinite(value))) return;
+  const [xmin, ymin, xmax, ymax] = bbox;
+  const width = xmax - xmin;
+  const height = ymax - ymin;
+  if (!(width > 0) || !(height > 0)) return; // 宽高为 0 先返回，不记 lastLocatedKey
+  applyTransform(layerFocusTransform(viewport,
+    {x: xmin, y: ymin, width, height}, fitMinScale, zoomCeiling.value));
+  selectedZoneKey.value = key;
+  lastLocatedKey = key;
+}
+watch([() => props.initialZoneKey, zones], locateInitialZone);
 
 // ---- 指针交互 ----
 const pointers = new Map(); // pointerId → {x, y}
@@ -478,8 +516,19 @@ onMounted(() => {
   viewport.height = element.clientHeight;
   fitMinScale = minScale(viewport, props.mapData.canvas, 24);
   resetView();
+  locateInitialZone();
   resizeObserver = new ResizeObserver(() => {
-    const wasFit = Math.abs(transform.scale - fitMinScale) < 1e-9;
+    // wasFit 不能只比对 fitMinScale：defaultFocusRect 取景的 scale 不同于整画布
+    // fit，用目标变换的 scale/tx/ty 容差判断，避免缩放/拖动后误触发 reset。
+    const fitTarget = focusRect.value ?? defaultFocusRect.value;
+    const wasFit = fitTarget
+      ? (() => {
+          const target = layerFocusTransform(viewport, fitTarget, fitMinScale, zoomCeiling.value);
+          return Math.abs(transform.scale - target.scale) < 1e-6
+            && Math.abs(transform.tx - target.tx) < 0.5
+            && Math.abs(transform.ty - target.ty) < 0.5;
+        })()
+      : Math.abs(transform.scale - fitMinScale) < 1e-9;
     const center = viewportWorldRect(transform, viewport);
     const x = center.x + center.width / 2;
     const y = center.y + center.height / 2;
@@ -487,7 +536,7 @@ onMounted(() => {
     viewport.height = element.clientHeight;
     deviceScale.value = window.devicePixelRatio || 1;
     fitMinScale = minScale(viewport, props.mapData.canvas, 24);
-    if (wasFit && !focusRect.value) {
+    if (wasFit) {
       resetView();
     } else {
       const scale = Math.min(Math.max(transform.scale, fitMinScale), zoomCeiling.value);
@@ -507,7 +556,8 @@ onBeforeUnmount(() => {
   <div
     ref="containerRef"
     class="map-surface"
-    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon, 'layer-mode': layers}"
+    :class="{dragging: dragState.active, 'moon-surface': isMoonCanon, 'layer-mode': layers,
+      'independent-surface': !!defaultFocusRect}"
     tabindex="0"
     role="application"
     aria-roledescription="提瓦特区域地图"
@@ -611,7 +661,8 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.map-surface:not(.moon-surface, .layer-mode)::after {
+/* 独立地图按有效区域取景且无楼层时，浅灰洗层会让原贴图发灰，排除。 */
+.map-surface:not(.moon-surface, .layer-mode, .independent-surface)::after {
   position: absolute;
   z-index: 2;
   inset: 0;

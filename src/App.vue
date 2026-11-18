@@ -29,6 +29,8 @@ const appRoot = ref(null);
 const followCardPreview = ref(import.meta.env.DEV ? toyFollowCardPreview() : null);
 const baseMaps = ref({});
 const mapName = ref('Teyvat');
+// 跨图搜索定位：搜索结果带目标分区 key 切图时记录，交给 MapSurface 初始定位。
+const mapZoneKey = ref(null);
 const activeMap = computed(() => mapName.value === 'Teyvat'
   ? mapData.value : baseMaps.value[mapName.value]);
 const loadError = ref(null);
@@ -53,7 +55,10 @@ const playerMotion = useAnchoredPanel(
 );
 const globeError = ref('');
 const mobileDevice = isMobileDevice();
-const showGlobe = computed(() => !layerModeActive.value && !globeError.value);
+// 只有提瓦特与霜月是球面世界；其余独立地图（层岩巨渊、旧日之海、远古圣山）
+// 由平面 MapSurface 承载，因此切到它们时 showGlobe 直接为假。
+const globeMaps = ['Teyvat', 'MoonCanon'];
+const showGlobe = computed(() => globeMaps.includes(mapName.value) && !layerModeActive.value && !globeError.value);
 const presentedGlobe = ref(true);
 const mapHandoff = shallowRef(null);
 const surfaceRef = computed(() => showGlobe.value ? globeSurface.value : planeSurface.value);
@@ -267,8 +272,17 @@ async function initialize() {
 
 onMounted(initialize);
 
-function selectMap(name) {
+function selectMap(name, zoneKey = null) {
   if (mapName.value === name) return;
+  // 只放行当前有效选项，隐藏地图（如空之神殿）不能被调起或经搜索进入。
+  if (!mapOptions.value.some((option) => option.value === name)) return;
+  // 换世界时旧的平面/球面交接不再成立：取消进行中的淡入淡出并按目标
+  // 世界直接落位 presentedGlobe，避免新图误套旧 viewport 的过渡状态。
+  if (surfaceFade) cancelAnimationFrame(surfaceFade.frame);
+  surfaceFade = null;
+  mapHandoff.value = null;
+  presentedGlobe.value = globeMaps.includes(name) && !globeError.value;
+  mapZoneKey.value = zoneKey ?? null;
   mapName.value = name;
   activeZone.value = null;
   focusRelief(null);
@@ -374,6 +388,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           :map-name="mapName"
           :bgm="bgm"
           :retain-layers="!!mapHandoff?.toGlobe"
+          :initial-zone-key="mapZoneKey"
           :smooth-boundaries="smoothBoundaries"
           @canvas-frame="(canvas) => { if (!showGlobe) receiveBackdrop(canvas) }"
           @surface-ready="onPlaneReady"

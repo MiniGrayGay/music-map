@@ -366,12 +366,12 @@ async function main() {
     await globe.setViewport({width: 1440, height: 900});
     await globe.emulateMediaFeatures([{name: 'prefers-reduced-motion', value: 'reduce'}]);
     await globe.goto(home, {waitUntil: 'domcontentloaded'});
-    await globe.waitForSelector('.globe-labels .place');
+    await globe.waitForSelector('.globe-canvas', {visible: true});
+    await globe.waitForSelector('.globe-status', {hidden: true});
     check(await globe.$('.map-surface') === null && await globe.$('.zoom-controls button[aria-label="球面地图"]') === null,
       '首页直接显示球面，工具栏无平面切换按钮');
-    const regionNames = ['蒙德', '璃月', '稻妻', '须弥', '枫丹', '纳塔', '至冬', '挪德卡莱'].sort();
-    const visibleRegions = await globe.$$eval('.globe-labels .place', (labels) => labels.map((label) => label.textContent).sort());
-    check(JSON.stringify(visibleRegions) === JSON.stringify(regionNames), '球面首页只标注七国和挪德卡莱');
+    check(await globe.$eval('.globe-labels', labels => labels.childElementCount === 0),
+      '球面首页在没有选区时不显示地点标签');
     const inazumaSea = await globe.evaluate(async () => {
       const response = await fetch('./tiles/meta.json');
       const {maps: {Teyvat: {native}}} = await response.json();
@@ -406,7 +406,7 @@ async function main() {
     await globe.waitForSelector(returnToWorld);
     check(await currentMapName() === '霜月', '霜月放大后复位回到霜月全览');
     await globe.click(returnToWorld);
-    await globe.waitForSelector('.globe-labels .place');
+    await globe.waitForSelector('.globe-status', {hidden: true});
     check(await currentMapName() === '提瓦特' && await globe.$('.lunar-transition:not([hidden])') === null,
       '霜月全览复位返回提瓦特，减少动态效果时直接切换');
     const search = 'input[aria-label="跳转到地点"]';
@@ -494,7 +494,8 @@ async function main() {
     await globe.waitForSelector('.layer-piece');
     await globe.click('button[aria-label="退出分层"]');
     await globe.waitForSelector('.map-surface', {hidden: true});
-    await globe.waitForSelector('.globe-labels .place');
+    await globe.waitForSelector('.globe-canvas', {visible: true});
+    await globe.waitForSelector('.globe-status', {hidden: true});
     check(await globe.$('.layer-piece') === null, '退出分层回到球面');
   } finally {
     await globe.close();

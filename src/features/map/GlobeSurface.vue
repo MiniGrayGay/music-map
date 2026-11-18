@@ -27,25 +27,12 @@ const props = defineProps({
 const emit = defineEmits([
   'handoff-ready', 'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame', 'relief-reveal',
 ]);
-const atlas = import.meta.glob('./globe/atlas/*', {eager: true, query: '?url', import: 'default'});
+const atlas = import.meta.glob(['./globe/atlas/Teyvat.webp', './globe/atlas/MoonCanon.webp', './globe/atlas/lroc-color-2k.jpg'], {eager: true, query: '?url', import: 'default'});
+// 球面只承载提瓦特与霜月；层岩巨渊、旧日之海、远古圣山等独立场景走平面 MapSurface。
 const chart = {
   Teyvat: {home: [.43, -.16], span: [4.03, 2.43], sea: [21, 60, 76], oceanRelief: true},
-  SeaOfBygoneEras: {home: [0, .02], span: [3.25, 2.2], sea: [18, 61, 78]},
-  AncientSacredMountain: {home: [0, .04], span: [3.13, 2.25], sea: [20, 64, 79]},
-  TempleOfSpace: {home: [0, .03], span: [2.6, 2.42], sea: [33, 48, 68]},
   MoonCanon: {home: [.08, .01], span: fullSpan, sea: [28, 48, 71], projection: 2},
 };
-// Atlas positions over the settlements used to locate each region on the overview.
-const regionAnchors = [
-  ['蒙德', [.763, .514]],
-  ['璃月', [.7159, .6582]],
-  ['稻妻', [.9271, .7983]],
-  ['须弥', [.603, .6526]],
-  ['枫丹', [.5254, .4499]],
-  ['纳塔', [.3251, .7292]],
-  ['至冬', [.4386, .1291]],
-  ['挪德卡莱', [.3086, .5529]],
-];
 const canvas = ref(null);
 const moon = ref(null);
 const lunarLayer = ref(null);
@@ -262,7 +249,7 @@ function chooseResult(result) {
     jumpToZone(result.key);
   } else {
     pendingSelection = {map: result.map, key: result.key};
-    emit('select-map', result.map);
+    emit('select-map', result.map, result.key);
   }
 }
 
@@ -289,10 +276,6 @@ async function showWorld() {
     if (installedMap === id) {
       globe.setZones(items);
     } else {
-      world.regions = id === 'Teyvat' ? regionAnchors.map(([name, uv]) => {
-        const [lon, lat] = atlasAngles(world, ...uv);
-        return {name, uv, lon, lat, vector: direction(lon, lat)};
-      }) : [];
       installedMap = id;
       globe.setWorld(world, image, items);
       if (props.initialViewport) {
@@ -384,7 +367,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
 </script>
 
 <template>
-  <div class="globe-surface">
+  <div class="globe-surface" :class="{'teyvat-sky': mapName === 'Teyvat'}">
     <canvas ref="stars" aria-hidden="true" />
     <canvas ref="canvas" class="globe-canvas" tabindex="0"
             aria-label="球面地图，可拖动或用方向键旋转，滚轮缩放，回车选择地点" />
@@ -438,34 +421,32 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
     radial-gradient(ellipse at 82% 10%, #25334e 0%, transparent 62%),
     linear-gradient(150deg, #0a1525 4%, #101b2d 47%, #070b17 96%);
 }
+.teyvat-sky {
+  background: radial-gradient(ellipse at 33% 50%, #172541, #0d162c 54%, #080c1a);
+}
 .globe-surface > canvas, .globe-labels { position: absolute; inset: 0; width: 100%; height: 100%; }
 .globe-surface > canvas:not(.globe-canvas), .globe-labels { pointer-events: none; }
 .globe-canvas { cursor: grab; touch-action: none; }
 .globe-canvas:active { cursor: grabbing; }
 .globe-canvas.target { cursor: pointer; }
-.globe-labels :deep(:is(.place, .active-zone-label)) {
+.globe-labels :deep(.active-zone-label) {
   position: absolute; left: 0; top: 0; background: transparent;
-  color: #e1eddf; border: 0; font-weight: 600; font-size: 14px; line-height: 1.2;
+  color: #ffbd98; font-weight: 700; font-size: 14px; line-height: 1.2;
   padding: 6px 5px 6px 16px; text-align: left; white-space: nowrap;
   text-shadow: 0 1px 4px #020b0d, 0 0 8px #000, 0 0 14px #121e1dc9;
 }
-.globe-labels :deep(.place) { pointer-events: auto; touch-action: none; cursor: pointer; }
-.globe-labels :deep(.active-zone-label) { color: #ffbd98; font-weight: 700; }
-.globe-labels :deep(:is(.place, .active-zone-label)::before) {
-  content: ''; position: absolute; height: 1px; top: 50%; background: #d7efe5a1;
+.globe-labels :deep(.active-zone-label::before) {
+  content: ''; position: absolute; height: 1px; top: 50%; background: #ffbd98;
   width: calc(10px + var(--region-label-gap)); left: calc(2px - var(--region-label-gap));
 }
 .globe-labels :deep(.label-left) { padding-inline: 5px 16px; }
 .globe-labels :deep(.label-left::before) { left: auto; right: calc(2px - var(--region-label-gap)); }
-.globe-labels :deep(.active-zone-label::before) { background: #ffbd98; }
 .globe-labels :deep(.active-zone-label.label-above) { padding-inline: 10px; text-align: center; }
 .globe-labels :deep(.active-zone-label.label-above::before) {
   left: var(--label-anchor-x); top: 100%; width: 1px; height: 9px;
 }
-.globe-labels :deep(.place:hover) { color: #ffb393; }
-.globe-labels :deep(.place:focus-visible) { outline: 2px solid #ff976d; }
 @media (max-width: 650px) {
-  .globe-labels :deep(:is(.place, .active-zone-label)) { font-size: 12px; }
+  .globe-labels :deep(.active-zone-label) { font-size: 12px; }
 }
 .moon-link {
   position: absolute; z-index: 1; translate: -50% -50%; width: var(--moon-size, 32px);

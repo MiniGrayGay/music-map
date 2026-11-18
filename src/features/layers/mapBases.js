@@ -2,8 +2,15 @@ export const mapLabels = {
   Teyvat: '提瓦特',
   SeaOfBygoneEras: '旧日之海',
   AncientSacredMountain: '远古圣山',
-  TempleOfSpace: '空之神殿',
+  TheChasm: '层岩巨渊·地下矿区',
   MoonCanon: '霜月',
+};
+
+// 独立场景只有平面展示，入场视口由归一化 rect [x, y, w, h] 指定；
+// 层岩巨渊以清单里的 map.viewBounds 为准，其余用实测值。
+const planeViewBounds = {
+  SeaOfBygoneEras: [.28, .33, .47, .40],
+  AncientSacredMountain: [.32, .22, .42, .48],
 };
 
 export async function loadLayerBases(mainMap) {
@@ -20,7 +27,9 @@ export async function loadLayerBases(mainMap) {
       if (!pyramid || pyramid.imageWidth !== canvas.width * 4 || pyramid.imageHeight !== canvas.height * 4) {
         return [];
       }
-      return [[name, {canvas, pyramid, seaColor: map.seaColor ?? '#163c4c', dataVersion: version}]];
+      const viewBounds = name === 'TheChasm' ? map.viewBounds : planeViewBounds[name];
+      return [[name, {canvas, pyramid, seaColor: map.seaColor ?? '#163c4c', dataVersion: version,
+        ...(viewBounds ? {viewBounds} : {})}]];
     }));
   } catch {
     return {};

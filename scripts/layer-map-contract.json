@@ -9,6 +9,7 @@
     "SeaOfBygoneEras": {"size": [4096, 3072], "gameMapRows": 3, "gameMapCols": 4, "gameMapUpRows": 2, "gameMapLeftCols": 5, "pixelScale": 1, "origin": [6144, 3072]},
     "AncientSacredMountain": {"size": [4096, 4096], "gameMapRows": 4, "gameMapCols": 4, "gameMapUpRows": 1, "gameMapLeftCols": 1, "pixelScale": 1, "origin": [2048, 2048]},
     "TempleOfSpace": {"size": [3072, 4096], "gameMapRows": 4, "gameMapCols": 3, "gameMapUpRows": 1, "gameMapLeftCols": 1, "pixelScale": 1, "origin": [2048, 2048]},
-    "MoonCanon": {"size": [17408, 9216], "gameMapRows": 9, "gameMapCols": 17, "gameMapUpRows": 3, "gameMapLeftCols": 10, "pixelScale": 1, "origin": [11264, 4096]}
+    "MoonCanon": {"size": [17408, 9216], "gameMapRows": 9, "gameMapCols": 17, "gameMapUpRows": 3, "gameMapLeftCols": 10, "pixelScale": 1, "origin": [11264, 4096]},
+    "TheChasm": {"size": [3072, 3072], "gameMapRows": 3, "gameMapCols": 3, "gameMapUpRows": 1, "gameMapLeftCols": 1, "pixelScale": 1, "origin": [2048, 2048]}
   }
 }

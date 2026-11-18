@@ -13,7 +13,7 @@ const TAU = 2 * Math.PI;
 const interpolate = (a, b, factor) => a + (b - a) * factor;
 const MIN_ZOOM = .53;
 const MAX_ZOOM = 18;
-const LUNAR_TRANSITION_DURATION = 720;
+const LUNAR_TRANSITION_DURATION = 820;
 const SPIN_RATE = TAU / 165000;
 const teyvatHomeCenter = [.5, .5];
 const orbitMajor = orbitDirection(0);
@@ -100,6 +100,25 @@ function sky(canvas, width, height, ratio) {
   context.globalAlpha = 1;
 }
 
+function installCloudField(gl) {
+  const size = 32;
+  const density = new Uint8Array(size ** 3);
+  // Repeatable 3D noise keeps the cloud field continuous at the poles and map seam.
+  let seed = 0x7231c49d;
+  for (let index = 0; index < density.length; index += 1) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    density[index] = seed >>> 24;
+  }
+  gl.activeTexture(gl.TEXTURE8);
+  gl.bindTexture(gl.TEXTURE_3D, gl.createTexture());
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage3D(gl.TEXTURE_3D, 0, gl.R8, size, size, size, 0, gl.RED, gl.UNSIGNED_BYTE, density);
+  gl.activeTexture(gl.TEXTURE0);
+}
+
 function initialize(canvas, fragment) {
   const gl = canvas.getContext('webgl2', {
     alpha: true, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: true,
@@ -131,7 +150,10 @@ function initialize(canvas, fragment) {
   gl.deleteShader(material);
   gl.useProgram(program);
   const uniforms = Object.fromEntries(
-    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale', 'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize', 'patchRect', 'fontaineSeaRect', 'occluder'].map(
+    ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale',
+      'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize',
+      'patchRect', 'fontaineSeaRect', 'occluder', 'orbitLook', 'cloudRotation',
+      'lunarPreviewBasis', 'hasLunarPreview', 'lunarMapBlend'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
   );
@@ -173,24 +195,40 @@ function initialize(canvas, fragment) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
   gl.uniform1i(gl.getUniformLocation(program, 'u_fontaineSea'), 7);
-  return {gl, uniforms, texture, patchTexture, moonStencil, fontaineSeaTexture,
+  installCloudField(gl);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_cloudField'), 8);
+  const lunarPreviewTexture = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE9);
+  gl.bindTexture(gl.TEXTURE_2D, lunarPreviewTexture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+  gl.activeTexture(gl.TEXTURE0);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_lunarPreview'), 9);
+  return {gl, uniforms, texture, patchTexture, moonStencil, fontaineSeaTexture, lunarPreviewTexture,
     detail: detailTextures(gl), nativeDetail: detailTextures(gl, 3, 4)};
 }
 
-function uploadAtlas({gl, texture}, image, wrapLongitude = false) {
-  gl.activeTexture(gl.TEXTURE0);
+function uploadAtlas({gl, texture}, image, wrapLongitude = false, unit = 0) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapLongitude ? gl.REPEAT : gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
   gl.generateMipmap(gl.TEXTURE_2D);
+  gl.activeTexture(gl.TEXTURE0);
 }
 
 function renderSphere(renderer, canvas, view) {
   const {gl, uniforms} = renderer;
   const {cx, cy, radius, ratio, world, basis, zoom = 1, detailSize = [0, 0],
     nativeSize = [0, 0], patchRect = [0, 0, 0, 0], fontaineSeaRect = [0, 0, 0, 0],
-    occluder = [0, 0, 0]} = view;
-  const extent = radius * 1.002;
+    occluder = [0, 0, 0], cloudAngle = 0, lunarMapBlend = 1, lunarPreviewBasis} = view;
+  // Fade the distant lighting as the map zooms in and terrain needs to be readable.
+  const hasOrbitLook = world.id === 'Teyvat' || world.projection === 2;
+  const close = hasOrbitLook ? clamp((zoom - 1.12) / 1.12, 0, 1) : 1;
+  const orbitLook = 1 - close * close * (3 - 2 * close);
+  const extent = radius * (world.id === 'Teyvat' && orbitLook > 0 ? 1.092 : 1.002);
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
   const bottom = Math.max(0, Math.floor(canvas.height - (cy + extent) * ratio));
   const right = Math.min(canvas.width, Math.ceil((cx + extent) * ratio));
@@ -221,6 +259,11 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform4fv(uniforms.patchRect, patchRect);
   gl.uniform4fv(uniforms.fontaineSeaRect, fontaineSeaRect);
   gl.uniform3fv(uniforms.occluder, occluder);
+  gl.uniform1f(uniforms.orbitLook, orbitLook);
+  gl.uniform2f(uniforms.cloudRotation, Math.cos(cloudAngle), Math.sin(cloudAngle));
+  gl.uniform1f(uniforms.lunarMapBlend, lunarMapBlend);
+  gl.uniform1i(uniforms.hasLunarPreview, Number(Boolean(lunarPreviewBasis)));
+  if (lunarPreviewBasis) gl.uniformMatrix3fv(uniforms.lunarPreviewBasis, false, lunarPreviewBasis);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.disable(gl.SCISSOR_TEST);
 }
@@ -276,9 +319,10 @@ export class Globe {
   setWorld(world, image, zones) {
     const fromMoon = this.world?.id === 'MoonCanon';
     const toMoon = world.id === 'MoonCanon';
-    this.stopLunarTransition();
+    // 先抓当前 2D 合成（旧星球＋信号层），再停掉在途过渡：中途快切不丢快照。
     const departure = this.world && fromMoon !== toMoon && !this.reducedMotion.matches
       ? this.captureLunarFrame() : null;
+    this.stopLunarTransition(Boolean(departure));
     uploadAtlas(this, image);
     if (world.safety && this.moonSafety !== world.safety) {
       const {gl, moonStencil} = this;
@@ -302,13 +346,21 @@ export class Globe {
     [this.lon, this.lat] = world.home;
     this.center = null;
     this.zoom = this.zoomTarget = 1;
+    this.lunarArrival = null;
+    if (departure && toMoon) {
+      // 首帧起点直接落在离场卡位大小，避免先画满屏再缩小；真正的飞往 home
+      // 延到首帧 draw 末尾由 pending 消费触发。
+      const moon = departure.moon ?? this.lunarDock;
+      this.center = [moon.x / this.width, moon.y / this.height];
+      this.zoom = this.zoomTarget = moon.radius / this.radius;
+      this.lunarArrival = {basis: moon.basis, firstFrame: null};
+      this.signals.style.opacity = this.labels.style.opacity = '0';
+    }
+    this.pendingLunarChange = departure ? {departure, toMoon} : null;
     this.spinTime = null;
     this.spinAfter = 0;
-    this.labelFor = new Map();
-    this.labelPlacement = new Map();
-    this.labels.replaceChildren();
+    this.clearSelectionLabel();
     this.orbitTime = null;
-    if (departure) this.animateLunarChange(departure, toMoon);
     this.requestFrame();
   }
 
@@ -316,63 +368,100 @@ export class Globe {
     const snapshot = this.lunarLayer;
     snapshot.width = this.canvas.width;
     snapshot.height = this.canvas.height;
-    snapshot.getContext('2d').drawImage(this.canvas, 0, 0);
+    const context = snapshot.getContext('2d');
+    context.drawImage(this.canvas, 0, 0);
+    context.drawImage(this.signals, 0, 0, snapshot.width, snapshot.height);
     return {x: this.cx, y: this.cy, radius: this.radius * this.zoom,
       moon: this.moonPose?.visible ? this.moonPose : null};
   }
 
-  stopLunarTransition() {
-    for (const animation of this.lunarAnimations ?? []) animation.cancel();
+  get lunarDock() {
+    return {x: this.width * (this.compact ? .76 : .74), y: this.height * (this.compact ? .61 : .57),
+      radius: this.radius * .135 * (this.compact ? 1.22 : 1)};
+  }
+
+  stopLunarTransition(keepSnapshot = false) {
+    for (const animation of this.lunarAnimations ?? []) {
+      animation.onfinish = null;
+      animation.cancel();
+    }
     this.lunarAnimations = null;
+    this.pendingLunarChange = null;
     this.orbitResumeAt = null;
+    // 只取消本次过渡自己的飞行，不碰用户或选区触发的飞行。
+    if (this.flight?.lunar) this.flight = null;
+    this.signals.style.opacity = '';
+    this.labels.style.opacity = '';
+    if (keepSnapshot) return;
     this.lunarLayer.hidden = true;
     this.lunarLayer.width = this.lunarLayer.height = 1;
   }
 
   animateLunarChange(departure, toMoon) {
     const snapshot = this.lunarLayer;
-    const timing = {duration: LUNAR_TRANSITION_DURATION, easing: 'cubic-bezier(.25,.67,.27,1)'};
-    const dock = {x: this.width * .74, y: this.height * .57, radius: this.radius * .135};
+    const timing = {duration: LUNAR_TRANSITION_DURATION, easing: 'cubic-bezier(.22,1,.36,1)'};
+    const dock = this.lunarDock;
     const fadeIn = [{opacity: 0}, {opacity: 1}];
     snapshot.hidden = false;
 
     if (toMoon) {
-      const moon = departure.moon ?? dock;
-      this.center = [moon.x / this.width, moon.y / this.height];
-      this.zoom = moon.radius / this.radius;
       this.flyTo(...this.world.home, 1);
       this.flight.duration = LUNAR_TRANSITION_DURATION;
-      this.lunarAnimations = [snapshot.animate([{opacity: 1}, {opacity: 0}], timing)];
+      this.flight.lunar = true;
+      // 信号层与标签从首帧起保持透明，延迟约两成时长后淡入；
+      // 时长相应扣除延迟，保证与快照同一时刻结束，避免收尾跳变。
+      const revealDelay = Math.round(LUNAR_TRANSITION_DURATION * .22);
+      const reveal = {...timing, duration: timing.duration - revealDelay, delay: revealDelay, fill: 'backwards'};
+      this.lunarAnimations = [snapshot.animate([{opacity: 1}, {opacity: 0}], timing),
+        ...[this.signals, this.labels].map((element) => {
+          element.style.opacity = '';
+          return element.animate(fadeIn, reveal);
+        })];
     } else {
-      const hasSatellite = this.world.id === 'Teyvat' && Boolean(this.moon);
+      const hasSatellite = this.world.id === 'Teyvat' && Boolean(this.moon)
+        && !this.moonRenderer.gl.isContextLost();
       if (hasSatellite) {
         const angle = this.lastVisibleMoonAngle ?? this.orbitHomeAngle;
         const [x, y, depth] = this.orbitPoint(angle, this.radius);
         Object.assign(dock, {x, y, radius: this.moonRadius(this.radius, depth)});
         this.orbitResumeAt = performance.now() + timing.duration;
         this.orbitStarted = this.orbitResumeAt - (angle - this.orbitHomeAngle) * 8300;
+        this.orbitTime = null;
+        this.drawSatellite(performance.now(), this.radius, true);
       }
       const origin = `${departure.x}px ${departure.y}px`;
       const movement = `translate(${dock.x - departure.x}px, ${dock.y - departure.y}px)`;
       const scale = dock.radius / departure.radius;
-      const start = {transformOrigin: origin, transform: 'translate(0, 0) scale(1)', opacity: 1};
+      const start = {transformOrigin: origin, transform: 'translate(0, 0) scale(1)'};
       const docked = {transformOrigin: origin, transform: `${movement} scale(${scale})`};
       const dockOffset = .77;
       const retreat = snapshot.animate(hasSatellite ? [
         {...start, easing: timing.easing},
-        {...docked, opacity: 1, offset: dockOffset},
-        {...docked, opacity: 0},
-      ] : [start, {...docked, opacity: 0}], hasSatellite ? {duration: timing.duration} : timing);
+        {...docked, offset: dockOffset}, docked,
+      ] : [{...start, opacity: 1}, {...docked, opacity: 0}],
+      hasSatellite ? {duration: timing.duration, fill: 'both'} : {...timing, fill: 'both'});
       this.lunarAnimations = [retreat, ...[this.canvas, this.labels, this.signals].map((element) =>
         element.animate(fadeIn, timing))];
       if (hasSatellite) {
-        // Reveal the satellite underneath the snapshot once both occupy the same disk.
-        this.lunarAnimations.push(this.satellite.animate([
-          {opacity: 0, easing: 'steps(1, end)'}, {opacity: 1, offset: dockOffset}, {opacity: 1},
-        ], {duration: timing.duration}));
+        // Both disks share the same position and radius throughout the retreat.
+        // Fade the chart over the orbit texture while the moon is shrinking.
+        const dockOrigin = `${dock.x}px ${dock.y}px`;
+        const inverse = `translate(${departure.x - dock.x}px, ${departure.y - dock.y}px) scale(${1 / scale})`;
+        const rest = {transformOrigin: dockOrigin, transform: 'translate(0, 0) scale(1)'};
+        this.lunarAnimations.push(snapshot.animate([
+          {opacity: 1}, {opacity: 1, offset: .24, easing: 'ease-in-out'},
+          {opacity: 0, offset: dockOffset}, {opacity: 0},
+        ], {duration: timing.duration, fill: 'both'}), this.satellite.animate([
+          {transformOrigin: dockOrigin, transform: inverse, easing: timing.easing},
+          {...rest, offset: dockOffset}, rest,
+        ], {duration: timing.duration, fill: 'both'}));
       }
     }
-    this.lunarAnimations[0].onfinish = () => this.stopLunarTransition();
+    // 收尾只清自己这一组动画：期间被取消/重建的旧 onfinish 不得误杀新过渡。
+    const animations = this.lunarAnimations;
+    animations[0].onfinish = () => {
+      if (this.lunarAnimations === animations) this.stopLunarTransition();
+    };
   }
 
   setZones(zones) {
@@ -395,6 +484,7 @@ export class Globe {
     thumbnail.height = Math.round(768 * image.naturalHeight / image.naturalWidth);
     thumbnail.getContext('2d').drawImage(image, 0, 0, thumbnail.width, thumbnail.height);
     uploadAtlas(this.moonRenderer, thumbnail, true);
+    uploadAtlas({gl: this.gl, texture: this.lunarPreviewTexture}, thumbnail, true, 9);
     this.moon = {span: fullSpan, sea: [0, 0, 0], projection: 0, naturalMoon: true};
     this.requestFrame();
   }
@@ -710,7 +800,15 @@ export class Globe {
     const focused = Boolean(this.selected);
     const detailFocusChanged = this.lastTileFocus !== focused;
     this.cameraMoving = moving;
-    const pose = [this.lon, this.lat, radius, cx, cy, ratio];
+    const arrival = this.lunarArrival;
+    let lunarMapBlend = 1;
+    if (arrival && !this.reducedMotion.matches) {
+      arrival.firstFrame ??= time;
+      const t = clamp(((time - arrival.firstFrame) / LUNAR_TRANSITION_DURATION - .16) / .72, 0, 1);
+      lunarMapBlend = t * t * (3 - 2 * t);
+    }
+    if (lunarMapBlend === 1) this.lunarArrival = null;
+    const pose = [this.lon, this.lat, radius, cx, cy, ratio, lunarMapBlend];
     const changed = !this.sphereState || pose.some((value, index) => value !== this.sphereState[index]);
     // 拖动中密集重算可见瓦片会不断中止在途请求（弱网浪费且打断解码），
     // 紧凑设备在移动期间放宽到飞行航拍的同一节奏，静止后照常补齐。
@@ -739,6 +837,8 @@ export class Globe {
         zoom: this.zoom, detailSize: this.tiles.drawSize, nativeSize: this.nativeTiles.drawSize,
         patchRect: this.patchInAtlas(),
         fontaineSeaRect: this.world.id === 'Teyvat' ? this.fontaineSeaRect : undefined,
+        cloudAngle: this.reducedMotion.matches ? 0 : (time * .000011) % TAU,
+        lunarMapBlend, lunarPreviewBasis: arrival?.basis,
       });
       this.sphereState = pose;
       // The player captures and refracts this raster. Refresh at a settled pose,
@@ -751,6 +851,12 @@ export class Globe {
     const orbit = this.moon && overview;
     this.drawSatellite(time, radius, orbit);
     const lockVisible = this.drawSignals(time, radius, basis, orbit);
+    // 霜月切换在目标世界首帧绘制完成后才启动，保证起点取景已生效。
+    if (this.pendingLunarChange) {
+      const pending = this.pendingLunarChange;
+      this.pendingLunarChange = null;
+      this.animateLunarChange(pending.departure, pending.toMoon);
+    }
     this.onView?.(this.zoomTarget < MAX_ZOOM, this.zoomTarget > MIN_ZOOM, this.magnified);
     if (!this.flight && this.viewportAligned) {
       const pending = this.handoffDeadline > time && !this.tiles.visibleSettled;
@@ -768,7 +874,7 @@ export class Globe {
       && !this.reducedMotion.matches;
     if (this.flight || this.velocity || this.zoom !== this.zoomTarget || pulse
       || (this.selected && this.raiseStarted != null && this.raise < 1)
-      || autoSpin || (orbit && !this.reducedMotion.matches)) {
+      || this.lunarArrival || autoSpin || (orbit && !this.reducedMotion.matches)) {
       this.requestFrame();
     }
   }
@@ -840,13 +946,15 @@ export class Globe {
     const masked = depth > 0 && distance < radius + size * .32;
     const visible = !masked && cx >= size && cx <= this.width - size * .5
       && cy >= 55 && cy <= this.height - 68;
-    this.moonPose = {x: cx, y: cy, radius: size, visible};
+    const basis = lockedMoonBasis(radial);
+    this.moonPose = {x: cx, y: cy, radius: size, visible,
+      basis: [...basis.right, ...basis.up, ...basis.front]};
     renderSphere(this.moonRenderer, this.satellite, {
       cx, cy, ratio, radius: size, world: this.moon,
-      basis: lockedMoonBasis(radial),
+      basis,
       occluder: depth > 0 ? [this.cx * ratio, this.satellite.height - this.cy * ratio, radius * ratio] : [0, 0, 0],
     });
-    if (visible) this.lastVisibleMoonAngle = angle;
+    if (visible && (depth <= 0 || distance >= radius + size)) this.lastVisibleMoonAngle = angle;
     if (this.moonLink) {
       this.moonLink.hidden = !visible;
       if (visible) {
@@ -871,7 +979,7 @@ export class Globe {
       ctx.clip('evenodd');
     }
     ctx.lineWidth = 1 / ratio;
-    ctx.strokeStyle = 'rgba(216,225,222,.35)';
+    ctx.strokeStyle = 'rgba(216,225,240,.24)';
     ctx.beginPath();
     ctx.ellipse(cx, cy, major, minor, orbitRoll, Math.PI, TAU);
     ctx.stroke();
@@ -881,7 +989,7 @@ export class Globe {
     ctx.moveTo(cx + radius, cy);
     ctx.arc(cx, cy, radius, 0, TAU);
     ctx.clip('evenodd');
-    ctx.strokeStyle = 'rgba(216,225,222,.24)';
+    ctx.strokeStyle = 'rgba(216,225,240,.15)';
     ctx.setLineDash([3, 5]);
     ctx.beginPath();
     ctx.ellipse(cx, cy, major, minor, orbitRoll, 0, Math.PI);
@@ -897,40 +1005,19 @@ export class Globe {
     drawGlobeBoundaries(this, time, radius, basis);
     const lift = this.drawRaisedRegion(radius, basis, time);
     if (!lift) this.hideReliefCard();
-    const visible = [];
-    for (const region of this.world.regions) {
-      const [px, py, depth] = projectAtlas(this.world, basis, this.zoom, region.uv, region.vector);
-      if (depth < .16) continue;
-      const x = cx + px * radius;
-      const y = cy - py * radius;
-      if (x < 6 || x > this.width - 6) continue;
-      visible.push({region, x, y, depth});
-    }
-    let active;
     if (this.selected) {
       const {uv, vector} = this.selected;
       const [px, py, depth] = projectAtlas(this.world, basis, this.zoom, uv, vector);
       const x = cx + px * radius;
       const y = cy - py * radius - lift;
-      const visibleDepth = this.labelFor.has(this.selected) ? .10 : .16;
+      const visibleDepth = this.selectionLabel?.marker === this.selected ? .10 : .16;
       if (depth >= visibleDepth && x >= 0 && x <= this.width && y >= 0 && y <= this.height) {
-        active = {region: this.selected, x, y, depth, active: true};
-        visible.push(active);
+        this.drawSelectionLabel(x, y);
+        if (!lift) this.drawLock(time, x, y);
+        return !lift;
       }
     }
-    ctx.fillStyle = '#cbf1cf';
-    for (const {x, y, depth, active} of this.drawLabels(visible)) {
-      if (active) continue;
-      ctx.globalAlpha = clamp(depth, .42, .88);
-      ctx.beginPath();
-      ctx.arc(x, y, 2.1, 0, TAU);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    if (active && !lift) {
-      this.drawLock(time, active.x, active.y);
-      return true;
-    }
+    this.clearSelectionLabel();
     return false;
   }
 
@@ -1084,9 +1171,8 @@ export class Globe {
       zone.bottom = Math.max(zone.bottom, y);
     }
     const obstacles = this.labelObstacles();
-    for (const label of this.labelFor.values()) {
-      if (label.isConnected) obstacles.push(label.getBoundingClientRect());
-    }
+    const label = this.selectionLabel?.node;
+    if (label?.isConnected) obstacles.push(label.getBoundingClientRect());
     const controls = obstacles.map(rect => ({
       left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
     }));
@@ -1200,76 +1286,53 @@ export class Globe {
     ctx.shadowBlur = 0;
   }
 
-  drawLabels(visible) {
+  clearSelectionLabel() {
+    this.selectionLabel?.node.remove();
+    this.selectionLabel = null;
+  }
+
+  drawSelectionLabel(x, y) {
+    const marker = this.selected;
+    if (this.selectionLabel?.marker !== marker) {
+      this.clearSelectionLabel();
+      const node = document.createElement('span');
+      node.className = 'active-zone-label';
+      node.textContent = marker.zone.name;
+      this.labels.append(node);
+      this.selectionLabel = {marker, node};
+    }
+    const {node, placement: previous} = this.selectionLabel;
     const font = this.width <= 650 ? 12 : 14;
     const height = Math.ceil(font * 1.2) + 12;
-    const focus = document.activeElement;
-    const priority = ({region, active}) => active ? 3
-      : (this.labelFor.get(region) === focus ? 2 : Number(this.labelFor.has(region)));
-    const choices = visible.sort((a, b) => priority(b) - priority(a));
-    const placed = choices.length ? this.labelObstacles(true) : [];
-    const retained = new Set();
-    const displayed = [];
-    for (const item of choices) {
-      const {region, x, y, active} = item;
-      const name = active ? region.zone.name : region.name;
-      const span = Math.ceil(name.length * font * 1.04) + 22;
-      const top = y - height / 2;
-      const offset = active ? 12 : 2;
-      const alternatives = [0, 14, 30, 50, 62, 78, 94].flatMap((gap) => [x + offset + gap, x - span - offset - gap]
-        .map((left, index) => ({left, right: left + span, top, bottom: top + height, onLeft: index === 1, gap})));
-      if (active) {
-        const left = clamp(x - span / 2, 7, this.width - span - 7);
-        const labelTop = y - height - 12;
-        alternatives.splice(2, 0, {left, right: left + span, top: labelTop,
-          bottom: labelTop + height, above: true, gap: 0});
-      }
-      const previous = this.labelPlacement.get(region);
-      const preferred = previous && alternatives.find((option) =>
-        option.onLeft === previous.onLeft && option.above === previous.above && option.gap === previous.gap);
-      const fits = (bounds) => bounds.left >= 7 && bounds.right <= this.width - 7
-        && bounds.top >= 7 && bounds.bottom <= this.height - 7;
-      const unobstructed = (bounds) => fits(bounds) && !placed.some((other) => overlaps(bounds, other, 5));
-      // Keep visible labels attached to their map anchors throughout camera movement.
-      const keepPlacement = preferred && (active || (this.cameraMoving
-        ? fits(preferred) : unobstructed(preferred)));
-      let box = keepPlacement ? preferred : alternatives.find(unobstructed);
-      if (active && (!box || !fits(box))) {
-        const nearest = box ?? preferred ?? alternatives[2];
-        const left = clamp(nearest.left, 7, Math.max(7, this.width - span - 7));
-        const top = clamp(nearest.top, 7, Math.max(7, this.height - height - 7));
-        box = {...nearest, left, right: left + span, top, bottom: top + height};
-      }
-      if (!box) continue;
-      let label = this.labelFor.get(region);
-      if (!label) {
-        label = document.createElement(active ? 'span' : 'button');
-        label.className = active ? 'active-zone-label' : 'place';
-        label.textContent = name;
-        if (!active) {
-          label.type = 'button';
-          label.addEventListener('click', () => this.flyTo(region.lon, region.lat, 2.15));
-        }
-        this.labels.append(label);
-        this.labelFor.set(region, label);
-      }
-      label.classList.toggle('label-left', Boolean(box.onLeft));
-      label.classList.toggle('label-above', Boolean(box.above));
-      label.style.transform = `translate(${box.left}px,${box.top}px)`;
-      label.style.setProperty('--region-label-gap', `${box.gap}px`);
-      if (box.above) label.style.setProperty('--label-anchor-x', `${x - box.left}px`);
-      this.labelPlacement.set(region, box);
-      placed.push(box);
-      retained.add(region);
-      displayed.push(item);
+    const span = Math.ceil(marker.zone.name.length * font * 1.04) + 22;
+    const top = y - height / 2;
+    const alternatives = [0, 14, 30, 50, 62, 78, 94].flatMap((gap) =>
+      [x + 12 + gap, x - span - 12 - gap].map((left, index) => ({
+        left, right: left + span, top, bottom: top + height, onLeft: index === 1, gap,
+      })));
+    const labelTop = y - height - 12;
+    const labelLeft = clamp(x - span / 2, 7, this.width - span - 7);
+    const above = {left: labelLeft, right: labelLeft + span, top: labelTop,
+      bottom: labelTop + height, above: true, gap: 0};
+    alternatives.splice(2, 0, above);
+    const fits = (bounds) => bounds.left >= 7 && bounds.right <= this.width - 7
+      && bounds.top >= 7 && bounds.bottom <= this.height - 7;
+    // Keep the anchor stable while the selected region follows camera movement.
+    let box = previous && alternatives.find((option) =>
+      option.onLeft === previous.onLeft && option.above === previous.above && option.gap === previous.gap);
+    if (!box) {
+      const obstacles = this.labelObstacles(true);
+      box = alternatives.find(option => fits(option) && !obstacles.some(other => overlaps(option, other, 5)));
     }
-    for (const [region, label] of this.labelFor) {
-      if (retained.has(region)) continue;
-      label.remove();
-      this.labelFor.delete(region);
-      this.labelPlacement.delete(region);
-    }
-    return displayed;
+    const placement = box ?? above;
+    const left = clamp(placement.left, 7, Math.max(7, this.width - span - 7));
+    const paintedTop = clamp(placement.top, 7, Math.max(7, this.height - height - 7));
+    node.classList.toggle('label-left', Boolean(placement.onLeft));
+    node.classList.toggle('label-above', Boolean(placement.above));
+    node.style.transform = `translate(${left}px,${paintedTop}px)`;
+    node.style.setProperty('--region-label-gap', `${placement.gap}px`);
+    if (placement.above) node.style.setProperty('--label-anchor-x', `${x - left}px`);
+    this.selectionLabel.placement = placement;
   }
 
   zoneAt(x, y) {
@@ -1310,6 +1373,8 @@ export class Globe {
       return {distance: Math.hypot(ax - bx, ay - by), center: [(ax + bx) / 2, (ay + by) / 2]};
     }
     surface.addEventListener('pointerdown', (event) => {
+      // 用户接管即终止在途霜月过渡；自动帧不经过这里，不会误清。
+      if (this.lunarAnimations || this.pendingLunarChange) this.stopLunarTransition();
       const onCanvas = event.target === canvas;
       if (event.pointerType === 'touch') {
         if (!onCanvas && !this.labels.contains(event.target)) return;
@@ -1425,6 +1490,7 @@ export class Globe {
     });
     canvas.addEventListener('wheel', (event) => {
       if (!this.world) return;
+      if (this.lunarAnimations || this.pendingLunarChange) this.stopLunarTransition();
       event.preventDefault();
       const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.height : 1);
       this.zoomBy(Math.exp(-clamp(delta, -150, 150) * .0045), coordinates(event));

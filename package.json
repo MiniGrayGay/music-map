@@ -10,7 +10,7 @@
   "description": "原神 7.2 分层瓦片地图与区域音乐试听。",
   "scripts": {
     "data": "node scripts/build-map-data.mjs",
-    "tiles": "node scripts/build-layer-base.mjs && node scripts/build-tile-pyramid.mjs",
+    "tiles": "node scripts/build-layer-base.mjs && node scripts/build-tile-pyramid.mjs && node scripts/build-independent-maps.mjs",
     "layers": "node scripts/build-layer-data.mjs",
     "music": "node scripts/build-bgm-playlists.mjs",
     "audio:extract": "node scripts/extract-bgm-audio.mjs",

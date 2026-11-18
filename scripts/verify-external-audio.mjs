@@ -164,7 +164,8 @@ try {
   await page.goto(site.origin, {waitUntil: 'domcontentloaded'});
   const releaseFirst = media.hold(first.id);
   const search = 'input[aria-label="跳转到地点"]';
-  await page.waitForSelector('.globe-labels .place');
+  await page.waitForSelector('.globe-canvas', {visible: true});
+  await page.waitForSelector('.globe-status', {hidden: true});
   await page.click(search);
   await page.type(search, zone.name);
   await page.waitForSelector('.globe-results button');

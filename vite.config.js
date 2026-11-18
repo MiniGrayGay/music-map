@@ -13,6 +13,7 @@ const layersDir = path.join(projectDir, 'dist', 'layers');
 const workspaceAudio = path.join(workspaceRoot, 'dist', 'region-bgm-audio');
 const audioDir = fs.existsSync(workspaceAudio) ? workspaceAudio : path.join(projectDir, 'dist/region-bgm-audio');
 const workspaceBgm = path.join(workspaceRoot, 'dist', 'genshin-region-bgm.json');
+const projectBgm = path.join(projectDir, 'dist', 'data', 'genshin-region-bgm.json');
 
 function serveTilesDev(server) {
   server.middlewares.use((req, res, next) => {
@@ -45,7 +46,8 @@ function serveTilesDev(server) {
 function serveMusicData(server) {
   server.middlewares.use((req, res, next) => {
     const url = new URL(req.url, 'http://localhost');
-    const source = url.pathname === '/data/genshin-region-bgm.json' ? workspaceBgm
+    const isBgm = url.pathname === '/data/genshin-region-bgm.json';
+    const source = isBgm ? (fs.existsSync(projectBgm) ? projectBgm : workspaceBgm)
       : url.pathname === '/data/map-data.json' ? path.join(projectDir, 'public/data/map-data.json') : null;
     if (req.method !== 'GET' || !source) {
       next();
