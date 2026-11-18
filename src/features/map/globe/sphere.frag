@@ -40,6 +40,8 @@ out vec4 pixel;
 const float PI = 3.14159265359;
 // A low sun leaves a crescent of direct light and a soft, blue night side.
 const vec3 ORBIT_SUN = vec3(-.961, -.08, -.264);
+const vec2 AURA_LIGHT_DIRECTION = vec2(-.991, -.133);
+const vec3 AURA_HIGHLIGHT = vec3(.86, .98, 1.);
 
 vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
   // 按当前像素覆盖的纹素范围，从已加载瓦片的 mip 层采样。
@@ -178,7 +180,7 @@ float cloudDensity(vec2 p) {
   return smoothstep(.48, .76, banks * .51 + detail * .33 + wisps * .16);
 }
 
-vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight) {
+vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFocus) {
   float incidence = dot(vec3(p, z), ORBIT_SUN);
   float illumination = smoothstep(-.23, .66, incidence);
   float luma = dot(terrain, vec3(.2126, .7152, .0722));
@@ -197,7 +199,12 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight) {
   float haze = pow(grazing, 2.15) * mix(.10, .78, illumination);
   surface = mix(surface, mix(vec3(.034, .077, .174), vec3(.26, .72, .97), illumination), haze);
   float limb = exp(-z * 7.5) * mix(.10, .91, limbLight);
-  return mix(surface, mix(vec3(.064, .14, .30), vec3(.73, .95, 1.), limbLight), limb);
+  surface = mix(surface, mix(vec3(.064, .14, .30), vec3(.73, .95, 1.), limbLight), limb);
+  // The narrow highlight sits on the grazing rim, with softer light reaching
+  // into the clouds and terrain beneath it.
+  float rim = .49 * exp(-z * 13.);
+  float scatter = .42 * (1. - smoothstep(.06, .48, z));
+  return mix(surface, AURA_HIGHLIGHT, auraFocus * (rim + scatter));
 }
 
 vec3 lunarSideLight(vec3 terrain, vec2 p, float z) {
@@ -233,17 +240,24 @@ void main() {
   if (r >= (hasAtmosphere ? 1.09 : 1.001)) discard;
 
   float limbLight = 0.;
+  float auraFocus = 0.;
   float airOpacity = 0.;
   vec3 airColor = vec3(0.);
   if (hasAtmosphere) {
-    limbLight = smoothstep(-.17, .94, dot(p / max(r, .001), ORBIT_SUN.xy));
+    vec2 rimDirection = p / max(r, .001);
+    limbLight = smoothstep(-.17, .94, dot(rimDirection, ORBIT_SUN.xy));
+    auraFocus = smoothstep(.52, .999, dot(rimDirection, AURA_LIGHT_DIRECTION));
+    auraFocus *= auraFocus;
     // The disk is opaque inside the rim, so the outer glow cannot contribute there.
     if (r > .997) {
       float altitude = max(0., r - 1.);
       float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * 24.);
-      airOpacity = bloom * (1. - smoothstep(.035, .09, altitude))
-        * mix(.018, .98, limbLight) * u_orbitLook;
+      float outerLight = bloom * mix(.018, .98, limbLight);
+      float halo = auraFocus * exp(-altitude * 82.);
+      outerLight += (1. - outerLight) * halo * .43;
+      airOpacity = outerLight * (1. - smoothstep(.035, .09, altitude)) * u_orbitLook;
       airColor = mix(vec3(.065, .18, .40), vec3(.44, .84, 1.), limbLight);
+      airColor = mix(airColor, AURA_HIGHLIGHT, halo * .72);
     }
   }
   if (r >= 1.001) {
@@ -371,7 +385,7 @@ void main() {
       vec3 openOcean = mix(vec3(.043, .279, .421), vec3(.092, .447, .574), water);
       orbitalAlbedo = mix(orbitalAlbedo, openOcean, offshore);
     }
-    rgb = mix(rgb, orbitalSurface(orbitalAlbedo, p, z, limbLight), u_orbitLook);
+    rgb = mix(rgb, orbitalSurface(orbitalAlbedo, p, z, limbLight, auraFocus), u_orbitLook);
   }
   float opacity = 1. - smoothstep(.997, 1.001, r);
   // Output premultiplied RGBA for the canvas compositor. The atmosphere lies
