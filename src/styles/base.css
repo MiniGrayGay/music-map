@@ -42,6 +42,7 @@
   --ease-glass-out: cubic-bezier(.42, 0, .72, .38);
   --glass-reveal-duration: 240ms;
   --glass-dismiss-duration: 140ms;
+  --scene-transfer-duration: 320ms;
 
   /* 结构令牌（design.md）：间距全取 8 的倍数；圆角两档 + 全屏 0。 */
   --space-1: 8px;
@@ -66,6 +67,24 @@ body {
   color: var(--text-primary);
   color-scheme: light;
   overflow: hidden;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (any-pointer: coarse) {
+  body {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  :is(input:not([type='range'], [type='checkbox'], [type='radio']), textarea, [contenteditable='true']) {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* The map controls use the same LiquidGlass material as the audio panel. */
@@ -182,10 +201,7 @@ button {
   color: var(--text-primary);
 }
 
-/* 入场动画（design.md 动效条款）：出现减速 200–240ms、瞬时消失（出现比
-   消失略慢）；浮层与 dock 入场只动 opacity——位移会触发点击时的
-   scrollIntoView 修正破坏坐标稳定性（实测）；页面级（fixed）可动 scale。
-   prefers-reduced-motion 由下方全局规则关停。 */
+/* 小型状态提示沿用透明度入场，悬浮面板由各自的过渡保持开合连续。 */
 @keyframes ui-page-in {
   from { opacity: 0; transform: scale(.98); }
 }

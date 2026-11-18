@@ -30,6 +30,7 @@ const field = ref(null);
 const opened = ref(false);
 const menuOpen = ref(false);
 const tab = ref('playlists');
+const tabDestination = ref(null);
 const view = ref('library');
 const selectedListId = ref(null);
 const draft = ref('');
@@ -47,6 +48,7 @@ let viewMotion;
 
 const current = computed(() => playlists.value.find((list) => list.id === selectedListId.value));
 const favoriteIds = computed(() => new Set(favorites.value));
+const highlightedTab = computed(() => tabDestination.value ?? tab.value);
 const isFavorites = computed(() => view.value === 'library' && tab.value === 'favorites');
 const selectsTracks = computed(() => ['new-tracks', 'add', 'edit'].includes(view.value));
 const displaysTracks = computed(() => selectsTracks.value || isFavorites.value || view.value === 'detail');
@@ -98,7 +100,8 @@ function reveal() {
 
 function capturePageBackground() {
   const sky = document.querySelector('.globe-surface');
-  const background = sky ? {'--playlist-sky': getComputedStyle(sky).backgroundImage} : {};
+  const background = sky
+    ? {'--playlist-sky': getComputedStyle(sky).getPropertyValue('--presented-sky')} : {};
   const source = props.readBackdrop();
   if (source?.width && source.height) {
     // Keep one small, softly filtered sample of the settled map for this page visit.
@@ -167,7 +170,9 @@ function cancelViewMotion() {
   for (const {finish} of animations) finish();
   for (const element of fades) element.style.opacity = '';
   panel.style.blockSize = '';
+  content.style.translate = '';
   content.inert = false;
+  tabDestination.value = null;
 }
 onBeforeUnmount(cancelViewMotion);
 
@@ -190,7 +195,9 @@ async function navigate(target, clearSelection = true, nextTab = tab.value) {
     return;
   }
 
-  // Keep the old layout until it has faded. Only the body changes for tab switches.
+  // Tabs keep the header and slide their corresponding list in the direction of selection.
+  const direction = pageChanges ? 0 : nextTab === 'favorites' ? 1 : -1;
+  const startOffset = parseFloat(content.style.translate) || 0;
   const parts = () => [content, ...(pageChanges
     ? [heading.value, backButton.value, more.value, tabStrip.value] : [])].filter(Boolean);
   const leaving = parts().map((element) => [element, Number(getComputedStyle(element).opacity)]);
@@ -201,6 +208,7 @@ async function navigate(target, clearSelection = true, nextTab = tab.value) {
   cancelViewMotion();
   const motion = {panel, content, animations: [], fades: new Set(), frame: 0, last: 0};
   viewMotion = motion;
+  if (!pageChanges) tabDestination.value = nextTab;
   content.inert = true;
   if (!mobile.value) panel.style.blockSize = fromHeight + 'px';
 
@@ -232,17 +240,22 @@ async function navigate(target, clearSelection = true, nextTab = tab.value) {
   }
 
   const easeOut = (progress) => 1 - (1 - progress) ** 3;
-  function fade(element, from, to, duration) {
+  function fade(element, from, to, duration, travel) {
     motion.fades.add(element);
     return animate(duration, (progress) => {
       const eased = to > from ? easeOut(progress) : progress ** 2;
       element.style.opacity = from + (to - from) * eased;
+      if (travel) {
+        const [start, end] = travel;
+        element.style.translate = (start + (end - start) * eased) + 'px';
+      }
     });
   }
 
   try {
     await Promise.all(leaving.map(([element, opacity]) =>
-      fade(element, opacity, 0, dismiss * .65)));
+      fade(element, opacity, 0, dismiss * .65,
+        direction && element === content ? [startOffset, -direction * 10] : null)));
     if (viewMotion !== motion) return;
     showView(target, nextTab, clearSelection);
     await nextTick();
@@ -267,7 +280,9 @@ async function navigate(target, clearSelection = true, nextTab = tab.value) {
       fade(element, 0, 1, reveal * .7));
     if (growth) await resizing;
     if (viewMotion !== motion) return;
-    await Promise.all([resizing, ...chrome, fade(content, 0, 1, reveal * .7)]);
+    await Promise.all([resizing, ...chrome,
+      fade(content, 0, 1, reveal * .85, direction ? [direction * 12, 0] : null),
+    ]);
     if (viewMotion === motion && pageChanges) focusHeading();
   } finally {
     if (viewMotion === motion) cancelViewMotion();
@@ -282,7 +297,7 @@ function back() {
 }
 
 function showLibraryTab(next) {
-  navigate('library', true, next);
+  if (next !== highlightedTab.value) navigate('library', true, next);
 }
 
 function openList(list) {
@@ -541,11 +556,12 @@ function importList() {
             </button>
           </header>
 
-          <nav v-if="view === 'library'" ref="tabStrip" class="playlist-tabs" aria-label="歌单管理">
-            <button type="button" :aria-pressed="tab === 'playlists'" @click="showLibraryTab('playlists')">
+          <nav v-if="view === 'library'" ref="tabStrip" class="playlist-tabs" aria-label="歌单管理"
+               :data-tab="highlightedTab">
+            <button type="button" :aria-pressed="highlightedTab === 'playlists'" @click="showLibraryTab('playlists')">
               我的歌单
             </button>
-            <button type="button" :aria-pressed="tab === 'favorites'" @click="showLibraryTab('favorites')">
+            <button type="button" :aria-pressed="highlightedTab === 'favorites'" @click="showLibraryTab('favorites')">
               收藏歌曲
             </button>
           </nav>
@@ -671,7 +687,7 @@ function importList() {
               <button
                 v-else-if="view === 'detail'"
                 type="button"
-                class="playlist-action map-glass"
+                class="playlist-action playlist-play-all map-glass"
                 @click="play()"
               >
                 <LiquidGlass variant="clear" />
@@ -862,21 +878,50 @@ function importList() {
 }
 
 .playlist-tabs {
+  --tab-gap: 3px;
+  --tab-inset: 2px;
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  padding: 2px;
+  gap: var(--tab-gap);
+  padding: var(--tab-inset);
+}
+
+.playlist-tabs::before {
+  position: absolute;
+  z-index: -1;
+  inset-block: var(--tab-inset);
+  inset-inline-start: var(--tab-inset);
+  inline-size: calc((100% - 2 * var(--tab-inset) - var(--tab-gap)) / 2);
+  border-radius: var(--radius-control);
+  background: var(--control-selected);
+  content: '';
+  transition: translate var(--scene-transfer-duration) var(--ease-glass-in);
+}
+
+.playlist-tabs[data-tab='favorites']::before {
+  translate: calc(100% + var(--tab-gap));
 }
 
 .playlist-tabs button {
   min-height: 37px;
   border-radius: var(--radius-control);
   color: var(--text-secondary);
+  transition: color var(--glass-dismiss-duration) ease;
 }
 
 .playlist-tabs button[aria-pressed='true'] {
-  background: var(--control-selected);
   color: var(--text-primary);
+}
+
+.playlist-tabs button:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+}
+
+@media (forced-colors: active) {
+  .playlist-tabs button[aria-pressed='true'] { outline: 1px solid Highlight; }
 }
 
 .playlist-scroll {
@@ -935,6 +980,14 @@ function importList() {
   color: var(--text-secondary);
 }
 
+.playlist-pane .playlist-track-play {
+  width: 34px;
+  border-radius: 50%;
+  background-color: rgb(220 245 244 / .08);
+  color: var(--text-primary);
+  transition: background-color var(--glass-dismiss-duration) ease;
+}
+
 .playlist-track-play svg {
   width: 15px;
   height: 15px;
@@ -943,18 +996,18 @@ function importList() {
 }
 
 @media (hover: hover) {
-  .playlist-track-play:hover svg {
-    color: white;
+  .playlist-pane .playlist-track-play:hover {
+    background-color: var(--control-hover);
   }
 }
 
-.playlist-track-play:focus-visible svg {
-  color: white;
+.playlist-pane .playlist-track-play:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -2px;
+  background-color: var(--control-focus);
 }
 
-.playlist-pane .playlist-track-play:focus-visible {
-  background: transparent;
-}
+.playlist-pane .playlist-track-play:active { background-color: var(--control-active); }
 
 .playlist-track-select {
   display: grid;
@@ -1082,6 +1135,11 @@ function importList() {
   font-size: 14px;
 }
 
+.playlist-pane .playlist-play-all {
+  padding-inline: var(--space-2);
+  border-radius: 999px;
+}
+
 .playlist-pane button:disabled, .playlist-menu button:disabled {
   opacity: .4;
   cursor: default;
@@ -1119,10 +1177,10 @@ function importList() {
 .playlist-pane--page {
   position: fixed;
   z-index: 30;
-  inset: 0;
+  inset: var(--visible-viewport-top, 0px) 0 auto;
   width: auto;
   max-height: none;
-  height: 100dvh;
+  height: var(--visible-viewport-height, 100dvh);
   border-radius: 0;
   background-color: #131a20;
   background-image: linear-gradient(180deg, rgb(9 14 18 / .5), rgb(9 14 18 / .63) 56%, rgb(9 14 18 / .76)),
@@ -1147,7 +1205,7 @@ function importList() {
   min-width: 38px;
   min-height: 44px;
 }
-.playlist-pane--page .playlist-track-play { width: 38px; }
+.playlist-pane--page .playlist-track-play { width: 44px; height: 44px; }
 .playlist-pane--page :is(input[type="search"], .playlist-input) { font-size: 16px; }
 
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {

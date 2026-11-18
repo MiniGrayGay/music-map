@@ -16,6 +16,7 @@ const MAX_ZOOM = 18;
 const ORBIT_MAX_ZOOM = 1.5;
 const LUNAR_TRANSITION_DURATION = 820;
 const SPIN_RATE = TAU / 165000;
+const COMPACT_SPIN_INTERVAL = 50;
 const centeredHome = [.5, .5];
 const orbitMajor = orbitDirection(0);
 const orbitMinor = orbitDirection(Math.PI / 2);
@@ -478,7 +479,9 @@ export class Globe {
     // 收尾只清自己这一组动画：期间被取消/重建的旧 onfinish 不得误杀新过渡。
     const animations = this.lunarAnimations;
     animations[0].onfinish = () => {
-      if (this.lunarAnimations === animations) this.stopLunarTransition();
+      if (this.lunarAnimations !== animations) return;
+      this.stopLunarTransition();
+      this.requestFrame();
     };
   }
 
@@ -735,12 +738,14 @@ export class Globe {
   }
 
   requestFrame() {
+    clearTimeout(this.spinWake);
     if (!this.disposed && !this.frame) this.frame = requestAnimationFrame((time) => this.draw(time));
   }
 
   dispose() {
     this.disposed = true;
     this.observer.disconnect();
+    clearTimeout(this.spinWake);
     cancelAnimationFrame(this.frame);
     this.stopLunarTransition();
     this.tiles.reset(null, 0);
@@ -803,12 +808,13 @@ export class Globe {
     this.advance(time, clamp(time - this.lastFrame, 1, 34));
     this.lastFrame = time;
     const overview = this.world.id === 'Teyvat' && this.zoom <= ORBIT_MAX_ZOOM;
-    const autoSpin = overview && !this.selected && this.zoom >= 1 && this.zoomTarget >= 1
-      && this.zoomTarget <= ORBIT_MAX_ZOOM
-      && !this.compact && !this.reducedMotion.matches;
-    if (autoSpin && time >= this.spinAfter && !this.pointer && !this.flight && !this.velocity) {
+    const spinInterval = this.compact ? COMPACT_SPIN_INTERVAL : 32;
+    const autoSpin = overview && !this.selected && this.zoom >= 1 && this.zoom === this.zoomTarget
+      && !this.pointer && !this.pinch && !this.flight && !this.velocity
+      && !this.lunarAnimations && !this.pendingLunarChange && !this.reducedMotion.matches;
+    if (autoSpin && time >= this.spinAfter) {
       this.spinTime ??= time;
-      if (time - this.spinTime >= 32) {
+      if (time - this.spinTime >= spinInterval) {
         this.lon = wrap(this.lon - Math.min(80, time - this.spinTime) * SPIN_RATE);
         this.spinTime = time;
       }
@@ -910,8 +916,13 @@ export class Globe {
       && !this.reducedMotion.matches;
     if (this.flight || this.velocity || this.zoom !== this.zoomTarget || pulse
       || (this.selected && this.raiseStarted != null && this.raise < 1)
-      || this.lunarArrival || autoSpin || (orbit && !this.reducedMotion.matches)) {
+      || this.lunarArrival || (orbit && !this.reducedMotion.matches)) {
       this.requestFrame();
+    } else if (autoSpin && !this.frame) {
+      // Wake only for the next overview update; touch input still requests a frame immediately.
+      const nextSpin = (this.spinTime ?? time) + spinInterval;
+      this.spinWake = setTimeout(() => this.requestFrame(),
+        Math.max(0, Math.max(this.spinAfter, nextSpin) - performance.now()));
     }
   }
 

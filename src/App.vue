@@ -50,8 +50,11 @@ const playbackZone = computed(() => playlistPlayback.value ?? activeZone.value);
 const presentedZone = ref(null);
 const view = reactive({canZoomIn: true, canZoomOut: true});
 const globeSurface = ref(null);
+const globeStage = ref(null);
 const planeSurface = ref(null);
 const planeStage = ref(null);
+const mapSnapshot = ref(null);
+const mapSwitching = ref(false);
 const mapToolbar = ref(null);
 const mapPopupPresent = ref(false);
 const layerPopupPresent = ref(false);
@@ -72,6 +75,113 @@ const surfaceRef = computed(() => showGlobe.value ? globeSurface.value : planeSu
 const keepGlobe = computed(() => !globeError.value && (showGlobe.value || presentedGlobe.value || !!mapHandoff.value));
 const keepPlane = computed(() => !showGlobe.value || !presentedGlobe.value || !!mapHandoff.value);
 let surfaceFade;
+// Independent maps retain one rendered frame while the incoming renderer gets ready.
+let mapTransfer;
+let queuedMap;
+let lastPointerType;
+
+function rememberPointer(event) {
+  lastPointerType = event.pointerType;
+}
+
+function suppressTouchMenu(event) {
+  const touch = event.pointerType === 'touch'
+    || (!event.pointerType && (event.sourceCapabilities?.firesTouchEvents || lastPointerType === 'touch'));
+  const field = event.target.closest?.('input, textarea, [contenteditable="true"]');
+  if (!touch || (field && !field.matches('[type="range"], [type="checkbox"], [type="radio"]'))) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function updateVisualViewport() {
+  const viewport = window.visualViewport;
+  const style = appRoot.value?.style;
+  if (!style) return;
+  if (viewport?.scale === 1) {
+    style.setProperty('--visible-viewport-height', `${viewport.height}px`);
+    style.setProperty('--visible-viewport-top', `${viewport.offsetTop}px`);
+  } else {
+    style.removeProperty('--visible-viewport-height');
+    style.removeProperty('--visible-viewport-top');
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', rememberPointer, true);
+  document.addEventListener('contextmenu', suppressTouchMenu, true);
+  window.visualViewport?.addEventListener('resize', updateVisualViewport);
+  window.visualViewport?.addEventListener('scroll', updateVisualViewport);
+  updateVisualViewport();
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', rememberPointer, true);
+  document.removeEventListener('contextmenu', suppressTouchMenu, true);
+  window.visualViewport?.removeEventListener('resize', updateVisualViewport);
+  window.visualViewport?.removeEventListener('scroll', updateVisualViewport);
+  mapTransfer?.animation?.cancel();
+});
+
+function captureMapSnapshot() {
+  const globe = globeStage.value?.querySelector('.globe-surface');
+  const plane = planeStage.value?.querySelector('.map-surface');
+  const planeOpacity = plane ? Number(getComputedStyle(planeStage.value).opacity) : 0;
+  const stage = planeOpacity === 1 ? plane : globe;
+  const snapshot = mapSnapshot.value;
+  if (!stage || !snapshot) return false;
+  const bounds = stage.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return false;
+  const ratio = Math.min(devicePixelRatio || 1, 1.5);
+  snapshot.width = Math.ceil(bounds.width * ratio);
+  snapshot.height = Math.ceil(bounds.height * ratio);
+  snapshot.style.background = globe && stage === globe
+    ? getComputedStyle(globe).getPropertyValue('--presented-sky') : getComputedStyle(stage).background;
+  const context = snapshot.getContext('2d');
+  if (!context) return false;
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  for (const [surface, opacity] of [[globe, planeOpacity === 1 ? 0 : 1], [plane, planeOpacity]]) {
+    if (!surface || !opacity) continue;
+    for (const image of surface.querySelectorAll(':scope > canvas, :scope > img')) {
+      if (image.hidden || (image instanceof HTMLImageElement && !image.naturalWidth)) continue;
+      const rect = image.getBoundingClientRect();
+      if (!rect.width || !rect.height || !image.width || !image.height) continue;
+      const style = getComputedStyle(image);
+      context.globalAlpha = opacity * Number(style.opacity);
+      context.filter = style.filter;
+      context.drawImage(image, rect.left - bounds.left, rect.top - bounds.top, rect.width, rect.height);
+    }
+  }
+  snapshot.hidden = false;
+  return true;
+}
+
+function revealMap(name) {
+  const transfer = mapTransfer;
+  if (transfer?.name !== name || transfer.animation) return;
+  const snapshot = mapSnapshot.value;
+  const finish = () => {
+    if (mapTransfer !== transfer) return;
+    mapTransfer = null;
+    mapSwitching.value = false;
+    snapshot.hidden = true;
+    snapshot.width = snapshot.height = 1;
+    const next = queuedMap;
+    queuedMap = null;
+    if (next) selectMap(...next);
+  };
+  const duration = parseFloat(getComputedStyle(snapshot).getPropertyValue('--scene-transfer-duration'));
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    finish();
+    return;
+  }
+  transfer.animation = snapshot.animate({opacity: [1, 0]}, {
+    duration, easing: 'ease-in-out', fill: 'forwards',
+  });
+  transfer.animation.onfinish = () => {
+    transfer.animation.cancel();
+    finish();
+  };
+}
 
 function finishHandoff(plan) {
   if (mapHandoff.value !== plan) return;
@@ -140,15 +250,19 @@ function onPlaneView(state) {
   if (!globeSurface.value?.alignViewport(state.viewportRect, aligned)) aligned();
 }
 
-function onPlaneReady() {
+function onPlaneReady(name) {
+  if (!showGlobe.value) revealMap(name);
   const plan = mapHandoff.value;
   if (!plan || plan.toGlobe) return;
   plan.rasterReady = true;
   maybeEnterLayer(plan);
 }
 
-function onGlobeFrame(canvas) {
-  if (showGlobe.value) receiveBackdrop(canvas);
+function onGlobeFrame(canvas, name) {
+  if (showGlobe.value && name === mapName.value) {
+    receiveBackdrop(canvas);
+    revealMap(name);
+  }
   const plan = mapHandoff.value;
   if (plan?.toGlobe && !plan.viewport) blendSurfaces(plan);
 }
@@ -280,15 +394,25 @@ async function initialize() {
 onMounted(initialize);
 
 function selectMap(name, zoneKey = null) {
+  if (mapTransfer?.animation) {
+    queuedMap = [name, zoneKey];
+    return;
+  }
   if (mapName.value === name) return;
   // 只放行当前有效选项，隐藏地图（如空之神殿）不能被调起或经搜索进入。
   if (!mapOptions.value.some((option) => option.value === name)) return;
-  // 换世界时旧的平面/球面交接不再成立：取消进行中的淡入淡出并按目标
-  // 世界直接落位 presentedGlobe，避免新图误套旧 viewport 的过渡状态。
+  // 提瓦特与霜月共用球面渲染器和轨道动画；独立地图等首帧就绪再交接。
+  const nextGlobe = globeMaps.includes(name) && !globeError.value;
+  const orbitTransfer = showGlobe.value && nextGlobe;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches
+    && (mapTransfer || (!orbitTransfer && captureMapSnapshot()))) {
+    mapTransfer = {name};
+    mapSwitching.value = true;
+  }
   if (surfaceFade) cancelAnimationFrame(surfaceFade.frame);
   surfaceFade = null;
   mapHandoff.value = null;
-  presentedGlobe.value = globeMaps.includes(name) && !globeError.value;
+  presentedGlobe.value = nextGlobe;
   mapZoneKey.value = zoneKey ?? null;
   mapName.value = name;
   activeZone.value = null;
@@ -368,7 +492,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 <template>
   <div ref="appRoot" class="app" :class="{'app--mobile': mobileDevice}">
     <template v-if="mapData">
-      <div v-if="!mobileDevice" class="app-controls" :inert="playlistPageOpen || !!mapHandoff">
+      <div v-if="!mobileDevice" class="app-controls"
+           :inert="playlistPageOpen || !!mapHandoff || mapSwitching">
         <ZoomControls
           :can-zoom-in="view.canZoomIn"
           :can-zoom-out="view.canZoomOut"
@@ -380,7 +505,8 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @reset="surfaceRef?.resetView()"
         />
       </div>
-      <div v-if="keepGlobe" class="map-stage" :inert="playlistPageOpen || !!mapHandoff || !showGlobe">
+      <div v-if="keepGlobe" ref="globeStage" class="map-stage"
+           :inert="playlistPageOpen || !!mapHandoff || mapSwitching || !showGlobe">
         <GlobeSurface
           ref="globeSurface"
           :map-data="activeMap"
@@ -396,6 +522,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           :mobile-device="mobileDevice"
           :smooth-boundaries="smoothBoundaries"
           @canvas-frame="onGlobeFrame"
+          @world-error="revealMap"
           @handoff-ready="mapHandoff?.toGlobe && blendSurfaces(mapHandoff)"
           @view="(state) => { if (showGlobe) Object.assign(view, state) }"
           @zone-activate="activateRegion"
@@ -406,7 +533,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
         />
       </div>
       <div v-if="keepPlane" ref="planeStage" class="map-stage" :style="{opacity: presentedGlobe ? 0 : 1}"
-           :inert="playlistPageOpen || !!mapHandoff || showGlobe">
+           :inert="playlistPageOpen || !!mapHandoff || mapSwitching || showGlobe">
         <MapSurface
           :key="mapName"
           ref="planeSurface"
@@ -423,6 +550,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           @blank-tap="activeZone = null"
         />
       </div>
+      <canvas ref="mapSnapshot" class="map-stage map-snapshot" width="1" height="1" aria-hidden="true" hidden />
       <div v-if="globeError" class="music-unavailable" role="status">{{ globeError }}</div>
       <div v-if="showRelief && reliefPackStatus" class="music-unavailable relief-loading">
         <span role="status">{{ reliefPackLabels[reliefPackStatus.stage] }}</span>
@@ -474,7 +602,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
                        :viewport-rect="showGlobe ? null : view.viewportRect"
                        :read-viewport="showGlobe ? surfaceRef?.viewportRect : null"
                        :floor-host="appRoot"
-                       :switching="!!mapHandoff"
+                       :switching="!!mapHandoff || mapSwitching"
                        @presence="layerPopupPresent = $event" />
           <PlaylistLibrary :library="playlistLibrary" :read-backdrop="readMapBackdrop"
                            @play="playPlaylist" @page-open="playlistPageOpen = $event" />
@@ -586,6 +714,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 }
 
 .map-stage { position: absolute; inset: 0; }
+.map-snapshot { width: 100%; height: 100%; pointer-events: none; }
 
 .app-controls {
   position: absolute;

@@ -101,7 +101,7 @@ const layerArtworkReady = computed(() => currentLayerIds.value.length > 0
   && currentLayerIds.value.every((id) => loadedLayerIds.has(id)));
 const layerArtworkFailed = computed(() => currentLayerIds.value.some(id => failedLayerIds.has(id)));
 watch([rasterReady, layerArtworkReady, layerArtworkFailed], ([ground, floor, failed]) => {
-  if (ground && (!layers.value || floor || failed)) emit('surface-ready');
+  if (ground && (!layers.value || floor || failed)) emit('surface-ready', props.mapName);
 }, {flush: 'post'});
 const zoomCeiling = computed(() => Math.min(MAX_SCALE, ...(layers.value?.pieces ?? []).map(
   (entry) => entry.pixelDensity / deviceScale.value,

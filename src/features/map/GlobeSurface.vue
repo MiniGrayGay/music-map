@@ -26,7 +26,8 @@ const props = defineProps({
   smoothBoundaries: {type: Boolean, default: true},
 });
 const emit = defineEmits([
-  'handoff-ready', 'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable', 'canvas-frame', 'relief-reveal',
+  'handoff-ready', 'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable',
+  'canvas-frame', 'relief-reveal', 'world-error',
 ]);
 const atlas = import.meta.glob(['./globe/atlas/Teyvat.webp', './globe/atlas/MoonCanon.webp', './globe/atlas/lroc-color-2k.jpg'], {eager: true, query: '?url', import: 'default'});
 // 球面只承载提瓦特与霜月；层岩巨渊、旧日之海、远古圣山等独立场景走平面 MapSurface。
@@ -49,6 +50,7 @@ const searchOpen = ref(false);
 const searchIndex = ref(0);
 const resultListId = useId();
 const status = ref('正在加载地图');
+const renderedMap = ref(props.mapName);
 const images = new Map();
 const zones = computed(() => musicView(props.bgm, props.mapName, [], false));
 const moonSafety = shallowRef(null);
@@ -117,7 +119,16 @@ function onSearchKeydown(event) {
     case 'Home': searchIndex.value = 0; break;
     case 'End': searchIndex.value = last; break;
   }
-  void nextTick(() => searchResults.value?.children[searchIndex.value]?.scrollIntoView({block: 'nearest'}));
+  void nextTick(() => {
+    const list = searchResults.value?.parentElement;
+    const option = searchResults.value?.children[searchIndex.value];
+    if (!list || !option) return;
+    const listBounds = list.getBoundingClientRect();
+    const itemBounds = option.getBoundingClientRect();
+    // Scroll the list in place, without asking the browser to pan the map behind it.
+    list.scrollTop += Math.min(0, itemBounds.top - listBounds.top)
+      + Math.max(0, itemBounds.bottom - listBounds.bottom);
+  });
 }
 
 watch(query, () => {
@@ -250,6 +261,7 @@ function chooseResult(result) {
   if (!result) return;
   query.value = '';
   dismissSearch();
+  if (props.mobileDevice) searchForm.value?.querySelector('input')?.blur();
   if (result.map === props.mapName) {
     jumpToZone(result.key);
   } else {
@@ -298,6 +310,7 @@ async function showWorld() {
   } catch (error) {
     if (revision === request) {
       status.value = error.message;
+      emit('world-error', id);
       if (props.initialViewport) emit('unavailable', error.message);
     }
   }
@@ -315,7 +328,10 @@ onMounted(() => {
     globe = new Globe({canvas: canvas.value, satellite: moon.value, moonLink: moonLink.value,
       lunarLayer: lunarLayer.value, mobileDevice: props.mobileDevice,
       signals: signals.value, stars: stars.value, labels: labels.value, fragment,
-      onFrame: (element) => emit('canvas-frame', element),
+      onFrame: (element) => {
+        renderedMap.value = installedMap;
+        emit('canvas-frame', element, installedMap);
+      },
       onReliefReveal: key => emit('relief-reveal', key),
       reliefTarget(key) {
         const target = props.reliefTarget;
@@ -373,7 +389,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
 </script>
 
 <template>
-  <div class="globe-surface" :class="{'teyvat-sky': mapName === 'Teyvat'}">
+  <div class="globe-surface" :class="{'teyvat-sky': renderedMap === 'Teyvat'}">
     <canvas ref="stars" aria-hidden="true" />
     <canvas ref="canvas" class="globe-canvas" tabindex="0"
             aria-label="球面地图，可拖动或用方向键旋转，滚轮缩放，回车选择地点" />
@@ -430,14 +446,27 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background:
+  --teyvat-sky: radial-gradient(ellipse at 33% 50%, #172541, #0d162c 54%, #080c1a);
+  --lunar-sky:
     radial-gradient(ellipse at 35% 43%, #28494c 0%, #172e3b 36%, transparent 72%),
     radial-gradient(ellipse at 82% 10%, #25334e 0%, transparent 62%),
     linear-gradient(150deg, #0a1525 4%, #101b2d 47%, #070b17 96%);
+  --presented-sky: var(--lunar-sky);
+  background: var(--lunar-sky);
+}
+.globe-surface::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: var(--teyvat-sky);
+  opacity: 0;
+  transition: opacity var(--scene-transfer-duration) ease-in-out;
 }
 .teyvat-sky {
-  background: radial-gradient(ellipse at 33% 50%, #172541, #0d162c 54%, #080c1a);
+  --presented-sky: var(--teyvat-sky);
 }
+.teyvat-sky::before { opacity: 1; }
 .globe-surface > canvas, .globe-labels { position: absolute; inset: 0; width: 100%; height: 100%; }
 .globe-surface > .globe-satellite { right: auto; bottom: auto; }
 .globe-surface > canvas:not(.globe-canvas), .globe-labels { pointer-events: none; }
@@ -517,6 +546,10 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
 .globe-results p { margin: 8px; }
 @media (max-width: 700px), (pointer: coarse) and (max-height: 500px) {
   .globe-search { --search-field-size: var(--mobile-control-size, 44px); }
+  .globe-result-list {
+    max-height: min(40dvh,
+      max(40px, calc(var(--visible-viewport-height, 100dvh) - var(--visible-viewport-top, 0px) - 120px)));
+  }
   .globe-search-field {
     border-radius: var(--radius-card);
   }
