@@ -7,6 +7,7 @@ const listensBeforePrompt = 3;
 // BetterGI 官网社区页链接的官方 B 站空间。
 const betterGiMid = '3546777483479879';
 const betterGiName = 'BetterGI';
+const betterGiSpace = `https://space.bilibili.com/${betterGiMid}`;
 let sdkRequest;
 let authorRequest;
 let listeningSession;
@@ -29,17 +30,16 @@ function localPreviewMode() {
   return null;
 }
 
-function localAuthor() {
+function webAuthor() {
   return {
     name: betterGiName,
     avatar: 'https://i2.hdslb.com/bfs/face/e671e7fab201dbe86e4ceef22c0342d034191518.jpg',
-    followers: 137188,
-    openSpace: () => window.open(`https://space.bilibili.com/${betterGiMid}`, '_blank', 'noopener'),
+    href: betterGiSpace,
   };
 }
 
 export function toyFollowCardPreview() {
-  return supportsDialog() && localPreviewMode() === 'preview' ? localAuthor() : null;
+  return supportsDialog() && localPreviewMode() === 'preview' ? webAuthor() : null;
 }
 
 function loadSdk() {
@@ -67,7 +67,11 @@ function loadSdk() {
 
 async function loadFollowTarget() {
   const sdk = await loadSdk();
-  if (!await sdk?.isSupport?.('navigate') || !await sdk.isSupport('getAuthorRelation')) return null;
+  if (!sdk) return null;
+  const supported = await Promise.all(
+    ['navigate', 'getAuthorProfile', 'getAuthorRelation'].map((method) => sdk.isSupport?.(method)),
+  );
+  if (!supported.every(Boolean)) return null;
   const [profile, relation] = await Promise.all([
     sdk.getAuthorProfile(),
     sdk.getAuthorRelation(),
@@ -120,24 +124,27 @@ export function useToyFollow(preview) {
   const author = shallowRef(null);
   const prompt = shallowRef(null);
   const tracking = shallowRef(false);
-  const inToy = !preview && supportsDialog() && isToyHost();
-  const localTrigger = import.meta.env.DEV && !preview
-    && supportsDialog() && localPreviewMode() === 'trigger';
+  const enabled = !preview && supportsDialog();
+  const inToy = enabled && isToyHost();
+  const localTrigger = enabled && localPreviewMode() === 'trigger';
   const session = localTrigger ? {count: listensBeforePrompt, shown: false}
-    : inToy ? (listeningSession ??= restoreSession()) : null;
+    : enabled ? (listeningSession ??= restoreSession()) : null;
   let disposed = false;
   let checkOnReturn = false;
   let pendingTarget = null;
 
   if (localTrigger) {
-    author.value = localAuthor();
-  } else if (session && !session.shown) {
+    author.value = webAuthor();
+  } else if (session && !session.shown && inToy) {
     pendingTarget = prepareToyFollow().then((result) => {
       pendingTarget = null;
       if (disposed || !result?.eligible || session.shown) return;
       author.value = result;
       tracking.value = true;
     });
+  } else if (session && !session.shown) {
+    author.value = webAuthor();
+    tracking.value = true;
   }
 
   async function refreshAfterProfile() {
@@ -175,20 +182,21 @@ export function useToyFollow(preview) {
     started = true;
     if (!author.value || session.shown || session.count < listensBeforePrompt) return true;
     session.shown = true;
-    if (inToy) saveSession(session);
+    if (!localTrigger) saveSession(session);
     const target = author.value;
-    prompt.value = {
+    prompt.value = inToy ? {
       ...target,
       openSpace: async () => {
-        checkOnReturn = inToy;
+        checkOnReturn = true;
         try {
-          await target.openSpace();
+          const result = await target.openSpace();
+          if (result?.status && result.status !== 'ok') throw new Error('打开 UP 主空间失败');
         } catch (error) {
           checkOnReturn = false;
           throw error;
         }
       },
-    };
+    } : target;
     author.value = null;
     tracking.value = false;
     return false;
@@ -218,7 +226,7 @@ export function useToyFollow(preview) {
     if (seconds < qualifyingSeconds) return;
     counted = true;
     session.count = Math.min(listensBeforePrompt, session.count + 1);
-    if (inToy) saveSession(session);
+    if (!localTrigger) saveSession(session);
   }
 
   return {prompt, tracking, resetTrack, beforePlay, pendingPromptCheck, savePosition, trackProgress};

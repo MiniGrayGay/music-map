@@ -48,13 +48,21 @@ async function follow() {
           <h2 :id="titleId" tabindex="-1" autofocus>{{ author.name }}</h2>
           <p v-if="followers !== null">{{ followers }}粉丝</p>
         </div>
-        <button class="toy-follow-action" type="button" @click="follow">
+        <component
+          :is="author.href ? 'a' : 'button'"
+          class="toy-follow-action"
+          :type="author.href ? undefined : 'button'"
+          :href="author.href"
+          :target="author.href ? '_blank' : undefined"
+          :rel="author.href ? 'noopener noreferrer' : undefined"
+          @click="!author.href && follow()"
+        >
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
             <path d="M8 2.75v10.5m-5.25-5.25h10.5" fill="none" stroke="currentColor"
                   stroke-width="1.5" stroke-linecap="round" />
           </svg>
-          关注
-        </button>
+          去关注
+        </component>
       </div>
       <p v-if="navigationError" class="toy-follow-error" role="status">暂时打不开 UP 主空间</p>
     </dialog>
@@ -139,6 +147,7 @@ async function follow() {
   color: #fff;
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition: background-color 150ms ease;
 }
