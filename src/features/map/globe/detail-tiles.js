@@ -1,6 +1,7 @@
 import {clamp, viewAtlasPoints} from './projection.js';
 import {TILE_SIZE as TILE, MIP_LEVELS} from './tileMipData.js';
 import {loadTileMipmaps} from './tileMipLoader.js';
+import {rasterAssetUrl} from '../releaseData.js';
 
 const EMPTY_SIZE = [0, 0];
 export function detailTextures(gl, mapUnit = 1, atlasUnit = 2) {
@@ -114,7 +115,7 @@ export class DetailTiles {
       const x = key % this.columns;
       const y = Math.floor(key / this.columns);
       const url = './tiles/' + this.world.id + '/' + this.zoom + '/' + x + '/' + y + '.webp?v=' + this.sourceIdentity.slice(0, 12);
-      void this.load(url, key, revision, controller);
+      void this.load(rasterAssetUrl(url), key, revision, controller);
     }
   }
 

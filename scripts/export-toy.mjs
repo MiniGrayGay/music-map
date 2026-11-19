@@ -13,6 +13,9 @@ import {isToySharedStorageId} from '../src/features/bgm/toySdk.js';
 import {reliefBlockBytes} from '../src/features/map/reliefFormat.js';
 import {mapLabels} from '../src/features/layers/mapBases.js';
 import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
+import {
+  dataPacketName, maskPacketStream, prepareRasterPaths, prepareReleaseData, withReleaseData, writeReleaseData,
+} from './release-data.mjs';
 
 const run = promisify(execFile);
 const project = path.resolve(import.meta.dirname, '..');
@@ -27,12 +30,6 @@ const pick = (entries, names) => Object.fromEntries(
   Object.entries(entries).filter(([key]) => names.has(key)),
 );
 const json = (relative) => readFile(path.join(distribution, relative), 'utf8').then(JSON.parse);
-
-async function writeJson(relative, value) {
-  const target = path.join(bundle, relative);
-  await mkdir(path.dirname(target), {recursive: true});
-  await writeFile(target, JSON.stringify(value));
-}
 
 // Re-encode display images, leaving PNG masks and vector graphics intact.
 function toyAssets(excludedMaps) {
@@ -85,10 +82,11 @@ function toyNotices() {
   };
 }
 
-async function writeImages(files) {
+async function writeImages(rasters) {
+  const files = [...rasters];
   for (let index = 0; index < files.length; index += 8) {
-    await Promise.allSettled(files.slice(index, index + 8).map(async (relative) => {
-      const target = path.join(bundle, relative);
+    await Promise.allSettled(files.slice(index, index + 8).map(async ([relative, packet]) => {
+      const target = path.join(bundle, packet);
       await mkdir(path.dirname(target), {recursive: true});
       await sharp(path.join(distribution, relative)).webp({quality, effort: 3, alphaQuality: 100}).toFile(target);
     })).then((results) => {
@@ -116,13 +114,15 @@ async function writeRelief(index, bgm) {
     }
   }
   const packedName = `points-${index.sha256.slice(0, 16)}.gz.data`;
-  const target = path.join(bundle, 'relief', packedName);
+  const modelPacket = dataPacketName(PACKED_RELIEF + ':' + index.sha256);
+  const target = path.join(bundle, modelPacket);
   await mkdir(path.dirname(target), {recursive: true});
-  await pipeline(Readable.from(blocks(), {objectMode: false}), createGzip(), createWriteStream(target));
+  await pipeline(Readable.from(blocks(), {objectMode: false}), createGzip(), maskPacketStream(modelPacket),
+    createWriteStream(target));
   const {size: compressedBytes} = await lstat(target);
-  await writeJson('relief/index.json', {
+  return {modelPacket, index: {
     schema: 1, encoding: PACKED_RELIEF, file: packedName, compressedBytes, unpackedBytes, zones,
-  });
+  }};
 }
 
 async function assemble() {
@@ -155,15 +155,23 @@ async function assemble() {
 
   await build({root: project, plugins: [toyAssets(excludedMaps), toyNotices()],
     build: {outDir: bundle, copyPublicDir: false, manifest: false, sourcemap: false}});
+  const {modelPacket, index} = await writeRelief(relief, bgm);
+  const packets = prepareReleaseData({
+    'data/map-data.json': {...map, preloadRelief: true},
+    'tiles/meta.json': tiles,
+    'layers/manifest.json': layers,
+    'layers/basemaps.json': basemaps,
+    'data/genshin-region-bgm.json': bgm,
+    'relief/index.json': index,
+  }, modelPacket);
+  const entry = path.join(bundle, 'index.html');
+  const tilePaths = tileFileNames(tiles);
   await Promise.all([
     copyFile(path.join(project, 'public/favicon.svg'), path.join(bundle, 'favicon.svg')),
-    writeJson('data/map-data.json', {...map, preloadRelief: true}), writeJson('data/genshin-region-bgm.json', bgm),
-    writeJson('tiles/meta.json', tiles), writeJson('layers/manifest.json', layers),
-    writeJson('layers/basemaps.json', basemaps),
+    writeReleaseData(bundle, packets.files),
+    readFile(entry, 'utf8').then((html) => writeFile(entry, withReleaseData(html, packets.encoded))),
+    writeImages(prepareRasterPaths([...tilePaths, ...layerFileNames(layers)])),
   ]);
-  await writeRelief(relief, bgm);
-  const tilePaths = tileFileNames(tiles);
-  await writeImages([...tilePaths, ...layerFileNames(layers)]);
   return {tiles: tilePaths.length, zones: Object.keys(relief.zones).length};
 }
 

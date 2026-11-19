@@ -1,9 +1,11 @@
+import {fetchMapDocument} from './releaseData.js';
+
 export const SUPPORTED_DATA_VERSION = '7.2.0';
 
 export async function loadMapData() {
   const [dataResponse, indexResponse] = await Promise.all([
-    fetch('./data/map-data.json'),
-    fetch('./tiles/meta.json'),
+    fetchMapDocument('./data/map-data.json'),
+    fetchMapDocument('./tiles/meta.json'),
   ]);
   if (!dataResponse.ok) {
     throw new Error(`map-data.json 加载失败（HTTP ${dataResponse.status}）；先运行 pnpm run data`);

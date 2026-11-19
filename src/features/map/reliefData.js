@@ -1,12 +1,13 @@
 import {decodeReliefBlock, reliefBlockBytes} from './reliefFormat.js';
 import {COMPACT_RELIEF, PACKED_RELIEF, decodeCompactRelief} from './reliefCompact.js';
+import {fetchMapDocument, maskPacket, reliefAsset} from './releaseData.js';
 
 let catalogTask;
 let packedTask;
 let completeBuffer;
 
 function readCatalog() {
-  catalogTask ??= fetch('./relief/index.json').then(async (response) => {
+  catalogTask ??= fetchMapDocument('./relief/index.json').then(async (response) => {
     if (!response.ok) throw new Error(`点阵索引 HTTP ${response.status}`);
     const index = await response.json();
     if (index.schema !== 1 || !index.zones) throw new Error('分区点阵索引无效');
@@ -31,7 +32,8 @@ function readCatalog() {
 async function downloadPackedRelief(index, report) {
   const total = index.compressedBytes;
   report({stage: 'download', received: 0, total});
-  const response = await fetch('./relief/' + index.file);
+  const {url, seed} = reliefAsset('./relief/' + index.file);
+  const response = await fetch(url);
   if (!response.ok) throw new Error('点阵包 HTTP ' + response.status);
   const compressed = new Uint8Array(total);
   const reader = response.body.getReader();
@@ -44,7 +46,7 @@ async function downloadPackedRelief(index, report) {
         await reader.cancel();
         throw new Error('点阵包大小不符');
       }
-      compressed.set(value, received);
+      compressed.set(seed === null ? value : maskPacket(value, seed, received), received);
       received += value.byteLength;
       report({stage: 'download', received, total});
     }
@@ -103,7 +105,8 @@ export async function loadReliefPoints(key, signal) {
   if (![offset, count, modelCount].every(Number.isSafeInteger) || offset < 0 || offset % 4 || count < 1 || modelCount < 0 || modelCount > count
     || offset + size > index.bytes) throw new Error('分区点阵范围无效');
   if (completeBuffer) return decodeReliefBlock(completeBuffer, entry, offset);
-  const response = await fetch(`./relief/${index.file}`, {
+  const {url, seed} = reliefAsset(`./relief/${index.file}`);
+  const response = await fetch(url, {
     signal, headers: {Range: `bytes=${offset}-${offset + size - 1}`},
   });
   if (response.status === 206) {
@@ -111,11 +114,13 @@ export async function loadReliefPoints(key, signal) {
     if (buffer.byteLength !== size || response.headers.get('content-range') !== `bytes ${offset}-${offset + size - 1}/${index.bytes}`) {
       throw new Error('分区点阵响应不完整');
     }
+    if (seed !== null) maskPacket(new Uint8Array(buffer), seed, offset);
     return decodeReliefBlock(buffer, entry);
   }
   if (response.status === 200) {
     const buffer = await response.arrayBuffer();
     if (buffer.byteLength !== index.bytes) throw new Error('点阵文件不完整');
+    if (seed !== null) maskPacket(new Uint8Array(buffer), seed);
     completeBuffer = buffer;
     return decodeReliefBlock(buffer, entry, offset);
   }

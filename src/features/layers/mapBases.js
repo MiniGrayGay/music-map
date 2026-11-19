@@ -1,3 +1,5 @@
+import {fetchMapDocument} from '../map/releaseData.js';
+
 export const mapLabels = {
   Teyvat: '提瓦特',
   SeaOfBygoneEras: '旧日之海',
@@ -16,7 +18,7 @@ const planeViewBounds = {
 export async function loadLayerBases(mainMap) {
   let response;
   try {
-    response = await fetch('./layers/basemaps.json');
+    response = await fetchMapDocument('./layers/basemaps.json');
     if (!response.ok) return {};
     const {format, version, maps} = await response.json();
     if (format !== 'teyvat-layer-bases-v2' || version !== mainMap.dataVersion) return {};

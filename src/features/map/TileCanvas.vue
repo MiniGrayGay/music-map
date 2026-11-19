@@ -3,6 +3,7 @@ import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
 import {isMobileDevice} from './isMobileDevice.js';
 import {mapRasterScale} from './mapRasterScale.js';
+import {rasterAssetUrl} from './releaseData.js';
 import {decodeTileImage} from './tileImage.js';
 
 const props = defineProps({
@@ -56,7 +57,7 @@ async function fetchTile(key) {
     const native = props.pyramid.native;
     const version = (native && key.startsWith(`${native.level}/`)
       ? native.sourceIdentity : props.pyramid.sourceIdentity).slice(0, 12);
-    const response = await fetch(`./tiles/${props.mapName}/${key}.webp?v=${version}`, {
+    const response = await fetch(rasterAssetUrl(`./tiles/${props.mapName}/${key}.webp?v=${version}`), {
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);

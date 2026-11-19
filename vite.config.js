@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {defineConfig} from 'vite';
 import vue from '@vitejs/plugin-vue';
 import {parseByteRange} from './scripts/byte-range.mjs';
+import {releaseNoticePlugin} from './scripts/release-data.mjs';
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(projectDir, '..', '..');
@@ -199,9 +200,22 @@ export default defineConfig({
         serveAudio(server);
       },
     },
+    releaseNoticePlugin(),
     includeWorkerAssetsInManifest(),
   ],
-  build: {emptyOutDir: false, manifest: buildManifestPath},
+  build: {
+    emptyOutDir: false,
+    manifest: buildManifestPath,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        assetFileNames(asset) {
+          const name = asset.names[0] ?? '';
+          return /\.(?:webp|png|jpe?g)$/i.test(name) ? 'assets/[hash][extname]' : 'assets/[name]-[hash][extname]';
+        },
+      },
+    },
+  },
   server: {host: '127.0.0.1', port: 5177, strictPort: true},
   preview: {host: '127.0.0.1', port: 5177, strictPort: true},
 });

@@ -1,16 +1,21 @@
 import {createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
-import {constants} from 'node:fs';
+import {constants, createReadStream, createWriteStream} from 'node:fs';
 import {copyFile, link, lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, promisify} from 'node:util';
+import {pipeline} from 'node:stream/promises';
 import {setTimeout as wait} from 'node:timers/promises';
 import {normalizeAudioBase} from '../src/features/bgm/audioUrl.js';
 import {
   INITIAL_MUSIC_PREVIEW_VERSION, INITIAL_MUSIC_PREVIEWS, mergedVerifiedTracks,
 } from '../src/features/bgm/verifiedTracks.js';
 import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
+import {
+  dataNoticeFile, dataNoticeText, dataPacketName, decodeSiteStamp, encodeSiteStamp, maskPacketStream, prepareRasterPaths,
+  prepareReleaseData, withReleaseData, writeReleaseData,
+} from './release-data.mjs';
 
 const dist = path.resolve(import.meta.dirname, '../dist');
 const marker = 'data/site-export.json';
@@ -37,7 +42,7 @@ async function validateDestination(output) {
   if (entries.some((entry) => !entry.isFile() && !entry.isDirectory())) {
     throw new Error(`导出目录包含链接或其他非普通内容 ${output}`);
   }
-  const stamp = await readFile(path.join(output, marker), 'utf8').then(JSON.parse, (error) => {
+  const stamp = await readFile(path.join(output, marker), 'utf8').then(decodeSiteStamp, (error) => {
     if (error.code !== 'ENOENT') throw error;
     throw new Error(`导出目标包含其他文件 ${output}`);
   });
@@ -118,7 +123,7 @@ async function renameDirectory(source, target) {
 async function copyFiles(source, target, files, transfer = copyAsset) {
   for (let index = 0; index < files.length; index += 32) {
     const batch = await Promise.allSettled(files.slice(index, index + 32).map((relative) =>
-      transfer(path.join(source, relative), path.join(target, relative))));
+      transfer(path.join(source, relative), path.join(target, relative), relative)));
     const failure = batch.find(({status}) => status === 'rejected');
     if (failure) throw failure.reason;
   }
@@ -235,13 +240,13 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   const prior = `${output}.prior`;
   if (await statIfPresent(prior)) throw new Error(`存在待恢复的上次导出 ${prior}`);
 
-  const relativeFiles = [
-    'favicon.svg', 'tiles/meta.json', 'data/map-data.json', 'layers/manifest.json', 'layers/basemaps.json',
-  ];
-  const [index, tiles, layers, bgm, build, relief] = await Promise.all([
+  const relativeFiles = ['favicon.svg'];
+  const [index, map, tiles, layers, basemaps, bgm, build, relief] = await Promise.all([
     readFile(path.join(source, 'index.html'), 'utf8'),
+    readFile(path.join(source, 'data/map-data.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'tiles/meta.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'layers/manifest.json'), 'utf8').then(JSON.parse),
+    readFile(path.join(source, 'layers/basemaps.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'data/genshin-region-bgm.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'data/build-assets.json'), 'utf8').then(JSON.parse),
     readFile(path.join(source, 'relief/index.json'), 'utf8').then(JSON.parse),
@@ -261,7 +266,6 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
     throw new Error('网页、地图与音乐文件版本不一致');
   }
   bgm.musicGraph.audioBaseUrl = audioBaseUrl;
-  const manifest = JSON.stringify(bgm);
   // 已核实兜底曲与初始试听补曲整组随站点导出（同站绝对路径试听）：先核对
   // 现有音频指纹，与 dist/region-bgm-audio 下的完整音频大库相互独立，仅按
   // 清单精确取文件。初始试听版本须与站点清单客户端版本一致，segment id
@@ -284,16 +288,30 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
       throw new Error(`已核实兜底音轨 ${track.id} 指纹不符`);
     }
   }));
-  const reliefFiles = reliefFileNames(relief, bgm);
-  const reliefSizes = await Promise.all(reliefFiles.map((relative) => assetSize(source, relative)));
-  if (reliefSizes[1] !== relief.bytes) throw new Error('分区点阵发布字节数不符');
-  const reliefBytes = reliefSizes[0] + reliefSizes[1];
-  relativeFiles.push(...assets, ...verifiedFiles, ...tileFileNames(tiles), ...layerFileNames(layers), ...reliefFiles);
-  const stamp = JSON.stringify({format: markerFormat,
-    files: [...relativeFiles, 'index.html', 'data/genshin-region-bgm.json']});
-  let bytes = Buffer.byteLength(index) + Buffer.byteLength(manifest) + Buffer.byteLength(stamp);
-  for (let index = 0; index < relativeFiles.length; index += 32) {
-    const batch = relativeFiles.slice(index, index + 32);
+  const [, reliefSource] = reliefFileNames(relief, bgm);
+  if (await assetSize(source, reliefSource) !== relief.bytes) throw new Error('分区点阵发布字节数不符');
+  const modelPacket = dataPacketName('raw-relief:' + relief.sha256);
+  const packets = prepareReleaseData({
+    'data/map-data.json': map,
+    'tiles/meta.json': tiles,
+    'layers/manifest.json': layers,
+    'layers/basemaps.json': basemaps,
+    'data/genshin-region-bgm.json': bgm,
+    'relief/index.json': relief,
+  }, modelPacket);
+  const html = withReleaseData(index, packets.encoded);
+  const rasterPaths = prepareRasterPaths([...tileFileNames(tiles), ...layerFileNames(layers)]);
+  relativeFiles.push(...assets, ...verifiedFiles);
+  const emitted = [
+    ...relativeFiles, ...rasterPaths.values(), ...packets.files.keys(), modelPacket, dataNoticeFile, 'index.html',
+  ];
+  const stamp = encodeSiteStamp({format: markerFormat, files: emitted});
+  const reliefBytes = relief.bytes;
+  let bytes = Buffer.byteLength(html) + Buffer.byteLength(stamp) + Buffer.byteLength(dataNoticeText) + reliefBytes;
+  for (const packet of packets.files.values()) bytes += packet.byteLength;
+  const inputFiles = [...relativeFiles, ...rasterPaths.keys()];
+  for (let index = 0; index < inputFiles.length; index += 32) {
+    const batch = inputFiles.slice(index, index + 32);
     const sizes = await Promise.all(batch.map((relative) => assetSize(source, relative)));
     bytes += sizes.reduce((sum, current) => sum + current, 0);
   }
@@ -303,9 +321,13 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
     const replace = await validateDestination(output);
     await mkdir(path.join(stage, 'data'));
     await copyFiles(source, stage, relativeFiles);
-    await writeFile(path.join(stage, 'data/genshin-region-bgm.json'), manifest, {flag: 'wx'});
+    await copyFiles(source, stage, [...rasterPaths.keys()], (file, _target, relative) =>
+      copyAsset(file, path.join(stage, rasterPaths.get(relative))));
+    await writeReleaseData(stage, packets.files);
+    await pipeline(createReadStream(path.join(source, reliefSource)), maskPacketStream(modelPacket),
+      createWriteStream(path.join(stage, modelPacket), {flags: 'wx'}));
     await writeFile(path.join(stage, marker), stamp, {flag: 'wx'});
-    await writeFile(path.join(stage, 'index.html'), index, {flag: 'wx'});
+    await writeFile(path.join(stage, 'index.html'), html, {flag: 'wx'});
     const snapshot = await validateDestination(stage);
     if (replace) await preserveDestination(output, prior, replace);
     try {
@@ -331,7 +353,7 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   } finally {
     await discardGenerated(stage);
   }
-  return {output, bytes, reliefBytes, files: relativeFiles.length + 3, audioBaseUrl};
+  return {output, bytes, reliefBytes, files: emitted.length + 1, audioBaseUrl};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

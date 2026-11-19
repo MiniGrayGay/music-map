@@ -7,6 +7,7 @@ import puppeteer from 'puppeteer-core';
 import {resolveMusic} from '../src/features/bgm/musicGraph.js';
 import {parseByteRange} from './byte-range.mjs';
 import {exportStaticSite} from './export-static-site.mjs';
+import {readReleaseDocument} from './release-data.mjs';
 
 const project = path.resolve(import.meta.dirname, '..');
 const release = path.join(project, 'dist');
@@ -134,7 +135,8 @@ try {
   console.log(`临时站点 ${site.origin}，临时音频源 ${media.origin}`);
   assert.equal((await fetch(`${site.origin}/region-bgm-audio/128266555.opus`)).status, 404);
 
-  const manifest = JSON.parse(await readFile(path.join(output, 'data/genshin-region-bgm.json'), 'utf8'));
+  assert.equal((await fetch(`${site.origin}/data/genshin-region-bgm.json`)).status, 404);
+  const manifest = await readReleaseDocument(output, 'data/genshin-region-bgm.json');
   assert.equal(manifest.musicGraph.audioBaseUrl, `${media.origin}/music/`);
   const zone = manifest.zones.find((item) => item.state === 'State_MengDe');
   const graph = manifest.musicGraph;

@@ -73,6 +73,10 @@ GitHub 仓库包含地图瓦片、分层贴片和精简音乐清单。播放器�
 Vercel 导入仓库后使用 `vercel.json`，以 Node.js 22 和项目锁定的 pnpm 构建
 `dist/site`。
 
+Vercel 和 Toy 发布包直接使用应用入口。地图清单、音乐分区规则和点云数据使用不带业务名称的发布文件，
+地图瓦片与分层贴片用重命名后的路径加载。前端按需还原数据，点云仍可分段读取。开发和构建输入保持原格式。
+停止逆向的提示分别保留在发布入口、数据加载模块及包内的 `DATA-NOTICE.txt`。
+
 更新网易云曲库时运行 `pnpm exec node scripts/build-netease-catalog.mjs --details`。
 脚本以已核验的分区曲目和正式发行的专辑为输入，核对曲名与专辑，再检查匿名播放状态和直链的 HTTP Range 响应。
 

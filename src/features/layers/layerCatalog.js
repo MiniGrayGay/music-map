@@ -1,3 +1,5 @@
+import {fetchMapDocument, rasterAssetUrl} from '../map/releaseData.js';
+
 // 7.2 分层地图清单（/layers/manifest.json，scripts/build-layer-data.py 产出）
 // 的接入层：拉取、严格校验、按地图投影并聚合成 Group→Floor→Layer 结构。
 // 清单缺失或契约不符时整体 ABSENT，选择器与叠绘不出现，保持纯地图语义。
@@ -43,7 +45,7 @@ export async function loadLayerCatalog(options = {}) {
   } = options;
   let response;
   try {
-    response = await fetcher(LAYER_MANIFEST_URL);
+    response = await fetchMapDocument(LAYER_MANIFEST_URL, fetcher);
   } catch {
     return absent('清单请求失败');
   }
@@ -204,7 +206,7 @@ function normalizeLayer(raw, index, scales, seenLayerIds, skipped) {
     name,
     mapName: raw.mapName,
     sceneId: isInt(raw.sceneId) ? raw.sceneId : null,
-    url: new URL(`layers/${raw.image}`, document.baseURI).href,
+    url: new URL(rasterAssetUrl(`layers/${raw.image}`), document.baseURI).href,
     drawOrder,
     yRange,
     scale, // null = 该地图暂无底图投影（保留在目录中，不参与渲染）
