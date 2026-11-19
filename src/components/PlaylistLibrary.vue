@@ -42,7 +42,7 @@ const message = ref('');
 const pageBackground = ref({});
 const resultStep = 60;
 const visibleLimit = ref(resultStep);
-const {playlists, favorites, storageFailed, savePlaylist, removePlaylist, toggleFavorite} =
+const {playlists, favorites, storageFailed, syncStatus, retrySync, savePlaylist, removePlaylist, toggleFavorite} =
   props.library;
 const paneMotion = useAnchoredPanel(() => opener.value);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -686,6 +686,13 @@ function importList() {
 
             <p v-if="message || storageFailed" role="status" class="playlist-message">
               {{ message || '暂时无法保存到此浏览器' }}
+            </p>
+            <p v-else-if="syncStatus === 'loading' || syncStatus === 'failed' || syncStatus === 'local'"
+               role="status" class="playlist-message">
+              {{ syncStatus === 'loading' ? '正在同步云歌单' : syncStatus === 'failed'
+                ? '云歌单暂未保存' : '云歌单暂不可用，已保留当前歌单' }}
+              <button v-if="syncStatus !== 'loading'" class="playlist-text-action" type="button"
+                      @click="retrySync">重试</button>
             </p>
 
             <footer

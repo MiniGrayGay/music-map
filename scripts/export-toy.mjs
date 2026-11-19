@@ -9,6 +9,7 @@ import {createGzip} from 'node:zlib';
 import sharp from 'sharp';
 import {build, normalizePath, transformWithEsbuild} from 'vite';
 import {PACKED_RELIEF, encodeCompactRelief} from '../src/features/map/reliefCompact.js';
+import {isToySharedStorageId} from '../src/features/bgm/toySdk.js';
 import {reliefBlockBytes} from '../src/features/map/reliefFormat.js';
 import {mapLabels} from '../src/features/layers/mapBases.js';
 import {layerFileNames, reliefFileNames, tileFileNames} from './asset-layout.mjs';
@@ -175,6 +176,9 @@ const zip = [
   '        if source.is_file(): archive.write(source, source.relative_to(root).as_posix())',
 ].join('\n');
 
+if (!isToySharedStorageId(process.env.VITE_TOY_SHARED_STORAGE_ID)) {
+  throw new Error('请用 VITE_TOY_SHARED_STORAGE_ID 指定 B 站创作中心的共享存档标识（st_ 开头）');
+}
 await mkdir(work);
 process.env.TEMP = work;
 process.env.TMP = work;

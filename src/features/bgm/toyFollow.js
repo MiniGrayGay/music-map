@@ -1,6 +1,6 @@
 import {onBeforeUnmount, shallowRef} from 'vue';
+import {isToyHost, loadToySdk} from './toySdk.js';
 
-const sdkUrl = 'https://s1.hdslb.com/bfs/seed/toy/app/sdk/toy-sdk.js';
 const sessionKey = 'teyvat-music-toy-follow';
 const qualifyingSeconds = 5;
 const listensBeforePrompt = 3;
@@ -8,16 +8,8 @@ const listensBeforePrompt = 3;
 const betterGiMid = '3546777483479879';
 const betterGiName = 'BetterGI';
 const betterGiSpace = `https://space.bilibili.com/${betterGiMid}`;
-let sdkRequest;
 let authorRequest;
 let listeningSession;
-
-function isToyHost() {
-  const {hostname, pathname} = location;
-  if (/(^|\.)bilibilitoy\.com$/i.test(hostname)) return true;
-  return /(^|\.)bilibili\.com$/i.test(hostname)
-    && (pathname.startsWith('/toy/') || Boolean(window.__TOY_META__?.toy_id));
-}
 
 function supportsDialog() {
   return typeof HTMLDialogElement !== 'undefined' && Boolean(HTMLDialogElement.prototype.showModal);
@@ -42,31 +34,8 @@ export function toyFollowCardPreview() {
   return supportsDialog() && localPreviewMode() === 'preview' ? webAuthor() : null;
 }
 
-function loadSdk() {
-  if (window.toy) return Promise.resolve(window.toy);
-  sdkRequest ??= new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = sdkUrl;
-    function finish(sdk) {
-      window.clearTimeout(timeout);
-      script.onload = script.onerror = null;
-      if (!sdk) script.remove();
-      resolve(sdk);
-    }
-    const timeout = window.setTimeout(() => finish(null), 4000);
-    script.onload = () => finish(window.toy ?? null);
-    script.onerror = () => finish(null);
-    document.head.append(script);
-  }).then((sdk) => {
-    if (!sdk) sdkRequest = undefined;
-    return sdk;
-  });
-  return sdkRequest;
-}
-
 async function loadFollowTarget() {
-  const sdk = await loadSdk();
+  const sdk = await loadToySdk();
   if (!sdk) return null;
   const supported = await Promise.all(
     ['navigate', 'getAuthorProfile', 'getAuthorRelation'].map((method) => sdk.isSupport?.(method)),
