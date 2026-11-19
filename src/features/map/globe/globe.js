@@ -3,6 +3,7 @@ import {drawGlobeBoundaries} from './boundaries.js';
 import {frameZone, placeReliefCard, reliefCardSize} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
+import {mapRasterScale} from '../mapRasterScale.js';
 import {retireReliefDock} from '../reliefDockMotion.js';
 import {
   atlasAngles, cameraAtAnchor, cameraBasis, cameraRoute, chartFlattening, chartScale, clamp, direction, dot, fullSpan,
@@ -16,6 +17,7 @@ const MAX_ZOOM = 18;
 const ORBIT_MAX_ZOOM = 1.5;
 const ATMOSPHERE_EXTENT = 1.092;
 const MOON_PAINT_INTERVAL = 32;
+const BASE_RASTER_SCALE = 1.45;
 const LUNAR_TRANSITION_DURATION = 820;
 const SPIN_RATE = TAU / 165000;
 const COMPACT_SPIN_INTERVAL = 50;
@@ -137,7 +139,7 @@ function initialize(canvas, fragment) {
   const uniforms = Object.fromEntries(
     ['center', 'radius', 'right', 'up', 'front', 'sea', 'span', 'zoom', 'flatten', 'chartScale',
       'projection', 'oceanRelief', 'naturalMoon', 'cleanFontaine', 'detailSize', 'nativeSize',
-      'patchRect', 'fontaineSeaRect', 'occluder', 'orbitLook', 'cloudRotation',
+      'patchRect', 'fontaineSeaRect', 'occluder', 'orbitLook', 'orbitalMipSpread', 'cloudRotation',
       'lunarPreviewBasis', 'hasLunarPreview', 'lunarMapBlend'].map(
       (name) => [name, gl.getUniformLocation(program, 'u_' + name)],
     ),
@@ -235,6 +237,7 @@ function renderSphere(renderer, canvas, view) {
   gl.uniform4fv(uniforms.fontaineSeaRect, fontaineSeaRect);
   gl.uniform3fv(uniforms.occluder, occluder);
   gl.uniform1f(uniforms.orbitLook, orbitLook);
+  gl.uniform1f(uniforms.orbitalMipSpread, renderer.mobileDevice ? .25 : .65);
   gl.uniform2f(uniforms.cloudRotation, Math.cos(cloudAngle), Math.sin(cloudAngle));
   gl.uniform1f(uniforms.lunarMapBlend, lunarMapBlend);
   gl.uniform1i(uniforms.hasLunarPreview, Number(Boolean(lunarPreviewBasis)));
@@ -531,7 +534,7 @@ export class Globe {
 
   resize() {
     const {width, height} = this.canvas.getBoundingClientRect();
-    const ratio = Math.min(devicePixelRatio, 1.45);
+    const ratio = mapRasterScale(width, height, BASE_RASTER_SCALE, this.mobileDevice);
     if (!width || !height || (width === this.width && height === this.height && ratio === this.ratio)) return;
     this.width = width;
     this.height = height;
@@ -542,10 +545,13 @@ export class Globe {
     this.chartRadius = Math.min(width * (phone ? .475 : .36), height * (phone ? .286 : .43));
     this.teyvatRadius = Math.min(width, height) / 2;
     this.canvas.parentElement.style.setProperty('--overview-diameter', `${this.teyvatRadius * 2}px`);
-    for (const canvas of [this.canvas, this.signals, this.stars]) {
+    for (const canvas of [this.canvas, this.signals]) {
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
     }
+    const starRatio = Math.min(ratio, BASE_RASTER_SCALE);
+    this.stars.width = Math.max(1, Math.round(width * starRatio));
+    this.stars.height = Math.max(1, Math.round(height * starRatio));
     // Allocate once per viewport, with room for the largest satellite in overview.
     if (this.moonRenderer) {
       const moonSide = 4 + 2 * this.moonRadius(this.teyvatRadius * ORBIT_MAX_ZOOM, -1) * ATMOSPHERE_EXTENT;
@@ -553,7 +559,7 @@ export class Globe {
       this.satellite.width = this.satellite.height = pixels;
       this.satellite.style.width = this.satellite.style.height = `${pixels / ratio}px`;
     }
-    sky(this.stars, width, height, ratio);
+    sky(this.stars, width, height, starRatio);
     this.sphereState = null;
     this.moonPaintAt = null;
     this.moonPose = null;

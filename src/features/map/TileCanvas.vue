@@ -1,6 +1,8 @@
 <script setup>
 import {onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {fontaineSeaRect, groundPatch, loadFontaineSeaPatch, loadGroundPatch} from './ground-patch.js';
+import {isMobileDevice} from './isMobileDevice.js';
+import {mapRasterScale} from './mapRasterScale.js';
 import {decodeTileImage} from './tileImage.js';
 
 const props = defineProps({
@@ -18,6 +20,7 @@ const bitmaps = new Map();
 const requested = new Map();
 const failures = new Set();
 const compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
+const mobile = isMobileDevice();
 const cacheLimit = compact ? 48 : 128;
 const concurrency = compact ? 4 : 8;
 let frameId = 0;
@@ -167,7 +170,7 @@ function draw() {
   const level = props.pyramid;
   const {width, height} = props.viewport;
   const {tx, ty, scale} = props.transform;
-  const dpr = Math.min(window.devicePixelRatio || 1, compact ? 1.35 : 2);
+  const dpr = mapRasterScale(width, height, compact ? 1.35 : 2, mobile);
   const rasterWidth = Math.round(width * dpr);
   const rasterHeight = Math.round(height * dpr);
   if (element.width !== rasterWidth) element.width = rasterWidth;

@@ -30,6 +30,7 @@ uniform vec2 u_nativeSize;
 uniform vec4 u_patchRect;
 uniform vec3 u_occluder;
 uniform float u_orbitLook;
+uniform float u_orbitalMipSpread;
 uniform vec2 u_cloudRotation;
 uniform mat3 u_lunarPreviewBasis;
 uniform bool u_hasLunarPreview;
@@ -357,7 +358,7 @@ void main() {
   float coverage = smoothstep(0., .022, margin);
   // coverage==0 时 mix 恒等于 u_sea，可跳过纹理 fetch；羽化区间照常。
   vec3 terrain = u_sea;
-  float footprint = 1. + .65 * u_orbitLook;
+  float footprint = 1. + u_orbitalMipSpread * u_orbitLook;
   if (coverage > 0.) terrain = mix(u_sea, readAtlas(uv, uvDx * footprint, uvDy * footprint), coverage);
   terrain = applyGroundPatch(terrain, uv, uvDx, uvDy);
   if (u_cleanFontaine) terrain = applyFontaineSea(terrain, uv, uvDx, uvDy);
