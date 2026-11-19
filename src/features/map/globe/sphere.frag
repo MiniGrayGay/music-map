@@ -189,14 +189,15 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   float illumination = smoothstep(-.23, .66, incidence);
   float luma = dot(terrain, vec3(.2126, .7152, .0722));
   vec3 muted = mix(terrain, vec3(luma), .42);
-  vec3 night = muted * vec3(.16, .23, .33) + vec3(.012, .019, .033);
+  // Neutral fill attenuates the map colors evenly as terrain rotates into shadow.
+  vec3 night = teyvat ? terrain * .49 + .006 : muted * vec3(.16, .23, .33) + vec3(.012, .019, .033);
   vec3 day = muted * vec3(.73, 1.04, 1.34) + vec3(.021, .071, .133);
   float sunward = smoothstep(.42, .97, incidence);
   day += max(vec3(0.), 1. - day) * vec3(.13, .19, .24) * sunward;
   vec3 surface = mix(night, day, illumination);
   if (teyvat) {
-    vec3 clouds = mix(vec3(.11, .22, .37), vec3(.77, .91, 1.), illumination);
-    surface = mix(surface, clouds, cloudDensity(p) * mix(.14, .72, illumination));
+    vec3 clouds = mix(vec3(.22), vec3(.77, .91, 1.), illumination);
+    surface = mix(surface, clouds, cloudDensity(p) * mix(.10, .72, illumination));
   }
 
   // Grazing rays traverse more air. The broad haze transitions into a
@@ -204,9 +205,11 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   float grazing = 1. - z;
   float haze = pow(grazing, 2.15) * mix(.10, .78, illumination);
   if (teyvat) haze *= .82;
-  surface = mix(surface, mix(vec3(.034, .077, .174), vec3(.26, .72, .97), illumination), haze);
+  vec3 shadowHaze = teyvat ? vec3(.08) : vec3(.034, .077, .174);
+  surface = mix(surface, mix(shadowHaze, vec3(.26, .72, .97), illumination), haze);
   float limb = exp(-z * 7.5) * mix(.10, .91, limbLight);
-  surface = mix(surface, mix(vec3(.064, .14, .30), vec3(.73, .95, 1.), limbLight), limb);
+  vec3 shadowLimb = teyvat ? vec3(.14) : vec3(.064, .14, .30);
+  surface = mix(surface, mix(shadowLimb, vec3(.73, .95, 1.), limbLight), limb);
   // The narrow highlight sits on the grazing rim, with softer light reaching
   // into the clouds and terrain beneath it.
   float rim = .49 * exp(-z * 13.);
@@ -219,7 +222,7 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
     float keyDepth = .64 * exp(-z * 6.5) + .22 * (1. - smoothstep(.05, .39, z));
     surface = mix(surface, vec3(.97, .99, 1.), keyArc * keyArc * keyDepth);
   }
-  return mix(neutralColor(surface), surface, smoothstep(.02, .50, incidence));
+  return surface;
 }
 
 vec3 lunarSideLight(vec3 terrain, vec2 p, float z) {
