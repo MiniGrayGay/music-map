@@ -1,5 +1,5 @@
 import {markRaw} from 'vue';
-import {fetchMapDocument} from '../map/releaseData.js';
+import {fetchMapDocument, mapDocument} from '../map/releaseData.js';
 import {audioUrl, normalizeAudioBase} from './audioUrl.js';
 import {projectRings, ringsBBox, ringsPathData} from './zoneGeometry.js';
 import {normalizeGameStates, withVerifiedTrack} from './musicGraph.js';
@@ -15,7 +15,7 @@ export const BGM_STATUS = {
 export async function loadRegionBgm(expectedClientVersion) {
   let response;
   try {
-    response = await fetchMapDocument('./data/genshin-region-bgm.json');
+    response = await fetchMapDocument(mapDocument.music);
   } catch {
     return verifying('清单请求失败');
   }

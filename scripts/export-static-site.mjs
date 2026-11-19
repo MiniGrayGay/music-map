@@ -8,6 +8,7 @@ import {parseArgs, promisify} from 'node:util';
 import {pipeline} from 'node:stream/promises';
 import {setTimeout as wait} from 'node:timers/promises';
 import {normalizeAudioBase} from '../src/features/bgm/audioUrl.js';
+import {reliefBlockBytes, SPLIT_RELIEF} from '../src/features/map/reliefFormat.js';
 import {
   INITIAL_MUSIC_PREVIEW_VERSION, INITIAL_MUSIC_PREVIEWS, mergedVerifiedTracks,
 } from '../src/features/bgm/verifiedTracks.js';
@@ -31,7 +32,7 @@ async function statIfPresent(file) {
   }
 }
 
-async function validateDestination(output) {
+async function validateDestination(output, inventory) {
   const status = await statIfPresent(output);
   if (!status) return null;
   if (!status.isDirectory() || status.isSymbolicLink()) {
@@ -42,7 +43,7 @@ async function validateDestination(output) {
   if (entries.some((entry) => !entry.isFile() && !entry.isDirectory())) {
     throw new Error(`导出目录包含链接或其他非普通内容 ${output}`);
   }
-  const stamp = await readFile(path.join(output, marker), 'utf8').then(decodeSiteStamp, (error) => {
+  const stamp = inventory ?? await readFile(path.join(output, marker), 'utf8').then(decodeSiteStamp, (error) => {
     if (error.code !== 'ENOENT') throw error;
     throw new Error(`导出目标包含其他文件 ${output}`);
   });
@@ -51,7 +52,8 @@ async function validateDestination(output) {
       && /^[A-Za-z0-9_./-]+$/.test(file) && !file.split('/').some((segment) => ['.', '..', ''].includes(segment)))) {
     throw new Error(`导出记录无效 ${output}`);
   }
-  const owned = new Set([...stamp.files, marker]);
+  const owned = new Set(stamp.files);
+  if (!inventory) owned.add(marker);
   const directories = new Set();
   for (const file of owned) {
     for (let directory = path.posix.dirname(file); directory !== '.'; directory = path.posix.dirname(directory)) {
@@ -67,6 +69,7 @@ async function validateDestination(output) {
   }
   snapshot.files.sort();
   snapshot.directories.sort();
+  if (inventory && snapshot.files.length !== owned.size) throw new Error(`发布文件不完整 ${output}`);
   return snapshot;
 }
 
@@ -157,7 +160,8 @@ async function copySite(source, target, snapshot, {preserve = false} = {}) {
     for (const relative of ['index.html', marker]) {
       if (snapshot.files.includes(relative)) await transfer(path.join(source, relative), path.join(target, relative));
     }
-    if (JSON.stringify(await validateDestination(target)) !== JSON.stringify(snapshot)) {
+    const inventory = snapshot.files.includes(marker) ? undefined : {format: markerFormat, files: snapshot.files};
+    if (JSON.stringify(await validateDestination(target, inventory)) !== JSON.stringify(snapshot)) {
       throw new Error(`复制后的站点文件不完整 ${target}`);
     }
   } catch (error) {
@@ -225,7 +229,7 @@ async function preserveDestination(output, prior, snapshot) {
   console.log('Windows 目录改名受限，已保留上一版快照并释放导出目录');
 }
 
-export async function exportStaticSite({source = dist, output = path.join(dist, 'site'), audioBase}) {
+export async function exportStaticSite({source = dist, output = path.join(dist, 'site'), audioBase, vercel = false}) {
   const audioBaseUrl = normalizeAudioBase(audioBase);
   if (!audioBaseUrl) throw new Error('请传入存放音频的公开目录 --audio-base');
   source = path.resolve(source);
@@ -290,22 +294,36 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   }));
   const [, reliefSource] = reliefFileNames(relief, bgm);
   if (await assetSize(source, reliefSource) !== relief.bytes) throw new Error('分区点阵发布字节数不符');
-  const modelPacket = dataPacketName('raw-relief:' + relief.sha256);
+  const modelPacket = vercel ? null : dataPacketName('raw-relief:' + relief.sha256);
+  const blocks = [];
+  let reliefIndex = relief;
+  if (vercel) {
+    const zones = {};
+    for (const [key, entry] of Object.entries(relief.zones)) {
+      const {offset, count, grid, sideCount} = entry;
+      const packet = dataPacketName(`relief-block:${relief.sha256}:${offset}`);
+      blocks.push({packet, start: offset, end: offset + reliefBlockBytes(entry) - 1});
+      zones[key] = {packet, count, grid, sideCount};
+    }
+    reliefIndex = {schema: 1, encoding: SPLIT_RELIEF, zones};
+  }
   const packets = prepareReleaseData({
     'data/map-data.json': map,
     'tiles/meta.json': tiles,
     'layers/manifest.json': layers,
     'layers/basemaps.json': basemaps,
     'data/genshin-region-bgm.json': bgm,
-    'relief/index.json': relief,
+    'relief/index.json': reliefIndex,
   }, modelPacket);
   const html = withReleaseData(index, packets.encoded);
   const rasterPaths = prepareRasterPaths([...tileFileNames(tiles), ...layerFileNames(layers)]);
   relativeFiles.push(...assets, ...verifiedFiles);
   const emitted = [
-    ...relativeFiles, ...rasterPaths.values(), ...packets.files.keys(), modelPacket, dataNoticeFile, 'index.html',
+    ...relativeFiles, ...rasterPaths.values(), ...packets.files.keys(),
+    ...(vercel ? blocks.map(({packet}) => packet) : [modelPacket]), dataNoticeFile, 'index.html',
   ];
-  const stamp = encodeSiteStamp({format: markerFormat, files: emitted});
+  const inventory = {format: markerFormat, files: emitted};
+  const stamp = vercel ? '' : encodeSiteStamp(inventory);
   const reliefBytes = relief.bytes;
   let bytes = Buffer.byteLength(html) + Buffer.byteLength(stamp) + Buffer.byteLength(dataNoticeText) + reliefBytes;
   for (const packet of packets.files.values()) bytes += packet.byteLength;
@@ -319,16 +337,27 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   await mkdir(stage);
   try {
     const replace = await validateDestination(output);
-    await mkdir(path.join(stage, 'data'));
+    if (stamp) await mkdir(path.join(stage, 'data'));
     await copyFiles(source, stage, relativeFiles);
     await copyFiles(source, stage, [...rasterPaths.keys()], (file, _target, relative) =>
       copyAsset(file, path.join(stage, rasterPaths.get(relative))));
     await writeReleaseData(stage, packets.files);
-    await pipeline(createReadStream(path.join(source, reliefSource)), maskPacketStream(modelPacket),
-      createWriteStream(path.join(stage, modelPacket), {flags: 'wx'}));
-    await writeFile(path.join(stage, marker), stamp, {flag: 'wx'});
+    const reliefFile = path.join(source, reliefSource);
+    if (vercel) {
+      for (let offset = 0; offset < blocks.length; offset += 16) {
+        const results = await Promise.allSettled(blocks.slice(offset, offset + 16).map(({packet, start, end}) =>
+          pipeline(createReadStream(reliefFile, {start, end}), maskPacketStream(packet),
+            createWriteStream(path.join(stage, packet), {flags: 'wx'}))));
+        const failure = results.find(({status}) => status === 'rejected');
+        if (failure) throw failure.reason;
+      }
+    } else {
+      await pipeline(createReadStream(reliefFile), maskPacketStream(modelPacket),
+        createWriteStream(path.join(stage, modelPacket), {flags: 'wx'}));
+      await writeFile(path.join(stage, marker), stamp, {flag: 'wx'});
+    }
     await writeFile(path.join(stage, 'index.html'), html, {flag: 'wx'});
-    const snapshot = await validateDestination(stage);
+    const snapshot = await validateDestination(stage, vercel ? inventory : undefined);
     if (replace) await preserveDestination(output, prior, replace);
     try {
       await installSite(stage, output, snapshot);
@@ -353,7 +382,7 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
   } finally {
     await discardGenerated(stage);
   }
-  return {output, bytes, reliefBytes, files: emitted.length + 1, audioBaseUrl};
+  return {output, bytes, reliefBytes, files: emitted.length + Number(Boolean(stamp)), audioBaseUrl};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

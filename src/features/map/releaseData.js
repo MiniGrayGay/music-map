@@ -1,4 +1,7 @@
-export const releaseJsonPaths = [
+export const mapDocument = Object.freeze({map: 0, tiles: 1, layers: 2, bases: 3, music: 4, relief: 5});
+const mapDocumentCount = Object.keys(mapDocument).length;
+
+export const releaseJsonPaths = typeof __VERCEL_RELEASE__ !== 'undefined' && __VERCEL_RELEASE__ ? null : [
   'data/map-data.json',
   'tiles/meta.json',
   'layers/manifest.json',
@@ -56,11 +59,16 @@ function releasePackets() {
 export function decodeReleaseIndex(encoded) {
   const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
   const paths = JSON.parse(new TextDecoder().decode(maskPacket(bytes, releaseIndexSeed)));
-  if (!Array.isArray(paths) || paths.length !== releaseJsonPaths.length + 1
-    || paths.some((path) => typeof path !== 'string' || !packetPathPattern.test(path))) {
+  if (!Array.isArray(paths) || paths.length !== mapDocumentCount + 1
+    || !paths.slice(0, mapDocumentCount).every(isReleasePacketName)
+    || (paths[mapDocumentCount] !== null && !isReleasePacketName(paths[mapDocumentCount]))) {
     throw new Error('发布数据索引无效');
   }
   return paths;
+}
+
+export function isReleasePacketName(name) {
+  return typeof name === 'string' && packetPathPattern.test(name);
 }
 
 export function rasterAssetUrl(relative) {
@@ -70,14 +78,18 @@ export function rasterAssetUrl(relative) {
 }
 
 export function reliefAsset(relative) {
-  const packet = releasePackets()?.[releaseJsonPaths.length];
+  const packet = releasePackets()?.[mapDocumentCount];
   return {url: packet ? './' + packet : relative, seed: packet ? packetSeed(packet) : null};
 }
 
-export async function fetchMapDocument(relative, fetcher = fetch) {
+export async function fetchMapDocument(slot, fetcher = fetch) {
   const paths = releasePackets();
-  if (!paths) return fetcher(relative);
-  const packet = paths[releaseJsonPaths.indexOf(relative.replace(/^\.\//, ''))];
+  if (!paths) {
+    const relative = releaseJsonPaths?.[slot];
+    if (!relative) throw new Error('缺少发布数据索引');
+    return fetcher('./' + relative);
+  }
+  const packet = paths[slot];
   if (!packet) throw new Error('缺少发布数据');
   const response = await fetcher('./' + packet);
   if (!response.ok) return response;

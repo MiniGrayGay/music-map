@@ -2,8 +2,20 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "installCommand": "corepack pnpm install --frozen-lockfile",
-  "buildCommand": "corepack pnpm run build:hosted",
+  "buildCommand": "corepack pnpm run build:hosted --vercel",
   "outputDirectory": "dist/site",
+  "routes": [
+    {
+      "src": "^/r/(?:[a-f0-9]{24}\\.data|[a-f0-9]{16}\\.webp)$",
+      "missing": [{"type": "header", "key": "sec-fetch-site", "value": "^same-origin$"}],
+      "mitigate": {"action": "deny"}
+    },
+    {
+      "src": "^/r/(?:[a-f0-9]{24}\\.data|[a-f0-9]{16}\\.webp)$",
+      "missing": [{"type": "header", "key": "sec-fetch-dest", "value": "^(empty|image)$"}],
+      "mitigate": {"action": "deny"}
+    }
+  ],
   "functions": {
     "api/netease-audio.js": {
       "regions": ["hkg1"]

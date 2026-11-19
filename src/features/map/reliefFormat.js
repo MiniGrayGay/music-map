@@ -1,3 +1,5 @@
+export const SPLIT_RELIEF = 'split-f32-v1';
+
 export function reliefBlockBytes(entry) {
   const grid = entry.grid;
   if (!grid) return entry.count * 12;

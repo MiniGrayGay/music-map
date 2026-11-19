@@ -1,22 +1,22 @@
-import {fetchMapDocument} from './releaseData.js';
+import {fetchMapDocument, mapDocument} from './releaseData.js';
 
 export const SUPPORTED_DATA_VERSION = '7.2.0';
 
 export async function loadMapData() {
   const [dataResponse, indexResponse] = await Promise.all([
-    fetchMapDocument('./data/map-data.json'),
-    fetchMapDocument('./tiles/meta.json'),
+    fetchMapDocument(mapDocument.map),
+    fetchMapDocument(mapDocument.tiles),
   ]);
   if (!dataResponse.ok) {
-    throw new Error(`map-data.json 加载失败（HTTP ${dataResponse.status}）；先运行 pnpm run data`);
+    throw new Error(`地图清单加载失败（HTTP ${dataResponse.status}）`);
   }
   if (!indexResponse.ok) {
-    throw new Error(`tiles/index.json 加载失败（HTTP ${indexResponse.status}）；先运行 pnpm run tiles`);
+    throw new Error(`瓦片清单加载失败（HTTP ${indexResponse.status}）`);
   }
   const raw = await dataResponse.json();
   const tilesIndex = await indexResponse.json();
   if (raw.format !== 'teyvat-region-map-data-v1') {
-    throw new Error(`map-data.json 格式不识别：${raw.format}`);
+    throw new Error(`无法识别地图清单格式 ${raw.format}`);
   }
   if (raw.dataVersion !== SUPPORTED_DATA_VERSION) {
     throw new Error(`地图数据版本 ${raw.dataVersion} 不是当前客户端 ${SUPPORTED_DATA_VERSION}；请重新生成`);

@@ -1,4 +1,4 @@
-import {fetchMapDocument, rasterAssetUrl} from '../map/releaseData.js';
+import {fetchMapDocument, mapDocument, rasterAssetUrl} from '../map/releaseData.js';
 
 // 7.2 分层地图清单（/layers/manifest.json，scripts/build-layer-data.py 产出）
 // 的接入层：拉取、严格校验、按地图投影并聚合成 Group→Floor→Layer 结构。
@@ -27,7 +27,6 @@ import {fetchMapDocument, rasterAssetUrl} from '../map/releaseData.js';
 //   - noImageLayers（当前客户端无贴图的层）保留计数，不进可选楼层；
 //   - 单一地下层的组同样有效（可回地面＝退出分层），不做过滤。
 
-export const LAYER_MANIFEST_URL = './layers/manifest.json';
 export const LAYER_CATALOG_STATUS = {
   ABSENT: 'absent', // 清单未就绪：不渲染选择器与叠绘
   READY: 'ready',
@@ -45,7 +44,7 @@ export async function loadLayerCatalog(options = {}) {
   } = options;
   let response;
   try {
-    response = await fetchMapDocument(LAYER_MANIFEST_URL, fetcher);
+    response = await fetchMapDocument(mapDocument.layers, fetcher);
   } catch {
     return absent('清单请求失败');
   }

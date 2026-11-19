@@ -1,13 +1,13 @@
-import {decodeReliefBlock, reliefBlockBytes} from './reliefFormat.js';
+import {decodeReliefBlock, reliefBlockBytes, SPLIT_RELIEF} from './reliefFormat.js';
 import {COMPACT_RELIEF, PACKED_RELIEF, decodeCompactRelief} from './reliefCompact.js';
-import {fetchMapDocument, maskPacket, reliefAsset} from './releaseData.js';
+import {fetchMapDocument, isReleasePacketName, mapDocument, maskPacket, packetSeed, reliefAsset} from './releaseData.js';
 
 let catalogTask;
 let packedTask;
 let completeBuffer;
 
 function readCatalog() {
-  catalogTask ??= fetchMapDocument('./relief/index.json').then(async (response) => {
+  catalogTask ??= fetchMapDocument(mapDocument.relief).then(async (response) => {
     if (!response.ok) throw new Error(`点阵索引 HTTP ${response.status}`);
     const index = await response.json();
     if (index.schema !== 1 || !index.zones) throw new Error('分区点阵索引无效');
@@ -17,7 +17,8 @@ function readCatalog() {
         || !Number.isSafeInteger(index.unpackedBytes) || index.unpackedBytes < 12) {
         throw new Error('点阵包索引无效');
       }
-    } else if (index.encoding !== COMPACT_RELIEF && (!/^points-[a-f0-9]{16}\.f32$/.test(index.file)
+    } else if (index.encoding !== COMPACT_RELIEF && index.encoding !== SPLIT_RELIEF
+      && (!/^points-[a-f0-9]{16}\.f32$/.test(index.file)
         || !Number.isSafeInteger(index.bytes) || index.bytes < 12 || !index.modelSources)) {
       throw new Error('分区点阵索引无效');
     }
@@ -80,6 +81,18 @@ export async function loadReliefPoints(key, signal) {
   const index = await readCatalog();
   if (signal.aborted || !Object.hasOwn(index.zones, key)) return null;
   const entry = index.zones[key];
+  if (index.encoding === SPLIT_RELIEF) {
+    if (!isReleasePacketName(entry.packet) || !Number.isSafeInteger(entry.count) || entry.count < 1) {
+      throw new Error('分区点阵索引无效');
+    }
+    const size = reliefBlockBytes(entry);
+    const response = await fetch('./' + entry.packet, {signal});
+    if (!response.ok) throw new Error(`分区点阵 HTTP ${response.status}`);
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength !== size) throw new Error('分区点阵响应不完整');
+    maskPacket(new Uint8Array(buffer), packetSeed(entry.packet));
+    return decodeReliefBlock(buffer, entry);
+  }
   if (index.encoding === PACKED_RELIEF) {
     const {offset, bytes, count} = entry;
     if (![offset, bytes, count].every(Number.isSafeInteger) || offset < 0 || bytes < 12 || count < 1

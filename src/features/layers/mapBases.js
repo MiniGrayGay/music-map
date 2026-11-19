@@ -1,4 +1,4 @@
-import {fetchMapDocument} from '../map/releaseData.js';
+import {fetchMapDocument, mapDocument} from '../map/releaseData.js';
 
 export const mapLabels = {
   Teyvat: '提瓦特',
@@ -18,7 +18,7 @@ const planeViewBounds = {
 export async function loadLayerBases(mainMap) {
   let response;
   try {
-    response = await fetchMapDocument('./layers/basemaps.json');
+    response = await fetchMapDocument(mapDocument.bases);
     if (!response.ok) return {};
     const {format, version, maps} = await response.json();
     if (format !== 'teyvat-layer-bases-v2' || version !== mainMap.dataVersion) return {};
