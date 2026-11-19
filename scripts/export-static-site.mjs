@@ -315,6 +315,9 @@ export async function exportStaticSite({source = dist, output = path.join(dist, 
     'data/genshin-region-bgm.json': bgm,
     'relief/index.json': reliefIndex,
   }, modelPacket);
+  if (vercel) {
+    packets.files.set('robots.txt', Buffer.from(`# Data use terms: /${dataNoticeFile}\nUser-agent: *\nDisallow: /r/\n`));
+  }
   const html = withReleaseData(index, packets.encoded);
   const rasterPaths = prepareRasterPaths([...tileFileNames(tiles), ...layerFileNames(layers)]);
   relativeFiles.push(...assets, ...verifiedFiles);
