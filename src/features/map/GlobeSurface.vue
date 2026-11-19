@@ -14,6 +14,7 @@ import fragment from './globe/sphere.frag?raw';
 const props = defineProps({
   mapData: {type: Object, required: true},
   mapName: {type: String, required: true},
+  showOverviewGuide: {type: Boolean, default: false},
   bgm: {type: Object, required: true},
   activeZone: {type: Object, default: null},
   availableMaps: {type: Array, required: true},
@@ -22,14 +23,15 @@ const props = defineProps({
   reliefTarget: {type: HTMLElement, default: null},
   reliefAspect: {type: Number, default: null},
   initialViewport: {type: Object, default: null},
+  reliefEnabled: {type: Boolean, default: false},
   mobileDevice: {type: Boolean, default: false},
   smoothBoundaries: {type: Boolean, default: true},
 });
 const emit = defineEmits([
   'handoff-ready', 'view', 'zone-activate', 'zone-focus', 'select-map', 'unavailable',
-  'canvas-frame', 'relief-reveal', 'world-error',
+  'canvas-frame', 'relief-reveal', 'world-error', 'overview-dismiss',
 ]);
-const atlas = import.meta.glob(['./globe/atlas/Teyvat.webp', './globe/atlas/MoonCanon.webp', './globe/atlas/lroc-color-2k.jpg'], {eager: true, query: '?url', import: 'default'});
+const atlas = import.meta.glob(['./globe/atlas/Teyvat.webp', './globe/atlas/MoonCanon.webp'], {eager: true, query: '?url', import: 'default'});
 // 球面只承载提瓦特与霜月；层岩巨渊、旧日之海、远古圣山等独立场景走平面 MapSurface。
 const chart = {
   Teyvat: {home: [.43, -.16], span: [4.03, 2.43], sea: [21, 60, 76], oceanRelief: true},
@@ -49,8 +51,16 @@ const searchResults = ref(null);
 const searchOpen = ref(false);
 const searchIndex = ref(0);
 const resultListId = useId();
+const overviewGuideId = useId();
+const overviewGuide = ref(null);
 const status = ref('正在加载地图');
 const renderedMap = ref(props.mapName);
+const overviewGuideVisible = computed(() => props.showOverviewGuide && renderedMap.value === 'Teyvat' && !status.value);
+watch(overviewGuide, (dialog) => {
+  if (!dialog) return;
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+  else dialog.setAttribute('open', '');
+}, {flush: 'post'});
 const images = new Map();
 const zones = computed(() => musicView(props.bgm, props.mapName, [], false));
 const moonSafety = shallowRef(null);
@@ -333,10 +343,11 @@ onMounted(() => {
         emit('canvas-frame', element, installedMap);
       },
       onReliefReveal: key => emit('relief-reveal', key),
+      reliefEnabled: () => props.reliefEnabled,
       reliefTarget(key) {
         const target = props.reliefTarget;
         const aspect = props.reliefAspect;
-        return aspect != null && target?.dataset.reliefZone === String(key) ? {target, aspect} : null;
+        return aspect != null && target?.dataset.reliefZone === String(key) ? target : null;
       },
       labelObstacles(includeRelief = false) {
         const overlays = document.querySelectorAll(
@@ -368,8 +379,8 @@ onMounted(() => {
   loadGroundPatch().then((image) => globe?.setGroundPatch(image, groundPatch)).catch(console.warn);
   // 默认世界即提瓦特；rect 只在提瓦特渲染中生效，其余世界传零矩形。
   loadFontaineSeaPatch().then((image) => globe?.setFontaineSeaPatch(image, fontaineSeaRect)).catch(console.warn);
-  // 装饰月球的 0.44MB 纹理只在不建第二 WebGL 上下文的桌面端预载。
-  if (!globe.compact) texture('lroc-color-2k.jpg').then((image) => globe?.setMoon(image)).catch(() => {});
+  // 桌面轨道月球和进入后的地图共用同一份霜月图集。
+  if (!globe.compact) texture('MoonCanon.webp').then((image) => globe?.setMoon(image)).catch(() => {});
 });
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', dismissOutsideSearch, true);
@@ -393,10 +404,24 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
     <canvas ref="stars" aria-hidden="true" />
     <canvas ref="canvas" class="globe-canvas" tabindex="0"
             aria-label="球面地图，可拖动或用方向键旋转，滚轮缩放，回车选择地点" />
+    <canvas ref="signals" aria-hidden="true" />
     <canvas ref="moon" class="globe-satellite" aria-hidden="true" hidden />
     <canvas ref="lunarLayer" class="lunar-transition" aria-hidden="true" hidden />
-    <canvas ref="signals" aria-hidden="true" />
     <div ref="labels" class="globe-labels" role="group" aria-label="提瓦特地区" />
+    <Transition name="overview-guide">
+      <dialog v-if="overviewGuideVisible" ref="overviewGuide" class="overview-guide"
+              :aria-labelledby="overviewGuideId" @cancel.stop.prevent="emit('overview-dismiss')"
+              @keydown.enter.prevent="emit('overview-dismiss')"
+              @pointerdown.stop @pointerup.stop @keydown.stop @wheel.stop.prevent>
+        <button class="overview-guide-trigger" type="button" :aria-labelledby="overviewGuideId"
+                @click.stop.prevent="emit('overview-dismiss')" />
+        <svg class="overview-guide-ring" viewBox="0 0 1000 1000" fill="none" aria-hidden="true">
+          <circle cx="500" cy="500" r="498" stroke="currentColor" stroke-width="1.6"
+                  stroke-dasharray="10 8" vector-effect="non-scaling-stroke" />
+        </svg>
+        <p :id="overviewGuideId" class="overview-guide-copy" tabindex="-1" autofocus>点击地图区域开始体验</p>
+      </dialog>
+    </Transition>
     <button v-if="!mobileDevice" ref="moonLink" type="button" class="moon-link"
             aria-label="进入霜月" title="进入霜月" hidden @click="emit('select-map', 'MoonCanon')" />
     <p v-if="status" class="globe-status" role="status">{{ status }}</p>
@@ -446,7 +471,7 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   width: 100%;
   height: 100%;
   overflow: hidden;
-  --teyvat-sky: radial-gradient(ellipse at 33% 50%, #172541, #0d162c 54%, #080c1a);
+  --teyvat-sky: radial-gradient(ellipse at 33% 50%, #17191f, #101216 54%, #08090b);
   --lunar-sky:
     radial-gradient(ellipse at 35% 43%, #28494c 0%, #172e3b 36%, transparent 72%),
     radial-gradient(ellipse at 82% 10%, #25334e 0%, transparent 62%),
@@ -468,11 +493,64 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
 }
 .teyvat-sky::before { opacity: 1; }
 .globe-surface > canvas, .globe-labels { position: absolute; inset: 0; width: 100%; height: 100%; }
-.globe-surface > .globe-satellite { right: auto; bottom: auto; }
+.globe-surface > .globe-satellite { right: auto; bottom: auto; will-change: translate; }
 .globe-surface > canvas:not(.globe-canvas), .globe-labels { pointer-events: none; }
 .globe-canvas { cursor: grab; touch-action: none; }
 .globe-canvas:active { cursor: grabbing; }
 .globe-canvas.target { cursor: pointer; }
+.overview-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  inline-size: 100%;
+  block-size: 100%;
+  max-inline-size: none;
+  max-block-size: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: rgb(0 0 0 / .44);
+  color: #fff;
+}
+.overview-guide[open] { display: grid; place-items: center; }
+.overview-guide::backdrop { background: transparent; }
+.overview-guide-trigger {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.overview-guide-ring,
+.overview-guide-copy { grid-area: 1 / 1; pointer-events: none; }
+.overview-guide-ring {
+  display: block;
+  width: calc(var(--overview-diameter, 4px) - 4px);
+  opacity: .9;
+}
+.overview-guide-copy {
+  margin: 0;
+  font-size: clamp(16px, 1.65vw, 24px);
+  font-weight: 400;
+  text-align: center;
+  text-shadow: 0 1px 8px #000;
+}
+.overview-guide:focus,
+.overview-guide-copy:focus,
+.overview-guide-trigger:focus { outline: none; }
+.overview-guide-trigger:focus-visible ~ .overview-guide-ring { opacity: 1; }
+.overview-guide-enter-active,
+.overview-guide-leave-active { transition: opacity 220ms ease; }
+.overview-guide-enter-from,
+.overview-guide-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .overview-guide-enter-active,
+  .overview-guide-leave-active { transition: none; }
+}
 .globe-labels :deep(.active-zone-label) {
   position: absolute; left: 0; top: 0; background: transparent;
   color: #ffbd98; font-weight: 700; font-size: 14px; line-height: 1.2;
@@ -493,7 +571,9 @@ defineExpose({zoomIn: () => globe?.zoomBy(1.22), zoomOut: () => globe?.zoomBy(1 
   .globe-labels :deep(.active-zone-label) { font-size: 12px; }
 }
 .moon-link {
-  position: absolute; z-index: 1; translate: -50% -50%; width: var(--moon-size, 32px);
+  position: absolute; z-index: 1; left: 0; top: 0; transform: translate(-50%, -50%);
+  will-change: translate;
+  width: var(--moon-size, 32px);
   height: var(--moon-size, 32px); border-radius: 50%; border: 0;
   padding: 0; background: transparent; color: #dbe6f5; cursor: pointer;
 }

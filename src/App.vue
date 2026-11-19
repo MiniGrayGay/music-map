@@ -30,6 +30,22 @@ const appRoot = ref(null);
 const followCardPreview = ref(import.meta.env.DEV ? toyFollowCardPreview() : null);
 const baseMaps = ref({});
 const mapName = ref('Teyvat');
+const overviewGuideKey = 'teyvat-overview-guide-seen';
+const showOverviewGuide = ref(true);
+try {
+  showOverviewGuide.value = localStorage.getItem(overviewGuideKey) !== '1';
+} catch {
+  // Storage may be disabled in an embedded browser.
+}
+
+function dismissOverviewGuide() {
+  showOverviewGuide.value = false;
+  try {
+    localStorage.setItem(overviewGuideKey, '1');
+  } catch {
+    // The guide stays dismissed for the lifetime of this page.
+  }
+}
 // 跨图搜索定位：搜索结果带目标分区 key 切图时记录，交给 MapSurface 初始定位。
 const mapZoneKey = ref(null);
 const activeMap = computed(() => mapName.value === 'Teyvat'
@@ -522,17 +538,20 @@ onBeforeUnmount(() => releasePlayerEscape?.());
           ref="globeSurface"
           :map-data="activeMap"
           :map-name="mapName"
+          :show-overview-guide="showOverviewGuide"
           :bgm="bgm"
           :active-zone="activeZone"
           :available-maps="mapOptions"
           :search-host="mapToolbar"
           :toolbar-covered="!showGlobe || mapPopupPresent || layerPopupPresent"
           :initial-viewport="mapHandoff?.toGlobe ? mapHandoff.viewport : null"
+          :relief-enabled="showRelief && !reliefUnavailable"
           :relief-target="reliefDock"
           :relief-aspect="reliefAspect"
           :mobile-device="mobileDevice"
           :smooth-boundaries="smoothBoundaries"
           @canvas-frame="onGlobeFrame"
+          @overview-dismiss="dismissOverviewGuide"
           @world-error="revealMap"
           @handoff-ready="mapHandoff?.toGlobe && blendSurfaces(mapHandoff)"
           @view="(state) => { if (showGlobe) Object.assign(view, state) }"
@@ -661,7 +680,7 @@ onBeforeUnmount(() => releasePlayerEscape?.());
 }
 
 .relief-dock > :deep(.liquid-glass) {
-  inset: var(--relief-glass-top, 0) auto auto var(--relief-glass-left, 0);
+  inset: var(--relief-glass-top, 0) auto auto 0;
   inline-size: var(--relief-glass-width, 0px);
   block-size: var(--relief-glass-height, 0px);
   border-radius: var(--relief-glass-radius, var(--radius-card));

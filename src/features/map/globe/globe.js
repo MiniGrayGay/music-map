@@ -1,6 +1,6 @@
 import {DetailTiles, detailTextures} from './detail-tiles.js';
 import {drawGlobeBoundaries} from './boundaries.js';
-import {frameZone, placeReliefCard} from './framing.js';
+import {frameZone, placeReliefCard, reliefCardSize} from './framing.js';
 import {lockedMoonBasis, orbitDirection, ORBIT_RADIUS} from './lunar-orbit.js';
 import {moonCanonReachable} from '../mooncanonSafety.js';
 import {retireReliefDock} from '../reliefDockMotion.js';
@@ -14,6 +14,8 @@ const interpolate = (a, b, factor) => a + (b - a) * factor;
 const MIN_ZOOM = .53;
 const MAX_ZOOM = 18;
 const ORBIT_MAX_ZOOM = 1.5;
+const ATMOSPHERE_EXTENT = 1.092;
+const MOON_PAINT_INTERVAL = 32;
 const LUNAR_TRANSITION_DURATION = 820;
 const SPIN_RATE = TAU / 165000;
 const COMPACT_SPIN_INTERVAL = 50;
@@ -180,26 +182,15 @@ function initialize(canvas, fragment) {
   gl.uniform1i(gl.getUniformLocation(program, 'u_fontaineSea'), 7);
   installCloudField(gl);
   gl.uniform1i(gl.getUniformLocation(program, 'u_cloudField'), 8);
-  const lunarPreviewTexture = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE9);
-  gl.bindTexture(gl.TEXTURE_2D, lunarPreviewTexture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
-  gl.activeTexture(gl.TEXTURE0);
-  gl.uniform1i(gl.getUniformLocation(program, 'u_lunarPreview'), 9);
-  return {gl, uniforms, texture, patchTexture, moonStencil, fontaineSeaTexture, lunarPreviewTexture,
+  return {gl, uniforms, texture, patchTexture, moonStencil, fontaineSeaTexture,
     detail: detailTextures(gl), nativeDetail: detailTextures(gl, 3, 4)};
 }
 
-function uploadAtlas({gl, texture}, image, wrapLongitude = false, unit = 0) {
-  gl.activeTexture(gl.TEXTURE0 + unit);
+function uploadAtlas({gl, texture}, image) {
+  gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapLongitude ? gl.REPEAT : gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
   gl.generateMipmap(gl.TEXTURE_2D);
-  gl.activeTexture(gl.TEXTURE0);
 }
 
 function renderSphere(renderer, canvas, view) {
@@ -208,10 +199,11 @@ function renderSphere(renderer, canvas, view) {
     nativeSize = [0, 0], patchRect = [0, 0, 0, 0], fontaineSeaRect = [0, 0, 0, 0],
     occluder = [0, 0, 0], cloudAngle = 0, lunarMapBlend = 1, lunarPreviewBasis} = view;
   // Fade the distant lighting as the map zooms in and terrain needs to be readable.
-  const hasOrbitLook = world.id === 'Teyvat' || world.projection === 2;
+  const hasOrbitLook = world.id === 'Teyvat' || world.naturalMoon || world.projection === 2;
   const close = hasOrbitLook ? clamp((zoom - 1.12) / 1.12, 0, 1) : 1;
   const orbitLook = 1 - close * close * (3 - 2 * close);
-  const extent = radius * (world.id === 'Teyvat' && orbitLook > 0 ? 1.092 : 1.002);
+  const hasAtmosphere = world.projection === 2 ? lunarPreviewBasis && lunarMapBlend < 1 : orbitLook > 0;
+  const extent = radius * (hasAtmosphere ? ATMOSPHERE_EXTENT : 1.002);
   const left = Math.max(0, Math.floor((cx - extent) * ratio));
   const bottom = Math.max(0, Math.floor(canvas.height - (cy + extent) * ratio));
   const right = Math.min(canvas.width, Math.ceil((cx + extent) * ratio));
@@ -253,9 +245,9 @@ function renderSphere(renderer, canvas, view) {
 
 export class Globe {
   constructor({canvas, satellite, moonLink, lunarLayer, signals, stars, labels, fragment, mobileDevice,
-    labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost}) {
+    labelObstacles, reliefEnabled, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost}) {
     Object.assign(this, {canvas, satellite, moonLink, lunarLayer, signals, stars, labels, mobileDevice,
-      labelObstacles, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost});
+      labelObstacles, reliefEnabled, reliefTarget, onReliefReveal, onSelect, onView, onFrame, onContextLost});
     Object.assign(this, initialize(canvas, fragment));
     this.compact = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 680;
     // 资源紧张时浏览器直接收走上下文：交给上层切换到 2D 平面地图，而不是停在白屏。
@@ -353,7 +345,7 @@ export class Globe {
     this.spinTime = null;
     this.spinAfter = 0;
     this.clearSelectionLabel();
-    this.orbitTime = null;
+    this.moonPaintAt = null;
     this.requestFrame();
   }
 
@@ -435,7 +427,7 @@ export class Globe {
         Object.assign(dock, {x, y, radius: this.moonRadius(this.radius, depth)});
         this.orbitResumeAt = performance.now() + timing.duration;
         this.orbitStarted = this.orbitResumeAt - (angle - this.orbitHomeAngle) * 8300;
-        this.orbitTime = null;
+        this.moonPaintAt = null;
         this.drawSatellite(performance.now(), this.radius, true);
       }
       const origin = `${departure.x - departure.left}px ${departure.y - departure.top}px`;
@@ -492,11 +484,10 @@ export class Globe {
   setMoon(image) {
     if (!this.moonRenderer) return;
     const thumbnail = document.createElement('canvas');
-    thumbnail.width = 768;
-    thumbnail.height = Math.round(768 * image.naturalHeight / image.naturalWidth);
+    thumbnail.width = 1024;
+    thumbnail.height = Math.round(thumbnail.width * image.naturalHeight / image.naturalWidth);
     thumbnail.getContext('2d').drawImage(image, 0, 0, thumbnail.width, thumbnail.height);
-    uploadAtlas(this.moonRenderer, thumbnail, true);
-    uploadAtlas({gl: this.gl, texture: this.lunarPreviewTexture}, thumbnail, true, 9);
+    uploadAtlas(this.moonRenderer, thumbnail);
     this.moon = {span: fullSpan, sea: [0, 0, 0], projection: 0, naturalMoon: true};
     this.requestFrame();
   }
@@ -548,25 +539,29 @@ export class Globe {
     const phone = width <= 650;
     this.otherHomeCenter = this.mobileDevice || phone ? centeredHome : [width <= 900 ? .362 : .374, .485];
     // This is the fit at zoom 1; overview and close-up gates still use camera zoom.
-    this.radius = Math.min(width * (phone ? .475 : .36), height * (phone ? .286 : .43));
+    this.chartRadius = Math.min(width * (phone ? .475 : .36), height * (phone ? .286 : .43));
+    this.teyvatRadius = Math.min(width, height) / 2;
+    this.canvas.parentElement.style.setProperty('--overview-diameter', `${this.teyvatRadius * 2}px`);
     for (const canvas of [this.canvas, this.signals, this.stars]) {
       canvas.width = Math.max(1, Math.round(width * ratio));
       canvas.height = Math.max(1, Math.round(height * ratio));
     }
     // Allocate once per viewport, with room for the largest satellite in overview.
     if (this.moonRenderer) {
-      const moonSide = 4 + 2 * this.moonRadius(this.radius * ORBIT_MAX_ZOOM, -1);
+      const moonSide = 4 + 2 * this.moonRadius(this.teyvatRadius * ORBIT_MAX_ZOOM, -1) * ATMOSPHERE_EXTENT;
       const pixels = Math.ceil(moonSide * ratio);
       this.satellite.width = this.satellite.height = pixels;
       this.satellite.style.width = this.satellite.style.height = `${pixels / ratio}px`;
     }
     sky(this.stars, width, height, ratio);
     this.sphereState = null;
-    this.orbitTime = null;
+    this.moonPaintAt = null;
     this.moonPose = null;
+    this.idleOverview = false;
     this.requestFrame();
   }
 
+  get radius() { return this.world?.id === 'Teyvat' ? this.teyvatRadius : this.chartRadius; }
   get homeCenter() { return this.world?.id === 'Teyvat' ? centeredHome : this.otherHomeCenter; }
   get cx() { return this.width * (this.center ?? this.homeCenter)[0]; }
   get cy() { return this.height * (this.center ?? this.homeCenter)[1]; }
@@ -580,7 +575,6 @@ export class Globe {
       this.raiseStarted = null;
       this.reliefLeadStarted = null;
       this.reliefOpeningAt = null;
-      this.reliefEdge = null;
       this.reliefRevealed = false;
     }
     this.selected = zone;
@@ -593,6 +587,7 @@ export class Globe {
     if (!this.selected || !this.radius) return;
     const {width, height, radius} = this;
     this.flyTo(...frameZone(this.world, this.selected, {width, height, radius,
+      withRelief: this.world.id === 'Teyvat' && this.reliefEnabled?.(),
       obstacles: this.labelObstacles(), minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM}), true);
   }
 
@@ -879,14 +874,18 @@ export class Globe {
       }
     }
     const orbit = this.moon && overview;
-    const priorMoon = this.moonPose;
     this.drawSatellite(time, radius, orbit);
-    // In overview only the orbit moves; a second clear between orbit ticks
-    // would redraw the same signals across the whole viewport.
+    const orbitView = orbit ? [cx, cy, radius, ratio] : null;
+    const orbitChanged = orbitView
+      ? !this.signalOrbitView || orbitView.some((value, index) => value !== this.signalOrbitView[index])
+      : Boolean(this.signalOrbitView);
+    // The moon is composited above the orbit line. It can move while the line
+    // and the rest of the overview signal canvas stay in place.
     const idleOverview = overview && !focused && !moving && !this.reliefDock;
     let lockVisible = false;
-    if (!idleOverview || !this.idleOverview || changed || detailFocusChanged || priorMoon !== this.moonPose) {
+    if (!idleOverview || !this.idleOverview || orbitChanged) {
       lockVisible = this.drawSignals(time, radius, basis, orbit);
+      this.signalOrbitView = orbitView;
     }
     this.idleOverview = idleOverview;
     // 霜月切换在目标世界首帧绘制完成后才启动，保证起点取景已生效。
@@ -967,25 +966,24 @@ export class Globe {
     if (!active) {
       this.satellite.hidden = true;
       if (this.moonLink) this.moonLink.hidden = true;
-      this.orbitTime = null;
+      this.moonPaintAt = null;
       this.moonPose = null;
       return;
     }
-    if (this.orbitTime !== null && time - this.orbitTime < 32) return;
     if (this.moonRenderer?.gl.isContextLost()) {
       this.satellite.hidden = true;
       if (this.moonLink) this.moonLink.hidden = true;
+      this.moonPaintAt = null;
       this.moonPose = null;
       return;
     }
-    this.orbitTime = time;
     const orbitClock = Math.max(time, this.orbitResumeAt ?? time);
     const phase = this.reducedMotion.matches ? 0 : (orbitClock - this.orbitStarted) / 8300;
     const angle = this.orbitHomeAngle + phase;
     const {ratio} = this;
     const [cx, cy, depth, radial] = this.orbitPoint(angle, radius);
     const size = this.moonRadius(radius, depth);
-    if (this.moonPose?.angle === angle && this.moonPose.radius === size
+    if (this.moonPaintAt !== null && this.moonPose?.angle === angle && this.moonPose.radius === size
       && this.moonPose.x === cx && this.moonPose.y === cy) return;
     const distance = Math.hypot(cx - this.cx, cy - this.cy);
     const masked = depth > 0 && distance < radius + size * .32;
@@ -994,28 +992,42 @@ export class Globe {
     const basis = lockedMoonBasis(radial);
     this.moonPose = {x: cx, y: cy, radius: size, visible, angle,
       basis: [...basis.right, ...basis.up, ...basis.front]};
-    const extent = size * 1.001;
+    const extent = size * ATMOSPHERE_EXTENT;
     const inView = cx + extent > 0 && cx - extent < this.width
       && cy + extent > 0 && cy - extent < this.height;
     this.satellite.hidden = !inView || (depth > 0 && distance + extent <= radius);
     if (this.moonLink) this.moonLink.hidden = !visible;
-    if (this.satellite.hidden) return;
+    if (this.satellite.hidden) {
+      this.moonPaintAt = null;
+      return;
+    }
     const local = this.satellite.width / (2 * ratio);
     const left = cx - local;
     const top = cy - local;
-    this.satellite.style.left = `${left}px`;
-    this.satellite.style.top = `${top}px`;
-    renderSphere(this.moonRenderer, this.satellite, {
-      cx: local, cy: local, ratio, radius: size, world: this.moon,
-      basis,
-      occluder: depth > 0 ? [(this.cx - left) * ratio, this.satellite.height - (this.cy - top) * ratio,
-        radius * ratio] : [0, 0, 0],
-    });
+    // Screen position follows each refresh. Reuse the last shaded disk while
+    // its size and lighting are visually stable, except at an occlusion edge.
+    this.satellite.style.translate = `${left}px ${top}px`;
+    const clipped = depth > 0 && distance - extent < radius;
+    if (this.moonPaintAt === null || time - this.moonPaintAt >= MOON_PAINT_INTERVAL
+      || Math.abs(size - this.moonPaintRadius) * ratio >= .35 || clipped || this.moonPaintClipped) {
+      renderSphere(this.moonRenderer, this.satellite, {
+        cx: local, cy: local, ratio, radius: size, world: this.moon,
+        basis,
+        occluder: clipped ? [(this.cx - left) * ratio, this.satellite.height - (this.cy - top) * ratio,
+          radius * ratio] : [0, 0, 0],
+      });
+      this.moonPaintAt = time;
+      this.moonPaintRadius = size;
+      this.moonPaintClipped = clipped;
+    }
     if (visible && (depth <= 0 || distance >= radius + size)) this.lastVisibleMoonAngle = angle;
     if (this.moonLink && visible) {
-      this.moonLink.style.left = cx + 'px';
-      this.moonLink.style.top = cy + 'px';
-      this.moonLink.style.setProperty('--moon-size', Math.max(28, size * 2) + 'px');
+      this.moonLink.style.translate = `${cx}px ${cy}px`;
+      const diameter = Math.max(28, Math.round(size * 2));
+      if (diameter !== this.moonLinkSize) {
+        this.moonLink.style.setProperty('--moon-size', diameter + 'px');
+        this.moonLinkSize = diameter;
+      }
     }
   }
 
@@ -1024,14 +1036,6 @@ export class Globe {
     const major = radius * ORBIT_RADIUS;
     const minor = major * orbitAspect;
     ctx.save();
-    if (this.moonPose) {
-      const moon = this.moonPose;
-      ctx.beginPath();
-      ctx.rect(0, 0, this.width, this.height);
-      ctx.moveTo(moon.x + moon.radius, moon.y);
-      ctx.arc(moon.x, moon.y, moon.radius, 0, TAU);
-      ctx.clip('evenodd');
-    }
     ctx.lineWidth = 1 / ratio;
     ctx.strokeStyle = 'rgba(216,225,240,.24)';
     ctx.beginPath();
@@ -1178,18 +1182,14 @@ export class Globe {
       return;
     }
     const key = this.selected.zone.key;
-    const relief = this.reliefTarget?.(key);
-    if (!relief) {
+    const target = this.reliefTarget?.(key);
+    if (!target) {
       this.hideReliefCard();
       return;
     }
-    const {target, aspect} = relief;
     if (target.hasAttribute('data-relief-closing')) return;
 
-    const {left, top} = this.canvas.getBoundingClientRect();
-    const points = rings.flatMap((ring) => ring.map(([x, y]) => [x, y - lift])).filter(([x, y]) =>
-      x > 1 && x < this.width - 1 && y > 1 && y < this.height - 1,
-    );
+    const points = rings.flatMap((ring) => ring.map(([x, y]) => [x, y - lift]));
     if (points.length < 2) {
       this.hideReliefCard();
       return;
@@ -1201,28 +1201,10 @@ export class Globe {
       zone.top = Math.min(zone.top, y);
       zone.bottom = Math.max(zone.bottom, y);
     }
-    const obstacles = this.labelObstacles();
-    const label = this.selectionLabel?.node;
-    if (label?.isConnected) obstacles.push(label.getBoundingClientRect());
-    const controls = obstacles.map(rect => ({
-      left: rect.left - left, right: rect.right - left, top: rect.top - top, bottom: rect.bottom - top,
-    }));
-    const spanOnScreen = Math.max(zone.right - zone.left, zone.bottom - zone.top);
-    const heightLimit = Math.min(288, this.height * .32);
-    const height = Math.min(heightLimit, Math.max(178, 154 + spanOnScreen * .32));
-    const width = Math.min(430, this.width * .34, height * Math.max(1.1, aspect));
-    const panel = placeReliefCard(zone, {width, height}, this, controls, this.reliefEdge, points);
-    if (!panel) {
-      this.hideReliefCard();
-      return;
-    }
-    const {edge, leads} = panel;
-    const horizontal = edge === 'top' || edge === 'bottom';
-    const panelStart = horizontal ? panel.left : panel.top;
-    const edgeLength = horizontal ? panel.width : panel.height;
-    const revealSpan = leads ? leads[1].attach - leads[0].attach : Math.min(28, edgeLength);
-    const revealStart = leads ? leads[0].attach - panelStart : (edgeLength - revealSpan) / 2;
-    this.reliefEdge = edge;
+    const panel = placeReliefCard(zone, reliefCardSize(this), points);
+    const {leads} = panel;
+    const revealSpan = leads ? leads[1].attach - leads[0].attach : Math.min(28, panel.height);
+    const revealStart = leads ? leads[0].attach - panel.top : (panel.height - revealSpan) / 2;
 
     if (leads) {
       this.reliefLeadStarted ??= time;
@@ -1256,11 +1238,6 @@ export class Globe {
     const elapsed = this.reducedMotion.matches ? 495 : time - this.reliefOpeningAt;
     const expanding = clamp(elapsed / 360, 0, 1);
     const eased = expanding * expanding * (3 - 2 * expanding);
-    const revealDepth = 12;
-    const startX = horizontal ? revealStart : edge === 'right' ? panel.width - revealDepth : 0;
-    const startY = horizontal ? edge === 'bottom' ? panel.height - revealDepth : 0 : revealStart;
-    const startWidth = horizontal ? revealSpan : revealDepth;
-    const startHeight = horizontal ? revealDepth : revealSpan;
 
     // Write the first glass frame before making the dock visible. Geometry and
     // content share this clock so the final-size backing cannot paint first.
@@ -1268,14 +1245,13 @@ export class Globe {
     target.style.top = `${panel.top}px`;
     target.style.width = `${panel.width}px`;
     target.style.height = `${panel.height}px`;
-    target.style.setProperty('--relief-glass-left', `${startX * (1 - eased)}px`);
-    target.style.setProperty('--relief-glass-top', `${startY * (1 - eased)}px`);
-    target.style.setProperty('--relief-glass-width', `${interpolate(startWidth, panel.width, eased)}px`);
-    target.style.setProperty('--relief-glass-height', `${interpolate(startHeight, panel.height, eased)}px`);
+    target.style.setProperty('--relief-glass-top', `${revealStart * (1 - eased)}px`);
+    target.style.setProperty('--relief-glass-width', `${interpolate(12, panel.width, eased)}px`);
+    target.style.setProperty('--relief-glass-height', `${interpolate(revealSpan, panel.height, eased)}px`);
     target.style.setProperty('--relief-glass-radius', `calc(6px + (var(--radius-card) - 6px) * ${eased})`);
     target.style.setProperty('--relief-content-opacity', String(clamp((elapsed - 255) / 240, 0, 1)));
     this.reliefDock = target;
-    target.dataset.reliefEdge = edge;
+    target.dataset.reliefEdge = 'left';
     target.dataset.reliefPlaced = '';
     if (!this.reliefRevealed) {
       this.reliefRevealed = true;

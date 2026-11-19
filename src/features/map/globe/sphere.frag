@@ -11,7 +11,6 @@ uniform sampler2D u_fontaineSea;
 uniform highp sampler3D u_cloudField;
 uniform vec4 u_fontaineSeaRect;
 uniform sampler2D u_moonStencil;
-uniform sampler2D u_lunarPreview;
 uniform vec2 u_center;
 uniform float u_radius;
 uniform vec3 u_right;
@@ -42,6 +41,10 @@ const float PI = 3.14159265359;
 const vec3 ORBIT_SUN = vec3(-.961, -.08, -.264);
 const vec2 AURA_LIGHT_DIRECTION = vec2(-.991, -.133);
 const vec3 AURA_HIGHLIGHT = vec3(.86, .98, 1.);
+
+vec3 neutralColor(vec3 color) {
+  return vec3(dot(color, vec3(.2126, .7152, .0722)));
+}
 
 vec3 readAtlas(vec2 uv, vec2 dx, vec2 dy) {
   // 按当前像素覆盖的纹素范围，从已加载瓦片的 mip 层采样。
@@ -180,7 +183,7 @@ float cloudDensity(vec2 p) {
   return smoothstep(.48, .76, banks * .51 + detail * .33 + wisps * .16);
 }
 
-vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFocus) {
+vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFocus, bool cloudsVisible) {
   float incidence = dot(vec3(p, z), ORBIT_SUN);
   float illumination = smoothstep(-.23, .66, incidence);
   float luma = dot(terrain, vec3(.2126, .7152, .0722));
@@ -190,8 +193,10 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   float sunward = smoothstep(.42, .97, incidence);
   day += max(vec3(0.), 1. - day) * vec3(.13, .19, .24) * sunward;
   vec3 surface = mix(night, day, illumination);
-  vec3 clouds = mix(vec3(.11, .22, .37), vec3(.77, .91, 1.), illumination);
-  surface = mix(surface, clouds, cloudDensity(p) * mix(.14, .72, illumination));
+  if (cloudsVisible) {
+    vec3 clouds = mix(vec3(.11, .22, .37), vec3(.77, .91, 1.), illumination);
+    surface = mix(surface, clouds, cloudDensity(p) * mix(.14, .72, illumination));
+  }
 
   // Grazing rays traverse more air. The broad haze transitions into a
   // narrower bright limb on the sunward side.
@@ -204,7 +209,8 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   // into the clouds and terrain beneath it.
   float rim = .49 * exp(-z * 13.);
   float scatter = .42 * (1. - smoothstep(.06, .48, z));
-  return mix(surface, AURA_HIGHLIGHT, auraFocus * (rim + scatter));
+  surface = mix(surface, AURA_HIGHLIGHT, auraFocus * (rim + scatter));
+  return mix(neutralColor(surface), surface, smoothstep(.02, .50, incidence));
 }
 
 vec3 lunarSideLight(vec3 terrain, vec2 p, float z) {
@@ -221,23 +227,34 @@ vec3 moonPreviewTone(vec3 terrain, vec2 p, float z) {
   return mix(litMoon, vec3(luma), .44) * .78;
 }
 
-vec3 sampleMoonPreview(sampler2D atlas, vec3 n, vec2 p, float z) {
-  vec2 uv = vec2(atan(n.x, n.z), -asin(clamp(n.y, -1., 1.))) / u_span + .5;
-  vec2 dx = chartGradient(n, dFdx(n));
-  vec2 dy = chartGradient(n, dFdy(n));
-  return moonPreviewTone(textureGrad(atlas, uv, dx, dy).rgb, p, z);
+vec3 orbitalMoonSurface(vec3 n, vec2 p, float z, float limbLight, float auraFocus) {
+  vec3 terrain = lunarTerrain(lunarUV(n, 1.), lunarUV(n, -1.), n.z);
+  // Turn the chart into matte rock, retaining the cooler tones over the lunar sea.
+  float luma = dot(terrain, vec3(.2126, .7152, .0722));
+  vec3 rock = mix(vec3(.15, .16, .18), vec3(.51, .53, .57), sqrt(luma));
+  float sea = smoothstep(.043, .22, min(terrain.g, terrain.b) - terrain.r) * smoothstep(.24, .58, luma);
+  vec3 albedo = mix(rock, vec3(.22, .31, .37), .63 * sea);
+  return neutralColor(orbitalSurface(albedo, p, z, limbLight, auraFocus, false));
 }
 
 vec4 premultiplied(vec3 color, float opacity) {
   return vec4(clamp(color, 0., 1.) * opacity, opacity);
 }
 
+vec4 withAtmosphere(vec3 color, float opacity, vec3 airColor, float airOpacity) {
+  // The atmosphere lies behind the disk and shows through the antialiased edge.
+  return premultiplied(color, opacity) + premultiplied(airColor, airOpacity * (1. - opacity));
+}
+
 void main() {
   if (u_occluder.z > 0. && distance(gl_FragCoord.xy, u_occluder.xy) < u_occluder.z) discard;
   vec2 p = (gl_FragCoord.xy - u_center) / u_radius;
   float r = length(p);
-  bool hasAtmosphere = u_orbitLook > 0. && u_projection != 2;
+  float atmosphere = u_projection != 2 ? u_orbitLook : (u_hasLunarPreview ? 1. - u_lunarMapBlend : 0.);
+  bool hasAtmosphere = atmosphere > 0.;
   if (r >= (hasAtmosphere ? 1.09 : 1.001)) discard;
+  float moonAtmosphere = u_naturalMoon || u_projection == 2 ? atmosphere : 0.;
+  float edge = mix(.003, max(.003, .8 / u_radius), moonAtmosphere);
 
   float limbLight = 0.;
   float auraFocus = 0.;
@@ -249,39 +266,40 @@ void main() {
     auraFocus = smoothstep(.52, .999, dot(rimDirection, AURA_LIGHT_DIRECTION));
     auraFocus *= auraFocus;
     // The disk is opaque inside the rim, so the outer glow cannot contribute there.
-    if (r > .997) {
+    if (r > 1. - edge) {
       float altitude = max(0., r - 1.);
       float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * 24.);
-      float outerLight = bloom * mix(.018, .98, limbLight);
+      float outerLight = bloom * .98 * limbLight;
       float halo = auraFocus * exp(-altitude * 82.);
       outerLight += (1. - outerLight) * halo * .43;
-      airOpacity = outerLight * (1. - smoothstep(.035, .09, altitude)) * u_orbitLook;
+      airOpacity = outerLight * (1. - smoothstep(.035, .09, altitude)) * atmosphere;
       airColor = mix(vec3(.065, .18, .40), vec3(.44, .84, 1.), limbLight);
       airColor = mix(airColor, AURA_HIGHLIGHT, halo * .72);
+      if (moonAtmosphere > 0.) airColor = neutralColor(airColor);
     }
   }
   if (r >= 1.001) {
     pixel = premultiplied(airColor, airOpacity);
     return;
   }
+  float opacity = 1. - smoothstep(1. - edge, 1.001, r);
 
   vec3 ice = vec3(.49, .79, .82);
 
   float z = sqrt(max(0., 1. - dot(p, p)));
   vec3 n = normalize(u_right * p.x + u_up * p.y + u_front * z);
   if (u_naturalMoon) {
-    float opacity = 1. - smoothstep(.997, 1.001, r);
-    pixel = premultiplied(sampleMoonPreview(u_atlas, n, p, z), opacity);
+    vec3 moon = orbitalMoonSurface(n, p, z, limbLight, auraFocus);
+    pixel = withAtmosphere(moon, opacity, airColor, airOpacity);
     return;
   }
   if (u_projection == 2) {
-    float opacity = 1. - smoothstep(.997, 1.001, r);
     vec3 preview = vec3(0.);
     if (u_hasLunarPreview && u_lunarMapBlend < 1.) {
       vec3 previewNormal = normalize(u_lunarPreviewBasis * vec3(p, z));
-      preview = sampleMoonPreview(u_lunarPreview, previewNormal, p, z);
+      preview = orbitalMoonSurface(previewNormal, p, z, limbLight, auraFocus);
       if (u_lunarMapBlend == 0.) {
-        pixel = premultiplied(preview, opacity);
+        pixel = withAtmosphere(preview, opacity, airColor, airOpacity);
         return;
       }
     }
@@ -298,7 +316,7 @@ void main() {
       if (!u_hasLunarPreview) preview = moonPreviewTone(terrain, p, z);
       shaded = mix(preview, shaded, u_lunarMapBlend);
     }
-    pixel = premultiplied(shaded, opacity);
+    pixel = withAtmosphere(shaded, opacity, airColor, airOpacity);
     return;
   }
   float lon = atan(n.x, n.z);
@@ -385,11 +403,7 @@ void main() {
       vec3 openOcean = mix(vec3(.043, .279, .421), vec3(.092, .447, .574), water);
       orbitalAlbedo = mix(orbitalAlbedo, openOcean, offshore);
     }
-    rgb = mix(rgb, orbitalSurface(orbitalAlbedo, p, z, limbLight, auraFocus), u_orbitLook);
+    rgb = mix(rgb, orbitalSurface(orbitalAlbedo, p, z, limbLight, auraFocus, true), u_orbitLook);
   }
-  float opacity = 1. - smoothstep(.997, 1.001, r);
-  // Output premultiplied RGBA for the canvas compositor. The atmosphere lies
-  // behind the visible disk and contributes only through its uncovered edge.
-  float visibleAir = airOpacity * (1. - opacity);
-  pixel = premultiplied(rgb, opacity) + premultiplied(airColor, visibleAir);
+  pixel = withAtmosphere(rgb, opacity, airColor, airOpacity);
 }

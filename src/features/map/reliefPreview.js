@@ -132,7 +132,7 @@ export function mountReliefPreview(canvas, active = true) {
     const {width, height} = canvas;
     const {radius, height: elevationSpan, verticalCenter, verticalSpan, colorLow, colorHigh} = fit;
     const horizontalFit = .93 * width / (2 * Math.max(.1, radius));
-    const verticalFit = (height - 6 * density) / Math.max(.001, verticalSpan);
+    const verticalFit = (height - 14 * density) / Math.max(.001, verticalSpan);
     const pixelsPerUnit = Math.min(horizontalFit, Math.max(1, verticalFit));
     const dotRadius = Math.min(3 * density, Math.max(1.65 * density, pixelsPerUnit * (normalizedSpacing ?? 0) * .52));
     gl.useProgram(program);
