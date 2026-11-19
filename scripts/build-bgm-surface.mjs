@@ -1,6 +1,7 @@
 import {readFile, readdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
+import {stripMergedRegionSuffix} from '../src/features/bgm/regionNames.js';
 import {
   compareSourceOrder, components, covers, difference, emptyPolygon, filledRings, intersection, intersects,
   lineFromPoints, pointAt, pointsFromLine, polygonFromRings, polygonRings, polygonsOnly, roundPositions,
@@ -230,7 +231,6 @@ async function projectSurface(volumes, excluded, underground, terrain, ground) {
       })).filter(({overlap}) => overlap >= 0.02);
       if (!owners.length) continue;
       const largest = owners.reduce((a, b) => b.overlap > a.overlap ? b : a).zone;
-      const suffix = new Set(owners.map(({zone}) => zone.name)).size > 1 ? '等' : '';
       const rings = polygonRings(patch).map((ring) =>
         roundPositions(pointsFromLine(ring, {omitClosing: true}))).filter((ring, index) => {
         if (index === 0) return true;
@@ -245,7 +245,7 @@ async function projectSurface(volumes, excluded, underground, terrain, ground) {
       const [x, z] = rings[0][0];
       const zone = {
         id: `${largest.id}:${x.toFixed(5)}:${z.toFixed(5)}`,
-        name: largest.name + suffix, state, rings, areaIds: owners.map(({zone}) => zone.id),
+        name: largest.name, state, rings, areaIds: owners.map(({zone}) => zone.id),
       };
       if (intersects(patch, noBoundary)) {
         // A missing height decision creates a hole in the hit area. Its edge
@@ -262,7 +262,9 @@ async function projectSurface(volumes, excluded, underground, terrain, ground) {
 }
 
 function retainZoneIds(previous, current) {
-  const bySources = (zone) => JSON.stringify([zone.state, zone.name, zone.areaIds.toSorted((a, b) => a - b)]);
+  const bySources = (zone) => JSON.stringify([
+    zone.state, stripMergedRegionSuffix(zone), zone.areaIds.toSorted((a, b) => a - b),
+  ]);
   const lookup = group(previous ?? [], bySources);
   const taken = new Set(current.map(({id}) => id));
   for (const zone of current) {

@@ -18,6 +18,12 @@ const names = new Map([
 const numberedName = /^区域\s*\d+(?:等)?$/u;
 const unnamedLocation = '未命名地点';
 
+// 兼容旧版合并音区清单中附在地名末尾的「等」。
+export function stripMergedRegionSuffix({name, id, areaIds}) {
+  return typeof id === 'string' && id.includes(':') && Array.isArray(areaIds) && areaIds.length > 1
+    ? name.replace(/等$/u, '') : name;
+}
+
 export function geographicName(name) {
   const text = typeof name === 'string' ? name.trim() : '';
   return text && text !== unnamedLocation && !numberedName.test(text) && !/^[?？\s]+$/u.test(text)
@@ -25,7 +31,7 @@ export function geographicName(name) {
 }
 
 export function displayRegionName(row, clientVersion, sceneId, floorName) {
-  const original = row.name.trim();
+  const original = stripMergedRegionSuffix(row).trim();
   if (!numberedName.test(original)) return original;
   if (floorName) return floorName;
   if (clientVersion === '7.2.0') {

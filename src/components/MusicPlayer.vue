@@ -1236,6 +1236,10 @@ onBeforeUnmount(() => {
   outline-offset: -2px;
 }
 
+.track-list .queue-play {
+  text-shadow: none;
+}
+
 .queue-name {
   overflow: hidden;
   text-overflow: ellipsis;
