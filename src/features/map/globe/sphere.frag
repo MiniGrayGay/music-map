@@ -37,7 +37,7 @@ uniform float u_lunarMapBlend;
 out vec4 pixel;
 
 const float PI = 3.14159265359;
-// A low sun leaves a crescent of direct light and a soft, blue night side.
+// A low sun leaves a crescent of direct light with a subdued night side.
 const vec3 ORBIT_SUN = vec3(-.961, -.08, -.264);
 const vec2 AURA_LIGHT_DIRECTION = vec2(-.991, -.133);
 const vec3 AURA_HIGHLIGHT = vec3(.86, .98, 1.);
@@ -183,7 +183,7 @@ float cloudDensity(vec2 p) {
   return smoothstep(.48, .76, banks * .51 + detail * .33 + wisps * .16);
 }
 
-vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFocus, bool cloudsVisible) {
+vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFocus, bool teyvat) {
   float incidence = dot(vec3(p, z), ORBIT_SUN);
   float illumination = smoothstep(-.23, .66, incidence);
   float luma = dot(terrain, vec3(.2126, .7152, .0722));
@@ -193,7 +193,7 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   float sunward = smoothstep(.42, .97, incidence);
   day += max(vec3(0.), 1. - day) * vec3(.13, .19, .24) * sunward;
   vec3 surface = mix(night, day, illumination);
-  if (cloudsVisible) {
+  if (teyvat) {
     vec3 clouds = mix(vec3(.11, .22, .37), vec3(.77, .91, 1.), illumination);
     surface = mix(surface, clouds, cloudDensity(p) * mix(.14, .72, illumination));
   }
@@ -202,6 +202,7 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   // narrower bright limb on the sunward side.
   float grazing = 1. - z;
   float haze = pow(grazing, 2.15) * mix(.10, .78, illumination);
+  if (teyvat) haze *= .82;
   surface = mix(surface, mix(vec3(.034, .077, .174), vec3(.26, .72, .97), illumination), haze);
   float limb = exp(-z * 7.5) * mix(.10, .91, limbLight);
   surface = mix(surface, mix(vec3(.064, .14, .30), vec3(.73, .95, 1.), limbLight), limb);
@@ -210,6 +211,13 @@ vec3 orbitalSurface(vec3 terrain, vec2 p, float z, float limbLight, float auraFo
   float rim = .49 * exp(-z * 13.);
   float scatter = .42 * (1. - smoothstep(.06, .48, z));
   surface = mix(surface, AURA_HIGHLIGHT, auraFocus * (rim + scatter));
+  if (teyvat) {
+    // A concentrated key light brightens the rim facing the source. Its
+    // angular falloff keeps the rest of the crescent from lifting with it.
+    float keyArc = auraFocus * auraFocus * auraFocus;
+    float keyDepth = .64 * exp(-z * 6.5) + .22 * (1. - smoothstep(.05, .39, z));
+    surface = mix(surface, vec3(.97, .99, 1.), keyArc * keyArc * keyDepth);
+  }
   return mix(neutralColor(surface), surface, smoothstep(.02, .50, incidence));
 }
 
@@ -268,7 +276,8 @@ void main() {
     // The disk is opaque inside the rim, so the outer glow cannot contribute there.
     if (r > 1. - edge) {
       float altitude = max(0., r - 1.);
-      float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * 24.);
+      float falloff = moonAtmosphere > 0. ? 24. : 38.;
+      float bloom = .67 * exp(-altitude * 103.) + .33 * exp(-altitude * falloff);
       float outerLight = bloom * .98 * limbLight;
       float halo = auraFocus * exp(-altitude * 82.);
       outerLight += (1. - outerLight) * halo * .43;
@@ -276,6 +285,7 @@ void main() {
       airColor = mix(vec3(.065, .18, .40), vec3(.44, .84, 1.), limbLight);
       airColor = mix(airColor, AURA_HIGHLIGHT, halo * .72);
       if (moonAtmosphere > 0.) airColor = neutralColor(airColor);
+      else airOpacity *= .52;
     }
   }
   if (r >= 1.001) {
